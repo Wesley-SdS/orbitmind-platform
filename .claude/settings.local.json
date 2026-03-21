@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(ls -laR C:/Users/alura/Documents/github/orbitmind-platform/apps/web/app/'\\(auth\\)'/)",
+      "Bash(ls -laR C:/Users/alura/Documents/github/orbitmind-platform/apps/web/app/'\\(dashboard\\)'/)",
+      "Bash(pnpm dlx:*)",
+      "Bash(taskkill //F //IM \"shadcn\")",
+      "Bash(kill %1)",
+      "Bash(pnpm --filter @orbitmind/web typecheck)",
+      "Bash(pnpm --filter @orbitmind/web build)"
     ]
   }
 }
