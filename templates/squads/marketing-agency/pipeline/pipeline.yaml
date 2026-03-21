@@ -1,0 +1,116 @@
+name: "Pipeline Marketing Agency"
+description: "Research → Strategy → Content → Design → SEO → Review → Publish"
+
+steps:
+  # ──────────────────────────────────────────────
+  # Fase 1: Pesquisa
+  # ──────────────────────────────────────────────
+  - id: step-01
+    name: "Pesquisa de Mercado"
+    agent: researcher
+    execution: subagent
+    model_tier: fast
+    file: steps/step-01-research.md
+    outputFile: output/research-report.md
+    skills: [web_search, web_fetch]
+
+  - id: step-02
+    name: "Análise de Tendências"
+    agent: researcher
+    execution: subagent
+    model_tier: fast
+    file: steps/step-02-trends.md
+    outputFile: output/trends-analysis.md
+    skills: [web_search]
+
+  # ──────────────────────────────────────────────
+  # Fase 2: Estratégia
+  # ──────────────────────────────────────────────
+  - id: step-03
+    name: "Definição de Estratégia"
+    agent: strategist
+    execution: inline
+    model_tier: powerful
+    file: steps/step-03-strategy.md
+    outputFile: output/content-strategy.md
+    depends_on: [step-01, step-02]
+
+  - id: step-04
+    name: "Aprovação da Estratégia"
+    type: checkpoint
+    message: |
+      A estratégia de conteúdo foi definida. Revise o documento e escolha:
+    options:
+      - "Aprovar e continuar para criação de conteúdo"
+      - "Solicitar ajustes na estratégia"
+      - "Cancelar pipeline"
+
+  # ──────────────────────────────────────────────
+  # Fase 3: Criação de Conteúdo
+  # ──────────────────────────────────────────────
+  - id: step-05
+    name: "Criação de Copy"
+    agent: copywriter
+    execution: inline
+    model_tier: powerful
+    file: steps/step-05-copy.md
+    outputFile: output/content-copy.md
+    depends_on: [step-04]
+
+  - id: step-06
+    name: "Otimização SEO"
+    agent: seo-analyst
+    execution: subagent
+    model_tier: fast
+    file: steps/step-06-seo.md
+    outputFile: output/seo-optimization.md
+    depends_on: [step-05]
+
+  # ──────────────────────────────────────────────
+  # Fase 4: Design
+  # ──────────────────────────────────────────────
+  - id: step-07
+    name: "Design Visual"
+    agent: designer
+    execution: inline
+    model_tier: powerful
+    file: steps/step-07-design.md
+    outputFile: output/visual-assets/
+    skills: [image-generator]
+    depends_on: [step-05]
+
+  # ──────────────────────────────────────────────
+  # Fase 5: Review
+  # ──────────────────────────────────────────────
+  - id: step-08
+    name: "Review de Qualidade"
+    agent: reviewer
+    execution: inline
+    model_tier: powerful
+    file: steps/step-08-review.md
+    outputFile: output/review-report.md
+    depends_on: [step-06, step-07]
+
+  - id: step-09
+    name: "Aprovação Final"
+    type: checkpoint
+    message: |
+      O conteúdo foi revisado. Veja o relatório de qualidade e decida:
+    options:
+      - "Aprovar e publicar"
+      - "Enviar para revisão do copywriter"
+      - "Enviar para revisão do designer"
+      - "Cancelar publicação"
+
+  # ──────────────────────────────────────────────
+  # Fase 6: Publicação
+  # ──────────────────────────────────────────────
+  - id: step-10
+    name: "Publicação em Redes Sociais"
+    agent: publisher
+    execution: inline
+    model_tier: fast
+    file: steps/step-10-publish.md
+    outputFile: output/publish-report.md
+    skills: [social-publisher]
+    depends_on: [step-09]

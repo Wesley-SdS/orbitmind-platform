@@ -1,0 +1,77 @@
+name: "Agência de Marketing Digital"
+code: "marketing-agency"
+description: >
+  Squad completo de marketing digital que pesquisa mercado, define estratégia,
+  cria conteúdo, produz design visual, revisa qualidade e publica em redes sociais.
+  Pipeline end-to-end com checkpoints de aprovação humana.
+icon: "🚀"
+version: "1.0.0"
+created: "2026-03-21"
+
+# Budget
+budget:
+  monthly_tokens: 2000000
+  warning_threshold: 0.8
+  pause_threshold: 1.0
+
+# Performance
+performance_mode: "alta-performance"
+
+# Skills
+skills:
+  - web_search
+  - web_fetch
+  - image-generator
+  - social-publisher
+  - document-writer
+
+# Dados de referência
+data:
+  - pipeline/data/research-brief.md
+  - pipeline/data/content-strategy.md
+  - pipeline/data/tone-of-voice.md
+  - pipeline/data/quality-criteria.md
+  - pipeline/data/anti-patterns.md
+
+# Agentes
+agents:
+  - id: researcher
+    name: "Ana Insights"
+    icon: "🔍"
+    custom: agents/researcher.md
+
+  - id: strategist
+    name: "Sofia Strategy"
+    icon: "🧠"
+    custom: agents/strategist.md
+
+  - id: copywriter
+    name: "Carlos Copy"
+    icon: "✍️"
+    custom: agents/copywriter.md
+
+  - id: designer
+    name: "Diana Design"
+    icon: "🎨"
+    custom: agents/designer.md
+
+  - id: seo-analyst
+    name: "Samuel SEO"
+    icon: "📊"
+    custom: agents/seo-analyst.md
+
+  - id: reviewer
+    name: "Vera Review"
+    icon: "✅"
+    custom: agents/reviewer.md
+
+  - id: publisher
+    name: "Paula Post"
+    icon: "📤"
+    custom: agents/publisher.md
+
+# Pipeline
+pipeline:
+  entry: pipeline/pipeline.yaml
+
+output_dir: output/
