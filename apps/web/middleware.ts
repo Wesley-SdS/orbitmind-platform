@@ -1,29 +1,29 @@
-import { auth } from "@/lib/auth";
 import { NextResponse, type NextRequest } from "next/server";
 
-const middleware = auth(((req: NextRequest & { auth?: { user?: unknown } }) => {
-  const isLoggedIn = !!req.auth;
+const PUBLIC_ROUTES = ["/", "/login", "/register", "/api/webhooks", "/api/auth"];
+
+export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  const isPublicRoute =
-    pathname === "/" ||
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/register") ||
-    pathname.startsWith("/api/webhooks");
+  const isPublic = PUBLIC_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(route + "/"),
+  );
 
-  if (isPublicRoute) return NextResponse.next();
+  if (isPublic) return NextResponse.next();
 
-  if (!isLoggedIn) {
+  const token =
+    req.cookies.get("authjs.session-token")?.value ??
+    req.cookies.get("__Secure-authjs.session-token")?.value;
+
+  if (!token) {
     const loginUrl = new URL("/login", req.nextUrl.origin);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();
-}) as Parameters<typeof auth>[0]);
-
-export default middleware;
+}
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/auth).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
