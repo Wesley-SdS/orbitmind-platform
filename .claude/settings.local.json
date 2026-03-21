@@ -10,7 +10,22 @@
       "Bash(taskkill //F //IM \"shadcn\")",
       "Bash(kill %1)",
       "Bash(pnpm --filter @orbitmind/web typecheck)",
-      "Bash(pnpm --filter @orbitmind/web build)"
+      "Bash(pnpm --filter @orbitmind/web build)",
+      "Bash(mv \"app/\\(dashboard\\)/page.tsx\" \"app/\\(dashboard\\)/dashboard/page.tsx\")",
+      "Bash(ls \"app/\\(dashboard\\)/dashboard/\")",
+      "Bash(node -e \"try { require.resolve\\(''tw-animate-css''\\); console.log\\(''OK''\\) } catch\\(e\\) { console.log\\(''NOT FOUND''\\) }\")",
+      "Bash(node -e \"try { require.resolve\\(''shadcn''\\); console.log\\(''OK''\\) } catch\\(e\\) { console.log\\(''NOT FOUND''\\) }\")",
+      "Bash(curl -s http://localhost:3002/)",
+      "Bash(curl -s http://localhost:3001/_next/static/css/app/layout.css)",
+      "Bash(npx kill-port:*)",
+      "Bash(lsof -ti:3001 -ti:3002)",
+      "Bash(xargs kill:*)",
+      "Bash(netstat -ano)",
+      "Bash(while read:*)",
+      "Bash(do taskkill:*)",
+      "Bash(done)",
+      "Bash(do echo:*)",
+      "Bash(taskkill //F //PID $pid)"
     ]
   }
 }
