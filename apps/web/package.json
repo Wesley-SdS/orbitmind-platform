@@ -1,0 +1,44 @@
+{
+  "name": "@orbitmind/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push"
+  },
+  "dependencies": {
+    "@orbitmind/engine": "workspace:*",
+    "@orbitmind/shared": "workspace:*",
+    "next": "^15.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "drizzle-orm": "^0.39.0",
+    "postgres": "^3.4.0",
+    "@auth/core": "^0.37.0",
+    "@auth/drizzle-adapter": "^1.7.0",
+    "next-auth": "^5.0.0-beta.25",
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/postcss": "^4.0.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
+    "tailwind-merge": "^2.6.0",
+    "lucide-react": "^0.470.0",
+    "zod": "^3.24.0",
+    "yaml": "^2.7.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.5.0",
+    "typescript": "^5.7.0",
+    "drizzle-kit": "^0.30.0"
+  }
+}
