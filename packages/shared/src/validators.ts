@@ -132,8 +132,8 @@ export const squadStateSchema = z.object({
 // ──────────────────────────────────────────────
 
 export type SquadYaml = z.infer<typeof squadYamlSchema>;
-export type PipelineStep = z.infer<typeof pipelineStepSchema>;
+export type ValidatedPipelineStep = z.infer<typeof pipelineStepSchema>;
 export type Pipeline = z.infer<typeof pipelineSchema>;
-export type SkillDefinition = z.infer<typeof skillDefinitionSchema>;
-export type AgentState = z.infer<typeof agentStateSchema>;
-export type SquadState = z.infer<typeof squadStateSchema>;
+export type ValidatedSkillDefinition = z.infer<typeof skillDefinitionSchema>;
+export type ValidatedAgentState = z.infer<typeof agentStateSchema>;
+export type ValidatedSquadState = z.infer<typeof squadStateSchema>;
