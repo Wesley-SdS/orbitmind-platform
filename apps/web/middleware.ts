@@ -6,6 +6,7 @@ const middleware = auth(((req: NextRequest & { auth?: { user?: unknown } }) => {
   const { pathname } = req.nextUrl;
 
   const isPublicRoute =
+    pathname === "/" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/register") ||
     pathname.startsWith("/api/webhooks");
