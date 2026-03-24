@@ -1,119 +1,462 @@
 "use client";
 
-import { useState } from "react";
-import { Github, MessageCircle, Send, Hash, Slack, ExternalLink } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import {
+  Search, ExternalLink, Check, Settings2, Zap, Link2, ChevronDown, ChevronUp, Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { PremiumIntegration, GenericCatalogCategory } from "@/lib/integrations/types";
+import { CATEGORY_LABELS, type IntegrationCategory } from "@/lib/integrations/types";
 
-interface Integration {
+interface OrgIntegration {
   id: string;
-  name: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  status: "connected" | "disconnected";
-  details: string | null;
+  integrationId: string;
+  tier: string;
+  status: string;
+  config: Record<string, unknown>;
+  enabledCapabilities: string[];
+  connectedAt: string | null;
 }
 
-const INTEGRATIONS: Integration[] = [
-  {
-    id: "github",
-    name: "GitHub",
-    description: "Sincronize issues, PRs e webhooks com seus squads. Code review automatizado.",
-    icon: Github,
-    status: "connected" as const,
-    details: "3 repos conectados",
-  },
-  {
-    id: "discord",
-    name: "Discord",
-    description: "Notificacoes de tasks, checkpoints e budget via webhooks do Discord.",
-    icon: MessageCircle,
-    status: "connected" as const,
-    details: "2 canais configurados",
-  },
-  {
-    id: "telegram",
-    name: "Telegram",
-    description: "Alertas e notificacoes diretamente no Telegram via Bot API.",
-    icon: Send,
-    status: "disconnected" as const,
-    details: null,
-  },
-  {
-    id: "slack",
-    name: "Slack",
-    description: "Integre squads com canais do Slack para comunicacao em tempo real.",
-    icon: Hash,
-    status: "disconnected" as const,
-    details: null,
-  },
-  {
-    id: "gitlab",
-    name: "GitLab",
-    description: "Conecte repos do GitLab para pipelines CI/CD integrados.",
-    icon: ExternalLink,
-    status: "disconnected" as const,
-    details: null,
-  },
-];
+interface CatalogData {
+  premium: PremiumIntegration[];
+  premiumTotal: number;
+  generic: GenericCatalogCategory[];
+  genericTotal: number;
+  totalAvailable: number;
+}
 
 export default function IntegrationsPage() {
-  const [integrations, setIntegrations] = useState(INTEGRATIONS);
+  const [orgIntegrations, setOrgIntegrations] = useState<OrgIntegration[]>([]);
+  const [catalog, setCatalog] = useState<CatalogData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [showConnectedOnly, setShowConnectedOnly] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [expandedGeneric, setExpandedGeneric] = useState(false);
+  const [configModal, setConfigModal] = useState<PremiumIntegration | null>(null);
+  const [configOrgIntegration, setConfigOrgIntegration] = useState<OrgIntegration | null>(null);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    const [intResp, catResp] = await Promise.all([
+      fetch("/api/integrations").then((r) => r.json()),
+      fetch("/api/integrations/catalog").then((r) => r.json()),
+    ]);
+    setOrgIntegrations(intResp);
+    setCatalog(catResp);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const getOrgIntegration = (integrationId: string) =>
+    orgIntegrations.find((i) => i.integrationId === integrationId);
+
+  const isConnected = (integrationId: string) => {
+    const org = getOrgIntegration(integrationId);
+    return org?.status === "active";
+  };
+
+  async function handleConnect(integrationId: string, tier: "premium" | "generic") {
+    setConnectingId(integrationId);
+    try {
+      // Criar session Nango
+      const resp = await fetch("/api/integrations/connect", { method: "POST" });
+      const { sessionToken } = await resp.json();
+
+      if (sessionToken && typeof window !== "undefined") {
+        // Importar Nango frontend dinamicamente (default export)
+        const NangoFrontend = (await import("@nangohq/frontend")).default;
+        const nango = new NangoFrontend({ connectSessionToken: sessionToken });
+
+        nango.openConnectUI({
+          onEvent: async (event) => {
+            if (event.type === "connect") {
+              // Salvar no banco
+              await fetch("/api/integrations", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  integrationId,
+                  tier,
+                  status: "active",
+                  connectedAt: new Date().toISOString(),
+                }),
+              });
+              await loadData();
+            }
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Connect error:", error);
+    } finally {
+      setConnectingId(null);
+    }
+  }
+
+  async function handleDisconnect(id: string) {
+    await fetch(`/api/integrations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "disconnected" }),
+    });
+    await loadData();
+  }
+
+  async function handleSaveConfig(id: string, enabledCapabilities: string[]) {
+    await fetch(`/api/integrations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabledCapabilities }),
+    });
+    setConfigModal(null);
+    await loadData();
+  }
+
+  if (loading || !catalog) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const filteredPremium = catalog.premium.filter((i) => {
+    if (search && !i.name.toLowerCase().includes(search.toLowerCase()) && !i.description.toLowerCase().includes(search.toLowerCase())) return false;
+    if (showConnectedOnly && !isConnected(i.id)) return false;
+    if (selectedCategory && i.category !== selectedCategory) return false;
+    return true;
+  });
+
+  const filteredGeneric = catalog.generic.map((cat) => ({
+    ...cat,
+    integrations: cat.integrations.filter((id) => {
+      if (search && !id.toLowerCase().includes(search.toLowerCase())) return false;
+      if (showConnectedOnly && !isConnected(id)) return false;
+      return true;
+    }),
+  })).filter((cat) => cat.integrations.length > 0);
+
+  const categories = [...new Set(catalog.premium.map((i) => i.category))] as IntegrationCategory[];
+  const connectedCount = orgIntegrations.filter((i) => i.status === "active").length;
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Integracoes</h1>
-        <p className="text-muted-foreground">Conecte servicos externos ao seu workspace</p>
+        <p className="text-muted-foreground">
+          {connectedCount} conectadas de {catalog.totalAvailable}+ disponiveis via Nango
+        </p>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {integrations.map((integration) => (
-          <Card key={integration.id} className="relative">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                    <integration.icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">{integration.name}</CardTitle>
-                    {integration.details && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{integration.details}</p>
-                    )}
-                  </div>
-                </div>
-                <Badge
-                  variant={integration.status === "connected" ? "default" : "secondary"}
-                >
-                  {integration.status === "connected" ? "Conectado" : "Desconectado"}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <CardDescription>{integration.description}</CardDescription>
-              <div className="flex items-center justify-between">
-                <Switch
-                  checked={integration.status === "connected"}
-                  onCheckedChange={(checked) => {
-                    setIntegrations((prev) =>
-                      prev.map((i) =>
-                        i.id === integration.id
-                          ? { ...i, status: checked ? "connected" as const : "disconnected" as const }
-                          : i,
-                      ),
-                    );
-                  }}
-                />
-                <Button variant="outline" size="sm">
-                  Configurar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+
+      {/* Search + Filters */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar integracao..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant={showConnectedOnly ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowConnectedOnly(!showConnectedOnly)}
+          >
+            {showConnectedOnly ? "Conectados" : "Todos"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Category filters */}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant={selectedCategory === null ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSelectedCategory(null)}
+        >
+          Todos
+        </Button>
+        {categories.map((cat) => (
+          <Button
+            key={cat}
+            variant={selectedCategory === cat ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+          >
+            {CATEGORY_LABELS[cat]}
+          </Button>
         ))}
       </div>
+
+      {/* Premium Integrations */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Zap className="h-5 w-5 text-yellow-500" />
+          <h2 className="text-lg font-semibold">Integracoes Premium ({filteredPremium.length})</h2>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          Actions customizadas profundas com configuracao especifica
+        </p>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filteredPremium.map((integration) => {
+            const orgInt = getOrgIntegration(integration.id);
+            const connected = orgInt?.status === "active";
+
+            return (
+              <Card key={integration.id} className="relative">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                        <Link2 className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base">{integration.name}</CardTitle>
+                        <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[integration.category]}</p>
+                      </div>
+                    </div>
+                    <Badge variant={connected ? "default" : "secondary"}>
+                      {connected ? "Conectado" : "Desconectado"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <CardDescription className="text-sm">{integration.description}</CardDescription>
+
+                  <div className="flex flex-wrap gap-1">
+                    {integration.capabilities.slice(0, 3).map((cap) => (
+                      <Badge key={cap.id} variant="outline" className="text-xs">
+                        {cap.name}
+                      </Badge>
+                    ))}
+                    {integration.capabilities.length > 3 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{integration.capabilities.length - 3}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {connected ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => {
+                            setConfigModal(integration);
+                            setConfigOrgIntegration(orgInt ?? null);
+                          }}
+                        >
+                          <Settings2 className="h-4 w-4 mr-1" /> Configurar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => orgInt && handleDisconnect(orgInt.id)}
+                        >
+                          Desconectar
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        disabled={connectingId === integration.id}
+                        onClick={() => handleConnect(integration.id, "premium")}
+                      >
+                        {connectingId === integration.id ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                        )}
+                        Conectar
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Generic Integrations */}
+      {!selectedCategory && (
+        <div>
+          <div
+            className="flex items-center gap-2 mb-4 cursor-pointer"
+            onClick={() => setExpandedGeneric(!expandedGeneric)}
+          >
+            <Link2 className="h-5 w-5 text-blue-500" />
+            <h2 className="text-lg font-semibold">
+              Todas as Integracoes ({catalog.genericTotal}+)
+            </h2>
+            {expandedGeneric ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Conecte qualquer API via OAuth — autenticacao gerenciada pelo Nango
+          </p>
+
+          {expandedGeneric && (
+            <div className="space-y-6">
+              {filteredGeneric.map((cat) => (
+                <div key={cat.category}>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3">{cat.category}</h3>
+                  <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                    {cat.integrations.map((id) => {
+                      const connected = isConnected(id);
+                      return (
+                        <Card key={id} className="p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium capitalize">
+                              {id.replace(/-/g, " ")}
+                            </span>
+                            {connected ? (
+                              <Check className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                disabled={connectingId === id}
+                                onClick={() => handleConnect(id, "generic")}
+                              >
+                                {connectingId === id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  "Conectar"
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Config Modal */}
+      {configModal && (
+        <ConfigDialog
+          integration={configModal}
+          orgIntegration={configOrgIntegration}
+          onClose={() => setConfigModal(null)}
+          onSave={handleSaveConfig}
+        />
+      )}
     </div>
+  );
+}
+
+function ConfigDialog({
+  integration,
+  orgIntegration,
+  onClose,
+  onSave,
+}: {
+  integration: PremiumIntegration;
+  orgIntegration: OrgIntegration | null;
+  onClose: () => void;
+  onSave: (id: string, capabilities: string[]) => void;
+}) {
+  const [enabledCaps, setEnabledCaps] = useState<Set<string>>(
+    new Set(orgIntegration?.enabledCapabilities ?? integration.capabilities.map((c) => c.id)),
+  );
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  async function handleTest() {
+    if (!orgIntegration) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const resp = await fetch(`/api/integrations/${orgIntegration.id}/test`, { method: "POST" });
+      const data = await resp.json();
+      setTestResult(data.connected ? "Conexao OK" : "Falha na conexao");
+    } catch {
+      setTestResult("Erro ao testar");
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  function toggleCapability(capId: string) {
+    const next = new Set(enabledCaps);
+    if (next.has(capId)) next.delete(capId);
+    else next.add(capId);
+    setEnabledCaps(next);
+  }
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Configurar {integration.name}</DialogTitle>
+          <DialogDescription>{integration.description}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Capabilities */}
+          <div>
+            <h4 className="text-sm font-medium mb-2">Capabilities ativas</h4>
+            <div className="space-y-2">
+              {integration.capabilities.map((cap) => (
+                <label key={cap.id} className="flex items-start gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={enabledCaps.has(cap.id)}
+                    onCheckedChange={() => toggleCapability(cap.id)}
+                  />
+                  <div>
+                    <span className="text-sm font-medium">{cap.name}</span>
+                    <p className="text-xs text-muted-foreground">{cap.description}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Test + Save */}
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleTest} disabled={testing || !orgIntegration}>
+              {testing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+              Testar Conexao
+            </Button>
+            {testResult && (
+              <span className={`text-xs ${testResult.includes("OK") ? "text-green-500" : "text-red-500"}`}>
+                {testResult}
+              </span>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button onClick={() => orgIntegration && onSave(orgIntegration.id, [...enabledCaps])}>
+              Salvar
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
