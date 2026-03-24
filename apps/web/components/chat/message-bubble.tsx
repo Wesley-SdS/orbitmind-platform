@@ -5,25 +5,38 @@ import remarkGfm from "remark-gfm";
 import { AgentAvatar } from "./agent-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, X, Edit2 } from "lucide-react";
+import { Check, X, Edit2, Copy, RotateCcw } from "lucide-react";
 import type { ChatMessage } from "@orbitmind/shared";
+import { AngleSelector } from "./angle-selector";
+import { ToneSelector } from "./tone-selector";
 
 interface MessageBubbleProps {
   message: ChatMessage;
   agent?: { name: string; icon: string; role: string } | null;
+  onAction?: (content: string) => void;
 }
 
-export function MessageBubble({ message, agent }: MessageBubbleProps) {
+export function MessageBubble({ message, agent, onAction }: MessageBubbleProps) {
   const time = new Date(message.createdAt).toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
   });
 
   if (message.role === "system") {
-    return <SystemMessage message={message} />;
+    return <SystemMessage message={message} onAction={onAction} />;
   }
 
   const isUser = message.role === "user";
+  const meta = message.metadata as Record<string, unknown> | null;
+  const isArchitect = !!meta?.isArchitect;
+
+  // Check if this is a design proposal (contains approval question)
+  const hasDesignProposal =
+    isArchitect &&
+    !isUser &&
+    (message.content.includes("criar agora") ||
+      message.content.includes("ajustar") ||
+      message.content.includes("O que acha"));
 
   return (
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
@@ -75,14 +88,74 @@ export function MessageBubble({ message, agent }: MessageBubbleProps) {
             {message.content}
           </ReactMarkdown>
         </div>
+        {/* Action buttons for design proposals */}
+        {hasDesignProposal && onAction && (
+          <div className="flex gap-2 mt-1">
+            <Button size="sm" className="h-7 gap-1 text-xs" onClick={() => onAction("Criar agora")}>
+              <Check className="h-3 w-3" />
+              Criar
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => onAction("Quero ajustar")}>
+              <Edit2 className="h-3 w-3" />
+              Ajustar
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs text-destructive" onClick={() => onAction("Cancelar")}>
+              <X className="h-3 w-3" />
+              Cancelar
+            </Button>
+          </div>
+        )}
+        {/* Copy / Resend for user messages */}
+        {isUser && onAction && (
+          <div className="flex gap-1 mt-0.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => navigator.clipboard.writeText(message.content)}
+              title="Copiar"
+            >
+              <Copy className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => onAction(message.content)}
+              title="Reenviar"
+            >
+              <RotateCcw className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
         <span className="text-[10px] text-muted-foreground">{time}</span>
       </div>
     </div>
   );
 }
 
-function SystemMessage({ message }: { message: ChatMessage }) {
-  const isCheckpoint = (message.metadata as Record<string, unknown>)?.type === "checkpoint";
+function SystemMessage({ message, onAction }: { message: ChatMessage; onAction?: (content: string) => void }) {
+  const meta = message.metadata as Record<string, unknown> | null;
+  const msgType = meta?.type as string | undefined;
+  const isCheckpoint = msgType === "checkpoint";
+
+  // Angle selection
+  if (msgType === "angle-selection" && meta?.angles && onAction) {
+    return (
+      <div className="py-2 max-w-lg mx-auto">
+        <AngleSelector angles={meta.angles as Array<{ emoji: string; name: string; hook: string; description: string }>} onSelect={onAction} />
+      </div>
+    );
+  }
+
+  // Tone selection
+  if (msgType === "tone-selection" && meta?.tones && onAction) {
+    return (
+      <div className="py-2 max-w-lg mx-auto">
+        <ToneSelector tones={meta.tones as Array<{ id: string; name: string; emoji: string; description: string; example: string }>} onSelect={onAction} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex justify-center py-2">
@@ -90,17 +163,17 @@ function SystemMessage({ message }: { message: ChatMessage }) {
         <Badge variant="outline" className="gap-1.5 text-xs">
           {isCheckpoint ? "⏸️" : "🔔"} {message.content}
         </Badge>
-        {isCheckpoint && (
+        {isCheckpoint && onAction && (
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs">
+            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => onAction("Aprovar")}>
               <Check className="h-3 w-3" />
               Aprovar
             </Button>
-            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs">
+            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => onAction("Editar")}>
               <Edit2 className="h-3 w-3" />
               Editar
             </Button>
-            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs text-destructive">
+            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs text-destructive" onClick={() => onAction("Rejeitar")}>
               <X className="h-3 w-3" />
               Rejeitar
             </Button>

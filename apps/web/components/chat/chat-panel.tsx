@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageBubble } from "./message-bubble";
 import { TypingIndicator } from "./typing-indicator";
@@ -19,35 +21,57 @@ interface ChatPanelProps {
   squadName: string;
   initialMessages: ChatMessage[];
   agents: Agent[];
+  isArchitect?: boolean;
+  conversationId?: string;
+  onSquadCreated?: () => void;
 }
 
-const SIMULATED_RESPONSES = [
-  { agentIdx: 0, content: "Entendido! Vou analisar isso e trazer os dados relevantes." },
-  { agentIdx: 1, content: "Com base na analise, sugiro focarmos em 3 pontos-chave para maximizar o impacto." },
-  { agentIdx: 2, content: "Ja estou trabalhando no conteudo. Foco em storytelling e dados concretos!" },
-  { agentIdx: 5, content: "Revisao feita! Tudo aprovado com pequenos ajustes sugeridos." },
-];
-
-export function ChatPanel({ squadId, squadName, initialMessages, agents }: ChatPanelProps) {
+export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchitect, conversationId, onSquadCreated }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [typingAgent, setTypingAgent] = useState<Agent | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const responseIdx = useRef(0);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Sync when initialMessages change (squad switch)
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    setMessages(initialMessages);
+  }, [initialMessages]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    setTimeout(() => {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
   }, [messages, typingAgent]);
 
   const getAgent = useCallback(
-    (agentId?: string) => agents.find((a) => a.id === agentId) ?? null,
+    (agentId?: string) => {
+      if (!agentId) return null;
+      return agents.find((a) => a.id === agentId) ?? null;
+    },
     [agents],
   );
 
-  function handleSend(content: string) {
-    const userMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
+  // For architect messages, resolve agent from metadata
+  const resolveAgent = useCallback(
+    (msg: ChatMessage) => {
+      if (msg.agentId) return getAgent(msg.agentId);
+      const meta = msg.metadata as Record<string, unknown> | null;
+      if (meta?.isArchitect) {
+        return {
+          name: String(meta.agentName ?? "Arquiteto"),
+          icon: String(meta.agentIcon ?? "🧠"),
+          role: "Squad Architect",
+        };
+      }
+      return null;
+    },
+    [getAgent],
+  );
+
+  async function handleSend(content: string) {
+    // Optimistic: add user message immediately
+    const tempMsg: ChatMessage = {
+      id: `temp-${Date.now()}`,
       squadId,
       senderId: "current-user",
       content,
@@ -55,55 +79,103 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents }: ChatP
       metadata: {},
       createdAt: new Date().toISOString(),
     };
+    setMessages((prev) => [...prev, tempMsg]);
 
-    setMessages((prev) => [...prev, userMsg]);
+    // Show typing indicator
+    if (isArchitect) {
+      setTypingAgent({ id: "system-architect", name: "Arquiteto", icon: "🧠", role: "Architect" });
+    }
 
-    const sim = SIMULATED_RESPONSES[responseIdx.current % SIMULATED_RESPONSES.length]!;
-    const respondingAgent = agents[sim.agentIdx] ?? agents[0];
-    responseIdx.current++;
+    // Send to appropriate API
+    const endpoint = isArchitect ? "/api/chat/architect" : "/api/chat";
+    const body = isArchitect
+      ? { content, conversationId }
+      : { squadId, content };
 
-    if (respondingAgent) {
-      setTimeout(() => {
-        setTypingAgent(respondingAgent);
-      }, 500);
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
 
-      setTimeout(() => {
+    if (res.ok) {
+      const saved = await res.json();
+      if (saved.id) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempMsg.id ? { ...saved, createdAt: saved.createdAt ?? tempMsg.createdAt } : m)),
+        );
+      }
+    }
+
+    // Poll for architect response
+    if (isArchitect && conversationId) {
+      const pollHistory = async () => {
+        const histRes = await fetch(`/api/chat/architect/history?conversationId=${conversationId}`);
+        if (histRes.ok) {
+          const data = await histRes.json();
+          if (Array.isArray(data)) {
+            const parsed = (data as ChatMessage[]).map((m) => ({
+              ...m,
+              createdAt: typeof m.createdAt === "string" ? m.createdAt : new Date(m.createdAt as unknown as string).toISOString(),
+            }));
+            setMessages(parsed);
+            // Detect squad creation to refresh sidebar
+            if (parsed.some((m) => m.role === "agent" && m.content.includes("criado com sucesso"))) {
+              onSquadCreated?.();
+            }
+          }
+        }
         setTypingAgent(null);
-        const agentMsg: ChatMessage = {
-          id: `msg-${Date.now()}-agent`,
-          squadId,
-          agentId: respondingAgent.id,
-          content: sim.content,
-          role: "agent",
-          metadata: {},
-          createdAt: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, agentMsg]);
-      }, 2000 + Math.random() * 1500);
+      };
+      setTimeout(pollHistory, 3000);
+      setTimeout(pollHistory, 8000);
+      setTimeout(pollHistory, 15000);
     }
   }
 
+  async function handleNewConversation() {
+    // Nova conversa is handled by the parent page now (startNewConversation)
+    // This button just triggers a page-level reload via window location
+    window.location.href = "/chat";
+  }
+
+  const subtitle = isArchitect
+    ? "Criar e gerenciar squads"
+    : `${agents.length} agentes`;
+
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-border/50 px-4 py-3">
-        <h2 className="text-sm font-semibold">{squadName}</h2>
-        <p className="text-xs text-muted-foreground">{agents.length} agentes</p>
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="shrink-0 flex items-center justify-between border-b border-border/50 px-4 py-3">
+        <div>
+          <h2 className="text-sm font-semibold">{squadName}</h2>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
+        </div>
+        {isArchitect && messages.length > 0 && (
+          <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleNewConversation}>
+            <RotateCcw className="h-3.5 w-3.5" />
+            Nova Conversa
+          </Button>
+        )}
       </div>
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-4">
           {messages.map((msg) => (
             <MessageBubble
               key={msg.id}
               message={msg}
-              agent={msg.agentId ? getAgent(msg.agentId) : null}
+              agent={resolveAgent(msg)}
+              onAction={handleSend}
             />
           ))}
           {typingAgent && (
             <TypingIndicator agentName={typingAgent.name} agentIcon={typingAgent.icon} />
           )}
+          <div ref={bottomRef} />
         </div>
-      </ScrollArea>
-      <ChatInput onSend={handleSend} />
+      </div>
+      <div className="shrink-0">
+        <ChatInput onSend={handleSend} />
+      </div>
     </div>
   );
 }
