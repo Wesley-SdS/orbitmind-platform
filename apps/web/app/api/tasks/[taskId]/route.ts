@@ -52,6 +52,22 @@ export async function PATCH(
     }
 
     const updated = await updateTask(taskId, parsed.data);
+
+    // Broadcast task update via WebSocket
+    if (updated) {
+      try {
+        const { wsManager } = await import("@/lib/realtime/ws-manager");
+        wsManager.broadcastToSquad(updated.squadId, {
+          type: "TASK_UPDATED",
+          taskId: updated.id,
+          status: updated.status,
+          assignedAgentId: updated.assignedAgentId,
+        });
+      } catch {
+        // WS not available
+      }
+    }
+
     return NextResponse.json(updated);
   } catch {
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });

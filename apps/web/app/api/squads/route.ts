@@ -11,6 +11,7 @@ export async function GET(): Promise<Response> {
     }
 
     const squads = await getSquadsByOrgId(session.user.orgId);
+    console.log("[DEBUG /api/squads]", session.user.orgId, squads.map(s => ({ name: s.name, agentCount: s.agentCount, taskCount: s.taskCount })));
     return NextResponse.json(squads);
   } catch {
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
