@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { PremiumIntegration, GenericCatalogCategory } from "@/lib/integrations/types";
+import type { PremiumIntegration } from "@/lib/integrations/types";
 import { CATEGORY_LABELS, type IntegrationCategory } from "@/lib/integrations/types";
 
 interface OrgIntegration {
@@ -25,12 +25,27 @@ interface OrgIntegration {
   connectedAt: string | null;
 }
 
+interface DynamicProvider {
+  id: string;
+  displayName: string;
+  logoUrl: string;
+  authMode: string;
+  category: string;
+  docs: string;
+}
+
+interface GenericCategory {
+  category: string;
+  providers: DynamicProvider[];
+}
+
 interface CatalogData {
   premium: PremiumIntegration[];
   premiumTotal: number;
-  generic: GenericCatalogCategory[];
+  generic: GenericCategory[];
   genericTotal: number;
   totalAvailable: number;
+  source: "nango-api" | "static-fallback";
 }
 
 export default function IntegrationsPage() {
@@ -139,12 +154,12 @@ export default function IntegrationsPage() {
 
   const filteredGeneric = catalog.generic.map((cat) => ({
     ...cat,
-    integrations: cat.integrations.filter((id) => {
-      if (search && !id.toLowerCase().includes(search.toLowerCase())) return false;
-      if (showConnectedOnly && !isConnected(id)) return false;
+    providers: cat.providers.filter((p) => {
+      if (search && !p.displayName.toLowerCase().includes(search.toLowerCase()) && !p.id.toLowerCase().includes(search.toLowerCase())) return false;
+      if (showConnectedOnly && !isConnected(p.id)) return false;
       return true;
     }),
-  })).filter((cat) => cat.integrations.length > 0);
+  })).filter((cat) => cat.providers.length > 0);
 
   const categories = [...new Set(catalog.premium.map((i) => i.category))] as IntegrationCategory[];
   const connectedCount = orgIntegrations.filter((i) => i.status === "active").length;
@@ -296,7 +311,7 @@ export default function IntegrationsPage() {
         </div>
       </div>
 
-      {/* Generic Integrations */}
+      {/* Generic Integrations (700+ via Nango API) */}
       {!selectedCategory && (
         <div>
           <div
@@ -307,6 +322,9 @@ export default function IntegrationsPage() {
             <h2 className="text-lg font-semibold">
               Todas as Integracoes ({catalog.genericTotal}+)
             </h2>
+            {catalog.source === "nango-api" && (
+              <Badge variant="outline" className="text-xs">via Nango API</Badge>
+            )}
             {expandedGeneric ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </div>
           <p className="text-sm text-muted-foreground mb-4">
@@ -317,27 +335,38 @@ export default function IntegrationsPage() {
             <div className="space-y-6">
               {filteredGeneric.map((cat) => (
                 <div key={cat.category}>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-3">{cat.category}</h3>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3">
+                    {cat.category} ({cat.providers.length})
+                  </h3>
                   <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                    {cat.integrations.map((id) => {
-                      const connected = isConnected(id);
+                    {cat.providers.map((provider) => {
+                      const connected = isConnected(provider.id);
                       return (
-                        <Card key={id} className="p-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium capitalize">
-                              {id.replace(/-/g, " ")}
+                        <Card key={provider.id} className="p-3">
+                          <div className="flex items-center gap-2">
+                            {provider.logoUrl ? (
+                              <img
+                                src={provider.logoUrl}
+                                alt={provider.displayName}
+                                className="h-5 w-5 rounded object-contain flex-shrink-0"
+                              />
+                            ) : (
+                              <Link2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            )}
+                            <span className="text-sm font-medium truncate flex-1" title={provider.displayName}>
+                              {provider.displayName}
                             </span>
                             {connected ? (
-                              <Check className="h-4 w-4 text-green-500" />
+                              <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
                             ) : (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-6 px-2 text-xs"
-                                disabled={connectingId === id}
-                                onClick={() => handleConnect(id, "generic")}
+                                className="h-6 px-2 text-xs flex-shrink-0"
+                                disabled={connectingId === provider.id}
+                                onClick={() => handleConnect(provider.id, "generic")}
                               >
-                                {connectingId === id ? (
+                                {connectingId === provider.id ? (
                                   <Loader2 className="h-3 w-3 animate-spin" />
                                 ) : (
                                   "Conectar"

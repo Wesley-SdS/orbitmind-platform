@@ -77,3 +77,58 @@ export async function listConnections(orgId: string): Promise<Array<{ id: number
   const response = await nango.listConnections({ userId: orgId });
   return response.connections as unknown as Array<{ id: number; connection_id: string; provider_config_key: string }>;
 }
+
+// ──────────────────────────────────────────────
+// Provider Catalog (700+ integracoes)
+// ──────────────────────────────────────────────
+
+export interface NangoProvider {
+  name: string;
+  displayName: string;
+  logoUrl: string;
+  authMode: string;
+  categories: string[];
+  docs: string;
+}
+
+/** Cache em memoria — revalidado a cada 1h */
+let providerCache: { data: NangoProvider[]; fetchedAt: number } | null = null;
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hora
+
+/**
+ * Busca TODOS os providers disponiveis no Nango (700+).
+ * Usa cache em memoria com TTL de 1h.
+ * Retorna fallback vazio se NANGO_SECRET_KEY nao estiver configurada.
+ */
+export async function fetchNangoProviders(): Promise<NangoProvider[]> {
+  // Retorna cache se valido
+  if (providerCache && Date.now() - providerCache.fetchedAt < CACHE_TTL_MS) {
+    return providerCache.data;
+  }
+
+  try {
+    const nango = getNango();
+    const response = await nango.listProviders({});
+
+    const providers: NangoProvider[] = response.data.map((p) => ({
+      name: p.name,
+      displayName: p.display_name ?? p.name,
+      logoUrl: p.logo_url ?? "",
+      authMode: p.auth_mode ?? "UNKNOWN",
+      categories: (p as unknown as Record<string, unknown>).categories as string[] ?? [],
+      docs: p.docs ?? "",
+    }));
+
+    providerCache = { data: providers, fetchedAt: Date.now() };
+    return providers;
+  } catch (error) {
+    console.error("Falha ao buscar providers do Nango:", error);
+    // Retorna cache expirado se existir, senao array vazio
+    return providerCache?.data ?? [];
+  }
+}
+
+/** Invalida o cache de providers */
+export function invalidateProviderCache(): void {
+  providerCache = null;
+}
