@@ -1,0 +1,97 @@
+name: "Dev Team"
+code: dev-team
+icon: "💻"
+description: "Squad de desenvolvimento de software com arquiteto, desenvolvedores, reviewer e deployer. Cobre todo o ciclo de um PR: planejamento, codigo, review, testes e deploy."
+version: "1.0.0"
+performanceMode: alta-performance
+
+budget:
+  monthlyTokens: 2000000
+  warningThreshold: 0.8
+  pauseThreshold: 1.0
+
+skills:
+  - web_search
+  - web_fetch
+
+agents:
+  - id: architect
+    name: "Andre Arquitetura"
+    role: "Arquiteto de Software"
+    icon: "🏗️"
+    modelTier: powerful
+    execution: inline
+    description: "Define arquitetura, escolhe padroes, planeja implementacao e documenta decisoes tecnicas."
+
+  - id: developer-backend
+    name: "Bruno Backend"
+    role: "Desenvolvedor Backend"
+    icon: "⚙️"
+    modelTier: powerful
+    execution: inline
+    description: "Implementa APIs, logica de negocio, banco de dados e integracoes."
+
+  - id: developer-frontend
+    name: "Fernanda Frontend"
+    role: "Desenvolvedora Frontend"
+    icon: "🎨"
+    modelTier: powerful
+    execution: inline
+    description: "Implementa UI/UX, componentes React, responsividade e acessibilidade."
+
+  - id: reviewer
+    name: "Ricardo Review"
+    role: "Code Reviewer"
+    icon: "🔍"
+    modelTier: powerful
+    execution: inline
+    description: "Revisa codigo, identifica bugs, sugere melhorias de performance e seguranca."
+
+  - id: deployer
+    name: "Diego Deploy"
+    role: "DevOps e Deploy"
+    icon: "🚀"
+    modelTier: fast
+    execution: subagent
+    description: "Gerencia CI/CD, infraestrutura, deploys e monitoramento."
+
+pipeline:
+  - step: 1
+    name: "Briefing do Projeto"
+    type: checkpoint
+    message: "Descreva o que precisa ser desenvolvido"
+
+  - step: 2
+    name: "Planejamento de Arquitetura"
+    type: agent
+    agentId: architect
+
+  - step: 3
+    name: "Aprovacao de Arquitetura"
+    type: checkpoint
+    message: "Revise e aprove o plano tecnico"
+
+  - step: 4
+    name: "Desenvolvimento Backend"
+    type: agent
+    agentId: developer-backend
+
+  - step: 5
+    name: "Desenvolvimento Frontend"
+    type: agent
+    agentId: developer-frontend
+
+  - step: 6
+    name: "Code Review"
+    type: agent
+    agentId: reviewer
+
+  - step: 7
+    name: "Aprovacao Final"
+    type: checkpoint
+    message: "Aprove o codigo revisado para deploy"
+
+  - step: 8
+    name: "Deploy"
+    type: agent
+    agentId: deployer

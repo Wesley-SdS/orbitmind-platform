@@ -1,0 +1,140 @@
+name: "Fabrica de Carrosseis"
+code: instagram-carousel
+icon: "📸"
+description: "Transforma qualquer texto ou noticia em um carrossel visual, didatico e memoravel para Instagram com dados reais, reflexoes profundas e publicacao automatica."
+version: "1.0.0"
+performanceMode: alta-performance
+platform: instagram-feed
+
+budget:
+  monthlyTokens: 1500000
+  warningThreshold: 0.8
+  pauseThreshold: 1.0
+
+skills:
+  - web_search
+  - web_fetch
+  - image-creator
+  - instagram-publisher
+
+agents:
+  - id: researcher
+    name: "Angela Angulo"
+    role: "Especialista em Pesquisa e Curadoria de Noticias"
+    icon: "🔍"
+    modelTier: fast
+    execution: subagent
+    skills: [web_search, web_fetch]
+    description: "Pesquisa noticias relevantes, rankeia por potencial viral e seleciona as melhores para carrosseis."
+
+  - id: copywriter
+    name: "Carlos Carrossel"
+    role: "Especialista em Estrategia de Conteudo e Copy para Carrosseis"
+    icon: "✍️"
+    modelTier: powerful
+    execution: inline
+    skills: [web_search, web_fetch]
+    description: "Gera angulos criativos, cria copy persuasivo para cada slide do carrossel com hook, dados e CTA."
+
+  - id: image-designer
+    name: "Davi Design"
+    role: "Especialista em Design Visual para Carrosseis"
+    icon: "🎨"
+    modelTier: powerful
+    execution: inline
+    skills: [image-creator]
+    description: "Cria identidade visual bold e colorida, renderiza cada slide com tipografia impactante."
+
+  - id: reviewer
+    name: "Vera Veredito"
+    role: "Especialista em Controle de Qualidade de Carrosseis"
+    icon: "✅"
+    modelTier: powerful
+    execution: inline
+    description: "Avalia scroll-stop (1.5x peso), integridade de dados, coerencia narrativa, voz da marca e impacto visual."
+
+  - id: publisher
+    name: "Paula Post"
+    role: "Especialista em Publicacao no Instagram"
+    icon: "📤"
+    modelTier: fast
+    execution: inline
+    skills: [instagram-publisher]
+    description: "Valida e publica carrosseis no Instagram via Graph API com caption otimizado e hashtags."
+
+pipeline:
+  - step: 1
+    name: "Input de Conteudo"
+    type: checkpoint
+    message: "Qual tema ou noticia voce quer transformar em carrossel?"
+
+  - step: 2
+    name: "Pesquisa de Noticias"
+    type: agent
+    agentId: researcher
+
+  - step: 3
+    name: "Selecao de Historia"
+    type: checkpoint
+    message: "Escolha qual noticia/historia usar para o carrossel"
+
+  - step: 4
+    name: "Geracao de Angulos"
+    type: agent
+    agentId: copywriter
+
+  - step: 5
+    name: "Selecao de Angulo"
+    type: checkpoint
+    message: "Escolha qual angulo criativo usar"
+
+  - step: 6
+    name: "Criacao de Copy"
+    type: agent
+    agentId: copywriter
+    format: instagram-feed
+    vetoConditions:
+      - "Slides com mais de 40 palavras cada"
+      - "Ausencia de CTA no ultimo slide"
+      - "Dados citados sem fonte verificavel"
+
+  - step: 7
+    name: "Aprovacao de Texto"
+    type: checkpoint
+    message: "Revise e aprove o texto dos slides"
+
+  - step: 8
+    name: "Proposta Visual"
+    type: agent
+    agentId: image-designer
+
+  - step: 9
+    name: "Selecao Visual"
+    type: checkpoint
+    message: "Aprove a identidade visual proposta"
+
+  - step: 10
+    name: "Criacao de Slides"
+    type: agent
+    agentId: image-designer
+    format: instagram-feed
+
+  - step: 11
+    name: "Aprovacao de Imagens"
+    type: checkpoint
+    message: "Aprove os slides finais antes de publicar"
+
+  - step: 12
+    name: "Revisao de Qualidade"
+    type: agent
+    agentId: reviewer
+    onReject: "step-06"
+    maxReviewCycles: 3
+    vetoConditions:
+      - "Score de scroll-stop menor que 6/10"
+      - "Inconsistencia visual entre slides"
+
+  - step: 13
+    name: "Publicacao no Instagram"
+    type: agent
+    agentId: publisher

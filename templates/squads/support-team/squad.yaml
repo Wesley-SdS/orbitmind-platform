@@ -1,0 +1,79 @@
+name: "Suporte ao Cliente"
+code: support-team
+icon: "🎧"
+description: "Squad de atendimento e suporte com triagem automatica, respostas inteligentes, escalacao e analise de satisfacao. Atende via chat, email e ticket."
+version: "1.0.0"
+performanceMode: economico
+
+budget:
+  monthlyTokens: 500000
+  warningThreshold: 0.8
+  pauseThreshold: 1.0
+
+skills:
+  - web_search
+
+agents:
+  - id: triage
+    name: "Tiago Triagem"
+    role: "Especialista em Triagem e Classificacao"
+    icon: "📋"
+    modelTier: fast
+    execution: inline
+    description: "Classifica tickets por prioridade, categoria e sentimento. Roteia para o agente correto."
+
+  - id: responder
+    name: "Rita Resposta"
+    role: "Especialista em Respostas e Atendimento"
+    icon: "💬"
+    modelTier: powerful
+    execution: inline
+    skills: [web_search]
+    description: "Responde duvidas, resolve problemas comuns, consulta base de conhecimento e gera respostas empaticas."
+
+  - id: escalation
+    name: "Eduardo Escalacao"
+    role: "Especialista em Escalacao e Casos Complexos"
+    icon: "🔺"
+    modelTier: powerful
+    execution: inline
+    description: "Trata casos complexos, bugs reportados, reclamacoes graves e articula com equipes internas."
+
+  - id: analyst
+    name: "Ana Analise"
+    role: "Analista de Satisfacao e Metricas"
+    icon: "📊"
+    modelTier: fast
+    execution: subagent
+    description: "Monitora CSAT, NPS, tempo de resposta e gera relatorios de tendencias de tickets."
+
+pipeline:
+  - step: 1
+    name: "Receber Ticket"
+    type: checkpoint
+    message: "Novo ticket de suporte recebido"
+
+  - step: 2
+    name: "Triagem e Classificacao"
+    type: agent
+    agentId: triage
+
+  - step: 3
+    name: "Resposta ao Cliente"
+    type: agent
+    agentId: responder
+
+  - step: 4
+    name: "Aprovacao de Resposta"
+    type: checkpoint
+    message: "Revise a resposta antes de enviar"
+
+  - step: 5
+    name: "Escalacao (se necessario)"
+    type: agent
+    agentId: escalation
+
+  - step: 6
+    name: "Analise de Satisfacao"
+    type: agent
+    agentId: analyst
