@@ -1,0 +1,62 @@
+{
+  "nav": {
+    "chat": "Chat",
+    "board": "Board",
+    "squads": "Squads",
+    "agents": "Agents",
+    "integrations": "Integrations",
+    "settings": "Settings",
+    "office": "Office"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Overview of your squads and metrics",
+    "squadsActive": "Active Squads",
+    "tasksCompleted": "Tasks Completed",
+    "executionsToday": "Executions Today",
+    "estimatedCost": "Estimated Cost",
+    "thisMonth": "this month",
+    "budgetByAgent": "Budget by Agent",
+    "activeSquads": "Active Squads",
+    "recentActivity": "Recent Activity"
+  },
+  "chat": {
+    "newConversation": "New Conversation",
+    "sendMessage": "Send a message...",
+    "conversations": "Conversations",
+    "squads": "Squads",
+    "assistantTitle": "OrbitMind Assistant",
+    "assistantSubtitle": "Ask anything — create squads, edit agents, check status, view metrics."
+  },
+  "squads": {
+    "title": "Squads",
+    "subtitle": "Manage your AI agent squads",
+    "createSquad": "Create Squad",
+    "agents": "agents",
+    "tasks": "tasks",
+    "active": "Active",
+    "paused": "Paused",
+    "archived": "Archived"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage your organization and settings",
+    "organization": "Organization",
+    "members": "Members",
+    "aiProviders": "AI Providers",
+    "skills": "Skills",
+    "plan": "Plan",
+    "auditLog": "Audit Log"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "tryAgain": "Try again",
+    "confirm": "Confirm"
+  }
+}

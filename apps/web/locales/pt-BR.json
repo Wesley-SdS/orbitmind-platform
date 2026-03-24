@@ -1,0 +1,62 @@
+{
+  "nav": {
+    "chat": "Chat",
+    "board": "Board",
+    "squads": "Squads",
+    "agents": "Agentes",
+    "integrations": "Integracoes",
+    "settings": "Settings",
+    "office": "Escritorio"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Visao geral dos seus squads e metricas",
+    "squadsActive": "Squads Ativos",
+    "tasksCompleted": "Tasks Completadas",
+    "executionsToday": "Execucoes Hoje",
+    "estimatedCost": "Custo Estimado",
+    "thisMonth": "este mes",
+    "budgetByAgent": "Budget por Agente",
+    "activeSquads": "Squads Ativos",
+    "recentActivity": "Atividade Recente"
+  },
+  "chat": {
+    "newConversation": "Nova Conversa",
+    "sendMessage": "Envie uma mensagem...",
+    "conversations": "Conversas",
+    "squads": "Squads",
+    "assistantTitle": "OrbitMind Assistant",
+    "assistantSubtitle": "Pergunte qualquer coisa — criar squads, editar agentes, ver status, consultar metricas."
+  },
+  "squads": {
+    "title": "Squads",
+    "subtitle": "Gerencie seus squads de agentes IA",
+    "createSquad": "Criar Squad",
+    "agents": "agentes",
+    "tasks": "tasks",
+    "active": "Ativo",
+    "paused": "Pausado",
+    "archived": "Arquivado"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Gerencie sua organizacao e configuracoes",
+    "organization": "Organizacao",
+    "members": "Membros",
+    "aiProviders": "Provedores de IA",
+    "skills": "Skills",
+    "plan": "Plano",
+    "auditLog": "Audit Log"
+  },
+  "common": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "delete": "Deletar",
+    "edit": "Editar",
+    "create": "Criar",
+    "loading": "Carregando...",
+    "error": "Algo deu errado",
+    "tryAgain": "Tentar novamente",
+    "confirm": "Confirmar"
+  }
+}
