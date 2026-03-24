@@ -7,11 +7,12 @@ import {
   jsonb,
   integer,
   bigint,
+  boolean,
   pgEnum,
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // ──────────────────────────────────────────────
 // Enums
@@ -32,10 +33,8 @@ export const executionStatusEnum = pgEnum("execution_status", [
   "running", "completed", "failed", "cancelled",
 ]);
 export const actorTypeEnum = pgEnum("actor_type", ["user", "agent", "system"]);
-export const integrationTypeEnum = pgEnum("integration_type", [
-  "github", "gitlab", "discord", "telegram", "slack",
-]);
-export const integrationStatusEnum = pgEnum("integration_status", ["active", "inactive", "error"]);
+export const integrationTierEnum = pgEnum("integration_tier", ["premium", "generic"]);
+export const integrationStatusEnum = pgEnum("integration_status", ["active", "inactive", "error", "disconnected"]);
 export const messageRoleEnum = pgEnum("message_role", ["user", "agent", "system"]);
 
 // ──────────────────────────────────────────────
@@ -49,6 +48,9 @@ export const organizations = pgTable("organizations", {
   plan: orgPlanEnum("plan").notNull().default("free"),
   logoUrl: text("logo_url"),
   settings: jsonb("settings").default({}),
+  companyContext: jsonb("company_context").default({}),
+  onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
+  language: varchar("language", { length: 10 }).notNull().default("pt-BR"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -193,6 +195,9 @@ export const executions = pgTable("executions", {
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   error: text("error"),
+  // Run folders
+  runId: varchar("run_id", { length: 30 }),
+  version: integer("version").default(1),
 }, (table) => [
   index("executions_squad_id_idx").on(table.squadId),
   index("executions_agent_id_idx").on(table.agentId),
@@ -223,18 +228,41 @@ export const auditLogs = pgTable("audit_logs", {
 // Integrations
 // ──────────────────────────────────────────────
 
-export const integrations = pgTable("integrations", {
+export const orgIntegrations = pgTable("org_integrations", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
-  type: integrationTypeEnum("type").notNull(),
-  config: jsonb("config").default({}),
-  status: integrationStatusEnum("status").notNull().default("inactive"),
+  integrationId: varchar("integration_id", { length: 50 }).notNull(),
+  nangoConnectionId: varchar("nango_connection_id", { length: 200 }),
+  tier: integrationTierEnum("tier").notNull().default("generic"),
+  status: integrationStatusEnum("status").notNull().default("disconnected"),
+  config: jsonb("config").notNull().default({}),
+  enabledCapabilities: jsonb("enabled_capabilities").$type<string[]>().notNull().default([]),
   lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  connectedAt: timestamp("connected_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  index("integrations_org_id_idx").on(table.orgId),
+  index("org_integrations_org_id_idx").on(table.orgId),
+  uniqueIndex("org_integrations_org_integration_idx").on(table.orgId, table.integrationId),
 ]);
+
+export const integrationWebhooks = pgTable("integration_webhooks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id),
+  integrationId: varchar("integration_id", { length: 50 }).notNull(),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  payload: jsonb("payload").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("integration_webhooks_org_id_idx").on(table.orgId),
+  index("integration_webhooks_integration_id_idx").on(table.integrationId),
+]);
+
+// Keep legacy alias for backward compatibility during migration
+export const integrations = orgIntegrations;
 
 // ──────────────────────────────────────────────
 // Messages (Chat)
@@ -255,14 +283,239 @@ export const messages = pgTable("messages", {
 ]);
 
 // ──────────────────────────────────────────────
+// Squad Memories
+// ──────────────────────────────────────────────
+
+export const memoryTypeEnum = pgEnum("memory_type", [
+  "preference", "decision", "feedback", "pattern", "correction",
+]);
+
+export const squadMemories = pgTable("squad_memories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  squadId: uuid("squad_id").notNull().references(() => squads.id, { onDelete: "cascade" }),
+  type: memoryTypeEnum("type").notNull(),
+  content: text("content").notNull(),
+  source: varchar("source", { length: 200 }),
+  importance: integer("importance").notNull().default(5),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("squad_memories_squad_id_idx").on(table.squadId),
+]);
+
+// ──────────────────────────────────────────────
+// Investigations (Sherlock)
+// ──────────────────────────────────────────────
+
+export const investigations = pgTable("investigations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  squadId: uuid("squad_id").references(() => squads.id, { onDelete: "set null" }),
+  profileUrl: text("profile_url").notNull(),
+  platform: varchar("platform", { length: 20 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  rawContents: jsonb("raw_contents"),
+  patternAnalysis: jsonb("pattern_analysis"),
+  consolidatedAnalysis: jsonb("consolidated_analysis"),
+  contentsExtracted: integer("contents_extracted").default(0),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  error: text("error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("investigations_org_id_idx").on(table.orgId),
+  index("investigations_squad_id_idx").on(table.squadId),
+]);
+
+// ──────────────────────────────────────────────
+// Organization Skills
+// ──────────────────────────────────────────────
+
+export const skillTypeEnum = pgEnum("skill_type", ["mcp", "script", "api", "prompt"]);
+
+export const orgSkills = pgTable("org_skills", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  skillId: varchar("skill_id", { length: 100 }).notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  type: skillTypeEnum("type").notNull(),
+  version: varchar("version", { length: 20 }).notNull().default("1.0.0"),
+  config: jsonb("config").notNull().default({}),
+  encryptedSecrets: text("encrypted_secrets"),
+  isActive: boolean("is_active").notNull().default(false),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("org_skills_org_id_idx").on(table.orgId),
+]);
+
+// ──────────────────────────────────────────────
+// LLM Providers
+// ──────────────────────────────────────────────
+
+export const llmProviderTypeEnum = pgEnum("llm_provider_type", [
+  "anthropic",
+  "openai",
+  "gemini",
+]);
+
+export const llmAuthMethodEnum = pgEnum("llm_auth_method", [
+  "oauth_token",
+  "api_key",
+]);
+
+export const llmProviders = pgTable("llm_providers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  provider: llmProviderTypeEnum("provider").notNull(),
+  authMethod: llmAuthMethodEnum("auth_method").notNull(),
+  encryptedCredential: text("encrypted_credential").notNull(),
+  label: varchar("label", { length: 100 }).notNull(),
+  defaultModel: varchar("default_model", { length: 100 }),
+  isActive: boolean("is_active").notNull().default(true),
+  isDefault: boolean("is_default").notNull().default(false),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  totalTokensUsed: bigint("total_tokens_used", { mode: "number" }).notNull().default(0),
+  totalCostCents: integer("total_cost_cents").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("llm_providers_org_id_idx").on(table.orgId),
+]);
+
+// ──────────────────────────────────────────────
+// Marketplace
+// ──────────────────────────────────────────────
+
+export const marketplaceItemTypeEnum = pgEnum("marketplace_item_type", ["agent", "squad"]);
+export const marketplaceCategoryEnum = pgEnum("marketplace_category", [
+  "marketing", "development", "support", "sales", "content", "analytics", "design", "general",
+]);
+
+export const marketplaceItems = pgTable("marketplace_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  type: marketplaceItemTypeEnum("type").notNull(),
+  category: marketplaceCategoryEnum("category").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description").notNull(),
+  icon: varchar("icon", { length: 10 }).notNull(),
+  agentConfig: jsonb("agent_config"),
+  squadConfig: jsonb("squad_config"),
+  author: varchar("author", { length: 100 }).notNull().default("OrbitMind"),
+  version: varchar("version", { length: 20 }).notNull().default("1.0.0"),
+  tags: jsonb("tags").$type<string[]>().notNull().default([]),
+  installs: integer("installs").notNull().default(0),
+  rating: integer("rating"),
+  price: integer("price").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const marketplaceAcquisitions = pgTable("marketplace_acquisitions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  itemId: uuid("item_id").notNull().references(() => marketplaceItems.id),
+  squadId: uuid("squad_id").references(() => squads.id),
+  createdSquadId: uuid("created_squad_id").references(() => squads.id),
+  acquiredAt: timestamp("acquired_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ──────────────────────────────────────────────
+// Schedules
+// ──────────────────────────────────────────────
+
+export const schedules = pgTable("schedules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  squadId: uuid("squad_id").notNull().references(() => squads.id, { onDelete: "cascade" }),
+  cronExpression: varchar("cron_expression", { length: 50 }).notNull(),
+  timezone: varchar("timezone", { length: 50 }).notNull().default("America/Sao_Paulo"),
+  isActive: boolean("is_active").notNull().default(true),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+  autonomy: varchar("autonomy", { length: 20 }).notNull().default("autonomous"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("schedules_org_id_idx").on(table.orgId),
+  index("schedules_squad_id_idx").on(table.squadId),
+]);
+
+// ──────────────────────────────────────────────
+// API Tokens
+// ──────────────────────────────────────────────
+
+export const apiTokens = pgTable("api_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  tokenHash: varchar("token_hash", { length: 128 }).notNull(),
+  prefix: varchar("prefix", { length: 10 }).notNull(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("api_tokens_org_id_idx").on(table.orgId),
+]);
+
+// ──────────────────────────────────────────────
+// Content Analytics
+// ──────────────────────────────────────────────
+
+export const contentAnalytics = pgTable("content_analytics", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id),
+  squadId: uuid("squad_id").notNull().references(() => squads.id),
+  runId: varchar("run_id", { length: 30 }),
+  platform: varchar("platform", { length: 20 }).notNull(),
+  postId: varchar("post_id", { length: 100 }),
+  postUrl: text("post_url"),
+  likes: integer("likes").default(0),
+  comments: integer("comments").default(0),
+  shares: integer("shares").default(0),
+  saves: integer("saves").default(0),
+  views: integer("views").default(0),
+  reach: integer("reach").default(0),
+  contentType: varchar("content_type", { length: 20 }),
+  tone: varchar("tone", { length: 30 }),
+  angle: varchar("angle", { length: 50 }),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("content_analytics_org_id_idx").on(table.orgId),
+  index("content_analytics_squad_id_idx").on(table.squadId),
+]);
+
+// ──────────────────────────────────────────────
+// Pipeline Logs
+// ──────────────────────────────────────────────
+
+export const pipelineLogs = pgTable("pipeline_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  squadId: uuid("squad_id").notNull().references(() => squads.id, { onDelete: "cascade" }),
+  runId: varchar("run_id", { length: 30 }).notNull(),
+  level: varchar("level", { length: 10 }).notNull(),
+  event: varchar("event", { length: 100 }).notNull(),
+  data: jsonb("data"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("pipeline_logs_squad_id_idx").on(table.squadId),
+  index("pipeline_logs_run_id_idx").on(table.runId),
+]);
+
+// ──────────────────────────────────────────────
 // Relations
 // ──────────────────────────────────────────────
 
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   users: many(users),
   squads: many(squads),
-  integrations: many(integrations),
+  integrations: many(orgIntegrations),
   auditLogs: many(auditLogs),
+  llmProviders: many(llmProviders),
+  orgSkills: many(orgSkills),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -308,4 +561,16 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   squad: one(squads, { fields: [messages.squadId], references: [squads.id] }),
   sender: one(users, { fields: [messages.senderId], references: [users.id] }),
   agent: one(agents, { fields: [messages.agentId], references: [agents.id] }),
+}));
+
+export const llmProvidersRelations = relations(llmProviders, ({ one }) => ({
+  organization: one(organizations, { fields: [llmProviders.orgId], references: [organizations.id] }),
+}));
+
+export const orgSkillsRelations = relations(orgSkills, ({ one }) => ({
+  organization: one(organizations, { fields: [orgSkills.orgId], references: [organizations.id] }),
+}));
+
+export const squadMemoriesRelations = relations(squadMemories, ({ one }) => ({
+  squad: one(squads, { fields: [squadMemories.squadId], references: [squads.id] }),
 }));

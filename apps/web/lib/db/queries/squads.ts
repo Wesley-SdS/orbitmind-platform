@@ -1,29 +1,37 @@
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, count, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { squads, agents, tasks } from "@/lib/db/schema";
 
 export async function getSquadsByOrgId(orgId: string) {
-  const rows = await db
-    .select({
-      id: squads.id,
-      orgId: squads.orgId,
-      name: squads.name,
-      code: squads.code,
-      description: squads.description,
-      icon: squads.icon,
-      config: squads.config,
-      status: squads.status,
-      templateId: squads.templateId,
-      createdBy: squads.createdBy,
-      createdAt: squads.createdAt,
-      updatedAt: squads.updatedAt,
-      agentCount: sql<number>`(SELECT count(*) FROM agents WHERE agents.squad_id = ${squads.id})::int`,
-      taskCount: sql<number>`(SELECT count(*) FROM tasks WHERE tasks.squad_id = ${squads.id})::int`,
-    })
+  // Get squads first
+  const squadRows = await db
+    .select()
     .from(squads)
-    .where(and(eq(squads.orgId, orgId), sql`${squads.status} != 'archived'`));
+    .where(and(
+      eq(squads.orgId, orgId),
+      ne(squads.status, "archived"),
+      ne(squads.code, "system-architect"),
+    ));
 
-  return rows;
+  // Get counts separately (avoids Drizzle subquery parameter issue)
+  const agentCounts = await db
+    .select({ squadId: agents.squadId, count: count() })
+    .from(agents)
+    .groupBy(agents.squadId);
+
+  const taskCounts = await db
+    .select({ squadId: tasks.squadId, count: count() })
+    .from(tasks)
+    .groupBy(tasks.squadId);
+
+  const agentMap = new Map(agentCounts.map((r) => [r.squadId, r.count]));
+  const taskMap = new Map(taskCounts.map((r) => [r.squadId, r.count]));
+
+  return squadRows.map((s) => ({
+    ...s,
+    agentCount: agentMap.get(s.id) ?? 0,
+    taskCount: taskMap.get(s.id) ?? 0,
+  }));
 }
 
 export async function getSquadById(squadId: string) {
