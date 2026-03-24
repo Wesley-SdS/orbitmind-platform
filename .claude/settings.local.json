@@ -25,7 +25,27 @@
       "Bash(do taskkill:*)",
       "Bash(done)",
       "Bash(do echo:*)",
-      "Bash(taskkill //F //PID $pid)"
+      "Bash(taskkill //F //PID $pid)",
+      "Bash(cat:*)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\alura\\\\Documents\\\\github\\\\orbitmind-platform\\\\apps\\\\web\\\\app\\\\api\\\\chat\\\\[squadId]\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\alura\\\\Documents\\\\github\\\\orbitmind-platform\\\\apps\\\\web\\\\app\\\\api\\\\integrations\\\\[integrationId]\")",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm build:*)",
+      "Bash(npx next:*)",
+      "Bash(pnpm db:push)",
+      "Bash(pnpm db:seed)",
+      "Bash(npx shadcn@latest add dialog -y)",
+      "Bash(PGPASSWORD=orbitmind_dev psql -h localhost -U orbitmind -d orbitmind -c \"SELECT s.name, s.code, \\(SELECT count\\(*\\) FROM agents WHERE squad_id = s.id\\) as agents FROM squads s WHERE status != ''archived'';\")",
+      "Bash(docker exec:*)",
+      "Bash(grep \"\\\\.md$\")",
+      "Bash(ls:*)",
+      "Bash(xargs grep:*)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\alura\\\\Documents\\\\github\\\\orbitmind-platform\\\\apps\\\\web\\\\app\\\\api\\\\marketplace\\\\[itemId]\\\\acquire\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\alura\\\\Documents\\\\github\\\\orbitmind-platform\\\\apps\\\\web\\\\app\\\\api\\\\squads\\\\[squadId]\\\\runs\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\alura\\\\Documents\\\\github\\\\orbitmind-platform\\\\apps\\\\web\\\\app\\\\api\\\\squads\\\\[squadId]\\\\schedules\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\alura\\\\Documents\\\\github\\\\orbitmind-platform\\\\apps\\\\web\\\\app\\\\api\\\\v1\\\\squads\\\\[squadId]\\\\run\")",
+      "Bash(docker compose:*)",
+      "Bash(npx shadcn@latest add checkbox)"
     ]
   }
 }

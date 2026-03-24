@@ -24,6 +24,13 @@
     },
     "db:push": {
       "cache": false
+    },
+    "db:seed": {
+      "cache": false
+    },
+    "dev:ws": {
+      "cache": false,
+      "persistent": true
     }
   }
 }
