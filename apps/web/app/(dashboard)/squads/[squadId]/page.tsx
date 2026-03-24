@@ -1,29 +1,51 @@
-"use client";
+export const dynamic = "force-dynamic";
 
-import { useState } from "react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { ArrowLeft, Play, Pause, Settings, Zap, Clock, DollarSign, Hash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { MOCK_SQUADS, MOCK_AGENTS, MOCK_EXECUTIONS } from "@/lib/mock-data";
+import { getSessionUser } from "@/lib/auth/session";
+import { getSquadWithAgents } from "@/lib/db/queries/squads";
+import { getExecutionsBySquadId } from "@/lib/db/queries/executions";
 
-export default function SquadDetailPage() {
-  const squad = MOCK_SQUADS[0]!;
-  const agents = MOCK_AGENTS.filter((a) => a.squadId === squad.id);
-  const executions = MOCK_EXECUTIONS.filter((e) => e.squadId === squad.id);
+const STATUS_COLORS: Record<string, string> = {
+  idle: "bg-muted-foreground",
+  working: "bg-blue-500 animate-pulse",
+  paused: "bg-yellow-500",
+};
+
+export default async function SquadDetailPage({
+  params,
+}: {
+  params: Promise<{ squadId: string }>;
+}) {
+  const { orgId } = await getSessionUser();
+  const { squadId } = await params;
+  const squadData = await getSquadWithAgents(squadId);
+
+  if (!squadData || squadData.orgId !== orgId) {
+    notFound();
+  }
+
+  const { agents, ...squad } = squadData;
+  const executions = await getExecutionsBySquadId(squadId, 20);
 
   const totalTokens = executions.reduce((sum, e) => sum + e.tokensUsed, 0);
   const totalCost = executions.reduce((sum, e) => sum + e.estimatedCost, 0);
   const completed = executions.filter((e) => e.status === "completed").length;
-
-  const STATUS_COLORS: Record<string, string> = {
-    idle: "bg-muted-foreground",
-    working: "bg-blue-500 animate-pulse",
-    paused: "bg-yellow-500",
-  };
+  const avgDuration = executions.filter((e) => e.durationMs).length > 0
+    ? Math.round(
+        executions
+          .filter((e) => e.durationMs)
+          .reduce((sum, e) => sum + (e.durationMs ?? 0), 0) /
+          executions.filter((e) => e.durationMs).length /
+          1000,
+      )
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -64,7 +86,7 @@ export default function SquadDetailPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {agents.map((agent) => {
               const budgetPct = agent.monthlyBudgetTokens
-                ? Math.round((agent.budgetUsedTokens / agent.monthlyBudgetTokens) * 100)
+                ? Math.round(((agent.budgetUsedTokens ?? 0) / agent.monthlyBudgetTokens) * 100)
                 : 0;
               return (
                 <Card key={agent.id}>
@@ -75,7 +97,7 @@ export default function SquadDetailPage() {
                           {agent.icon}
                         </div>
                         <div
-                          className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${STATUS_COLORS[agent.status]}`}
+                          className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${STATUS_COLORS[agent.status] ?? STATUS_COLORS.idle}`}
                         />
                       </div>
                       <div>
@@ -209,15 +231,7 @@ export default function SquadDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">
-                  {Math.round(
-                    executions
-                      .filter((e) => e.durationMs)
-                      .reduce((sum, e) => sum + (e.durationMs ?? 0), 0) /
-                      executions.filter((e) => e.durationMs).length /
-                      1000,
-                  )}s
-                </p>
+                <p className="text-2xl font-bold">{avgDuration}s</p>
                 <p className="text-xs text-muted-foreground">por execucao</p>
               </CardContent>
             </Card>

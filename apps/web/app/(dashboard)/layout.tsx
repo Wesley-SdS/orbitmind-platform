@@ -1,32 +1,38 @@
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { TopBar } from "@/components/top-bar";
+import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
+import { getRequiredSession } from "@/lib/auth/session";
+import { getOrganizationById } from "@/lib/db/queries/organizations";
 
-const MOCK_USER = {
-  id: "u-1",
-  name: "Admin OrbitMind",
-  email: "admin@orbitmind.com",
-  orgId: "org-1",
-  role: "owner",
-};
-
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // TODO: trocar por auth() quando DB estiver rodando
-  const user = MOCK_USER;
+  const session = await getRequiredSession();
+  const user = {
+    id: session.user.id,
+    name: session.user.name,
+    email: session.user.email,
+    orgId: session.user.orgId,
+    role: session.user.role,
+  };
+
+  const org = await getOrganizationById(session.user.orgId);
+  const showTour = !(org?.onboardingCompleted);
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        <AppSidebar user={user} />
-        <div className="flex flex-1 flex-col">
-          <TopBar user={user} />
-          <main className="flex-1 overflow-auto p-6">{children}</main>
+      <OnboardingProvider showTour={showTour}>
+        <div className="flex min-h-screen w-full">
+          <AppSidebar user={user} />
+          <div className="flex flex-1 flex-col">
+            <TopBar user={user} />
+            <main className="flex-1 overflow-auto p-6">{children}</main>
+          </div>
         </div>
-      </div>
+      </OnboardingProvider>
     </SidebarProvider>
   );
 }

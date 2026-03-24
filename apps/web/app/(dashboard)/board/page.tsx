@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KanbanBoard } from "@/components/board/kanban-board";
 import { TaskDetailDialog } from "@/components/board/task-detail-dialog";
-import { MOCK_TASKS, MOCK_AGENTS, MOCK_SQUADS } from "@/lib/mock-data";
 
 interface Task {
   id: string;
@@ -17,13 +16,44 @@ interface Task {
   assignedAgentId?: string | null;
 }
 
+interface Agent {
+  id: string;
+  name: string;
+  icon: string;
+}
+
+interface Squad {
+  id: string;
+  name: string;
+  icon: string | null;
+}
+
 export default function BoardPage() {
-  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [squad, setSquad] = useState<Squad | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const agents = MOCK_AGENTS.map((a) => ({ id: a.id, name: a.name, icon: a.icon }));
-  const squad = MOCK_SQUADS[0]!;
+  useEffect(() => {
+    // Load first squad
+    fetch("/api/squads")
+      .then((r) => r.json())
+      .then((squads: Squad[]) => {
+        const first = squads[0];
+        if (!first) return;
+        setSquad(first);
+
+        // Load tasks and agents for this squad
+        fetch(`/api/tasks?squadId=${first.id}`)
+          .then((r) => r.json())
+          .then((data) => setTasks(data));
+
+        fetch(`/api/squads/${first.id}/agents`)
+          .then((r) => r.json())
+          .then((data: Agent[]) => setAgents(data.map((a) => ({ id: a.id, name: a.name, icon: a.icon }))));
+      });
+  }, []);
 
   const handleTaskClick = useCallback((task: Task) => {
     setSelectedTask(task);
@@ -34,6 +64,12 @@ export default function BoardPage() {
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)),
     );
+    // Persist to database
+    fetch(`/api/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus }),
+    });
   }, []);
 
   const handleTaskUpdate = useCallback((taskId: string, data: Partial<Task>) => {
@@ -41,6 +77,12 @@ export default function BoardPage() {
       prev.map((t) => (t.id === taskId ? { ...t, ...data } : t)),
     );
     setSelectedTask((prev) => (prev?.id === taskId ? { ...prev, ...data } : prev));
+    // Persist to database
+    fetch(`/api/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
   }, []);
 
   return (
@@ -48,7 +90,9 @@ export default function BoardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Board</h1>
-          <p className="text-sm text-muted-foreground">{squad.icon} {squad.name}</p>
+          {squad && (
+            <p className="text-sm text-muted-foreground">{squad.icon} {squad.name}</p>
+          )}
         </div>
         <Button size="sm">
           <Plus className="mr-2 h-4 w-4" />

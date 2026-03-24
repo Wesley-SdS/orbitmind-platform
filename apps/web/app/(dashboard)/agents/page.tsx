@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -13,7 +13,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
-import { MOCK_AGENTS, MOCK_SQUADS } from "@/lib/mock-data";
+
+interface AgentWithSquad {
+  id: string;
+  squadId: string;
+  name: string;
+  role: string;
+  icon: string | null;
+  modelTier: string;
+  monthlyBudgetTokens: number | null;
+  budgetUsedTokens: number | null;
+  status: string;
+  squadName: string;
+  squadIcon: string | null;
+}
+
+interface Squad {
+  id: string;
+  name: string;
+  icon: string | null;
+}
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   idle: { label: "Idle", color: "bg-muted-foreground" },
@@ -22,11 +41,30 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export default function AgentsPage() {
+  const [agents, setAgents] = useState<AgentWithSquad[]>([]);
+  const [squads, setSquads] = useState<Squad[]>([]);
   const [search, setSearch] = useState("");
   const [filterSquad, setFilterSquad] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const filtered = MOCK_AGENTS.filter((agent) => {
+  useEffect(() => {
+    fetch("/api/squads")
+      .then((r) => r.json())
+      .then((data) => {
+        setSquads(data);
+        // Fetch agents from each squad
+        const agentPromises = data.map((s: Squad) =>
+          fetch(`/api/squads/${s.id}/agents`).then((r) => r.json()).then((agents: AgentWithSquad[]) =>
+            agents.map((a: AgentWithSquad) => ({ ...a, squadName: (s as Squad & { name: string }).name, squadIcon: (s as Squad & { icon: string | null }).icon }))
+          )
+        );
+        Promise.all(agentPromises).then((results) => {
+          setAgents(results.flat());
+        });
+      });
+  }, []);
+
+  const filtered = agents.filter((agent) => {
     if (search && !agent.name.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterSquad !== "all" && agent.squadId !== filterSquad) return false;
     if (filterStatus !== "all" && agent.status !== filterStatus) return false;
@@ -56,7 +94,7 @@ export default function AgentsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os squads</SelectItem>
-            {MOCK_SQUADS.map((s) => (
+            {squads.map((s) => (
               <SelectItem key={s.id} value={s.id}>{s.icon} {s.name}</SelectItem>
             ))}
           </SelectContent>
@@ -76,9 +114,8 @@ export default function AgentsPage() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filtered.map((agent) => {
-          const squad = MOCK_SQUADS.find((s) => s.id === agent.squadId);
           const budgetPct = agent.monthlyBudgetTokens
-            ? Math.round((agent.budgetUsedTokens / agent.monthlyBudgetTokens) * 100)
+            ? Math.round(((agent.budgetUsedTokens ?? 0) / agent.monthlyBudgetTokens) * 100)
             : 0;
           const statusConf = STATUS_CONFIG[agent.status] ?? STATUS_CONFIG.idle!;
 
@@ -101,12 +138,10 @@ export default function AgentsPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {squad && (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span>{squad.icon}</span>
-                    <span>{squad.name}</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span>{agent.squadIcon}</span>
+                  <span>{agent.squadName}</span>
+                </div>
                 <div className="flex items-center justify-between text-xs">
                   <Badge variant="outline" className="text-[10px]">
                     {agent.modelTier === "powerful" ? "Opus" : "Haiku"}

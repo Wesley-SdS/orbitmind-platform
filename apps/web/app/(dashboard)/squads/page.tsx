@@ -1,13 +1,13 @@
-"use client";
+export const dynamic = "force-dynamic";
 
-import { useState } from "react";
 import Link from "next/link";
-import { Plus, Bot, Users, ClipboardList } from "lucide-react";
+import { Plus, Users, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { MOCK_SQUADS } from "@/lib/mock-data";
+import { getSessionUser } from "@/lib/auth/session";
+import { getSquadsByOrgId } from "@/lib/db/queries/squads";
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
   active: "default",
@@ -21,8 +21,10 @@ const STATUS_LABEL: Record<string, string> = {
   archived: "Arquivado",
 };
 
-export default function SquadsPage() {
-  const [squads] = useState(MOCK_SQUADS);
+export default async function SquadsPage() {
+  const { orgId } = await getSessionUser();
+  const squads = await getSquadsByOrgId(orgId);
+  console.log("[DEBUG /squads page]", orgId, squads.map(s => ({ name: s.name, agentCount: s.agentCount, taskCount: s.taskCount })));
 
   return (
     <div className="space-y-6">
@@ -31,14 +33,13 @@ export default function SquadsPage() {
           <h1 className="text-2xl font-bold">Squads</h1>
           <p className="text-muted-foreground">Gerencie seus squads de agentes IA</p>
         </div>
-        <Button render={<Link href="/squads/new" />}>
+        <Button render={<Link href="/chat?squad=system-architect" />}>
           <Plus className="mr-2 h-4 w-4" />
           Criar Squad
         </Button>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {squads.map((squad) => {
-          const budgetUsed = 35;
           return (
             <Link key={squad.id} href={`/squads/${squad.id}`}>
               <Card className="transition-colors hover:border-primary/50 cursor-pointer h-full">
@@ -68,18 +69,20 @@ export default function SquadsPage() {
                       {squad.taskCount} tasks
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Budget</span>
-                      <span>{budgetUsed}%</span>
-                    </div>
-                    <Progress value={budgetUsed} className="h-1.5" />
-                  </div>
                 </CardContent>
               </Card>
             </Link>
           );
         })}
+        {squads.length === 0 && (
+          <div className="col-span-full text-center py-12">
+            <p className="text-muted-foreground">Nenhum squad criado ainda.</p>
+            <Button className="mt-4" render={<Link href="/chat?squad=system-architect" />}>
+              <Plus className="mr-2 h-4 w-4" />
+              Criar seu primeiro squad
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

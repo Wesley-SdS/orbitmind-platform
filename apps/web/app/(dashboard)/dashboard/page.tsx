@@ -1,40 +1,49 @@
-"use client";
+export const dynamic = "force-dynamic";
 
 import { Bot, CheckCircle, Zap, DollarSign, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { MOCK_SQUADS, MOCK_AGENTS, MOCK_EXECUTIONS } from "@/lib/mock-data";
+import { getSessionUser } from "@/lib/auth/session";
+import { getDashboardMetrics } from "@/lib/db/queries/metrics";
 
-const STATS = [
-  { label: "Squads Ativos", value: "2", change: "+1 este mes", icon: Bot, color: "text-blue-500" },
-  { label: "Tasks Completadas", value: "8", change: "+3 esta semana", icon: CheckCircle, color: "text-green-500" },
-  { label: "Execucoes Hoje", value: "6", change: "4 concluidas", icon: Zap, color: "text-yellow-500" },
-  { label: "Custo Estimado", value: "R$ 3,78", change: "este mes", icon: DollarSign, color: "text-purple-500" },
-];
+const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
 
-const ACTIVITY = [
-  { icon: "🤖", text: "Carlos Copy completou 'Post LinkedIn sobre IA'", time: "2 min" },
-  { icon: "✅", text: "Vera Review aprovou copy do email marketing", time: "5 min" },
-  { icon: "📊", text: "Samuel SEO analisou SEO do blog post - Score: 78/100", time: "12 min" },
-  { icon: "🧠", text: "Sofia Strategy definiu estrategia Q2 2026", time: "25 min" },
-  { icon: "🔍", text: "Ana Insights completou pesquisa de tendencias", time: "45 min" },
-  { icon: "🚀", text: "Pipeline 'Marketing Campaign Q2' iniciado", time: "1h" },
-  { icon: "📤", text: "Paula Post publicou conteudo no Instagram", time: "2h" },
-  { icon: "🎨", text: "Diana Design criou carrossel de 5 slides", time: "3h" },
-];
+function formatRelativeTime(date: Date): string {
+  const diff = Date.now() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "agora";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
 
-const EXEC_DAYS = [
-  { day: "Seg", completed: 3, failed: 0, cancelled: 0 },
-  { day: "Ter", completed: 5, failed: 1, cancelled: 0 },
-  { day: "Qua", completed: 4, failed: 0, cancelled: 1 },
-  { day: "Qui", completed: 7, failed: 0, cancelled: 0 },
-  { day: "Sex", completed: 6, failed: 1, cancelled: 0 },
-  { day: "Sab", completed: 2, failed: 0, cancelled: 0 },
-  { day: "Dom", completed: 1, failed: 0, cancelled: 0 },
-];
+const AUDIT_ICONS: Record<string, string> = {
+  "squad.created": "🚀",
+  "agent.started": "🤖",
+  "task.completed": "✅",
+  "pipeline.checkpoint": "⏸️",
+  "checkpoint.approved": "👍",
+  "budget.warning": "⚠️",
+  "integration.connected": "🔗",
+  "org.created": "🏢",
+  "user.created": "👤",
+};
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const { orgId } = await getSessionUser();
+  const metrics = await getDashboardMetrics(orgId);
+
+  const stats = [
+    { label: "Squads Ativos", value: String(metrics.squadsActive), change: "", icon: Bot, color: "text-blue-500" },
+    { label: "Tasks Completadas", value: String(metrics.tasksCompletedThisMonth), change: "este mes", icon: CheckCircle, color: "text-green-500" },
+    { label: "Execucoes Hoje", value: String(metrics.executionsToday), change: "", icon: Zap, color: "text-yellow-500" },
+    { label: "Custo Estimado", value: `R$ ${(metrics.estimatedCostCentsThisMonth / 100).toFixed(2)}`, change: "este mes", icon: DollarSign, color: "text-purple-500" },
+  ];
+
+  const maxExec = Math.max(8, ...metrics.executionsByDay.map((d) => d.completed + d.failed + d.cancelled));
+
   return (
     <div className="space-y-6">
       <div>
@@ -43,7 +52,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {STATS.map((stat) => (
+        {stats.map((stat) => (
           <Card key={stat.label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -53,7 +62,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{stat.value}</p>
-              <p className="text-xs text-muted-foreground">{stat.change}</p>
+              {stat.change && <p className="text-xs text-muted-foreground">{stat.change}</p>}
             </CardContent>
           </Card>
         ))}
@@ -66,34 +75,40 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-end gap-3 h-40">
-              {EXEC_DAYS.map((d) => {
-                const total = d.completed + d.failed + d.cancelled;
-                const maxH = 128;
-                const h = Math.max((total / 8) * maxH, 8);
-                return (
-                  <div key={d.day} className="flex flex-1 flex-col items-center gap-1">
-                    <div className="relative w-full flex flex-col-reverse" style={{ height: maxH }}>
-                      <div
-                        className="w-full rounded-t bg-green-500/80"
-                        style={{ height: (d.completed / 8) * maxH }}
-                      />
-                      {d.failed > 0 && (
+              {metrics.executionsByDay.length > 0 ? (
+                metrics.executionsByDay.map((d) => {
+                  const dayDate = new Date(d.date + "T12:00:00Z");
+                  const dayLabel = DAY_LABELS[dayDate.getUTCDay()] ?? "";
+                  const maxH = 128;
+                  return (
+                    <div key={d.date} className="flex flex-1 flex-col items-center gap-1">
+                      <div className="relative w-full flex flex-col-reverse" style={{ height: maxH }}>
                         <div
-                          className="w-full bg-red-500/80"
-                          style={{ height: (d.failed / 8) * maxH }}
+                          className="w-full rounded-t bg-green-500/80"
+                          style={{ height: (d.completed / maxExec) * maxH }}
                         />
-                      )}
-                      {d.cancelled > 0 && (
-                        <div
-                          className="w-full bg-muted-foreground/30"
-                          style={{ height: (d.cancelled / 8) * maxH }}
-                        />
-                      )}
+                        {d.failed > 0 && (
+                          <div
+                            className="w-full bg-red-500/80"
+                            style={{ height: (d.failed / maxExec) * maxH }}
+                          />
+                        )}
+                        {d.cancelled > 0 && (
+                          <div
+                            className="w-full bg-muted-foreground/30"
+                            style={{ height: (d.cancelled / maxExec) * maxH }}
+                          />
+                        )}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">{dayLabel}</span>
                     </div>
-                    <span className="text-[10px] text-muted-foreground">{d.day}</span>
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+                  Nenhuma execucao nos ultimos 7 dias
+                </div>
+              )}
             </div>
             <div className="flex gap-4 mt-4 text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5">
@@ -117,28 +132,26 @@ export default function DashboardPage() {
             <CardTitle className="text-base">Budget por Agente</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {MOCK_AGENTS.slice(0, 5).map((agent) => {
-              const pct = agent.monthlyBudgetTokens
-                ? Math.round((agent.budgetUsedTokens / agent.monthlyBudgetTokens) * 100)
-                : 0;
-              return (
-                <div key={agent.id} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="flex items-center gap-1.5">
-                      <span>{agent.icon}</span>
-                      {agent.name}
-                    </span>
-                    <span className={pct > 80 ? "text-red-500" : pct > 60 ? "text-yellow-500" : "text-muted-foreground"}>
-                      {pct}%
-                    </span>
-                  </div>
-                  <Progress
-                    value={pct}
-                    className={`h-1.5 ${pct > 80 ? "[&>div]:bg-red-500" : pct > 60 ? "[&>div]:bg-yellow-500" : ""}`}
-                  />
+            {metrics.budgetByAgent.slice(0, 5).map((agent) => (
+              <div key={agent.agentId} className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5">
+                    <span>{agent.agentIcon}</span>
+                    {agent.agentName}
+                  </span>
+                  <span className={agent.percentage > 80 ? "text-red-500" : agent.percentage > 60 ? "text-yellow-500" : "text-muted-foreground"}>
+                    {agent.percentage}%
+                  </span>
                 </div>
-              );
-            })}
+                <Progress
+                  value={agent.percentage}
+                  className={`h-1.5 ${agent.percentage > 80 ? "[&>div]:bg-red-500" : agent.percentage > 60 ? "[&>div]:bg-yellow-500" : ""}`}
+                />
+              </div>
+            ))}
+            {metrics.budgetByAgent.length === 0 && (
+              <p className="text-sm text-muted-foreground">Nenhum agente configurado</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -149,7 +162,7 @@ export default function DashboardPage() {
             <CardTitle className="text-base">Squads Ativos</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {MOCK_SQUADS.filter((s) => s.status === "active").map((squad) => (
+            {metrics.activeSquads.map((squad) => (
               <div key={squad.id} className="flex items-center gap-3 rounded-lg border p-3">
                 <span className="text-2xl">{squad.icon}</span>
                 <div className="flex-1">
@@ -162,6 +175,9 @@ export default function DashboardPage() {
                 </Badge>
               </div>
             ))}
+            {metrics.activeSquads.length === 0 && (
+              <p className="text-sm text-muted-foreground">Nenhum squad ativo</p>
+            )}
           </CardContent>
         </Card>
 
@@ -171,18 +187,28 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {ACTIVITY.map((event, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <span className="text-base mt-0.5">{event.icon}</span>
+              {metrics.recentActivity.map((event) => (
+                <div key={event.id} className="flex items-start gap-3">
+                  <span className="text-base mt-0.5">{AUDIT_ICONS[event.action] ?? "📋"}</span>
                   <div className="flex-1">
-                    <p className="text-sm">{event.text}</p>
+                    <p className="text-sm">
+                      {event.action}
+                      {(event.metadata as Record<string, unknown>)?.taskTitle
+                        ? ` — ${(event.metadata as Record<string, unknown>).taskTitle}`
+                        : (event.metadata as Record<string, unknown>)?.squadName
+                          ? ` — ${(event.metadata as Record<string, unknown>).squadName}`
+                          : ""}
+                    </p>
                   </div>
                   <span className="shrink-0 text-[10px] text-muted-foreground flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {event.time}
+                    {formatRelativeTime(event.createdAt)}
                   </span>
                 </div>
               ))}
+              {metrics.recentActivity.length === 0 && (
+                <p className="text-sm text-muted-foreground">Nenhuma atividade recente</p>
+              )}
             </div>
           </CardContent>
         </Card>

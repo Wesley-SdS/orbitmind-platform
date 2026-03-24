@@ -11,6 +11,7 @@ import {
   Building2,
   Orbit,
   KanbanSquare,
+  ShoppingBag,
 } from "lucide-react";
 import {
   Sidebar,
@@ -37,13 +38,14 @@ interface AppSidebarProps {
 }
 
 const navItems = [
-  { title: "Chat", href: "/chat", icon: MessageSquare },
-  { title: "Board", href: "/board", icon: KanbanSquare },
-  { title: "Squads", href: "/squads", icon: Bot },
-  { title: "Agentes", href: "/agents", icon: Users },
-  { title: "Integracoes", href: "/integrations", icon: Link2 },
-  { title: "Settings", href: "/settings", icon: Settings },
-  { title: "Escritorio", href: "/office", icon: Building2, badge: "Em breve" },
+  { title: "Chat", href: "/chat", icon: MessageSquare, id: "sidebar-chat" },
+  { title: "Board", href: "/board", icon: KanbanSquare, id: "sidebar-board" },
+  { title: "Squads", href: "/squads", icon: Bot, id: "sidebar-squads" },
+  { title: "Agentes", href: "/agents", icon: Users, id: "sidebar-agents" },
+  { title: "Marketplace", href: "/marketplace", icon: ShoppingBag, id: "sidebar-marketplace" },
+  { title: "Integracoes", href: "/integrations", icon: Link2, id: "sidebar-integrations" },
+  { title: "Settings", href: "/settings", icon: Settings, id: "sidebar-settings" },
+  { title: "Escritorio", href: "/office", icon: Building2, id: "sidebar-office", badge: undefined as string | undefined },
 ];
 
 export function AppSidebar({ user }: AppSidebarProps) {
@@ -72,7 +74,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                   pathname === item.href ||
                   (item.href !== "/" && pathname.startsWith(item.href));
                 return (
-                  <SidebarMenuItem key={item.href}>
+                  <SidebarMenuItem key={item.href} id={item.id}>
                     <SidebarMenuButton
                       isActive={isActive}
                       render={<Link href={item.href} />}
