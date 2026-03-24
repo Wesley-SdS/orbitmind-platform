@@ -51,11 +51,47 @@ export type RuntimeType = "claude-code" | "codex" | "custom";
 export type AgentStatus = "idle" | "working" | "paused";
 export type AgentExecutionStatus = "idle" | "working" | "delivering" | "done" | "checkpoint";
 
+export interface AgentTask {
+  id: string;
+  name: string;
+  order: number;
+  input: string;
+  output: string;
+  process: string[];
+  outputFormat?: string;
+  outputExample?: string;
+  qualityCriteria: string[];
+  vetoConditions: string[];
+}
+
+export interface AgentPersona {
+  role: string;
+  identity: string;
+  communicationStyle: string;
+}
+
+export interface AgentDeepConfig {
+  persona?: AgentPersona;
+  principles?: string[];
+  operationalFramework?: { process: string[]; decisionCriteria: string[] };
+  voiceGuidance?: {
+    alwaysUse: Array<{ term: string; reason: string }>;
+    neverUse: Array<{ term: string; reason: string }>;
+    toneRules: string[];
+  };
+  outputExamples?: string[];
+  antiPatterns?: { neverDo: Array<{ mistake: string; reason: string }>; alwaysDo: Array<{ practice: string; reason: string }> };
+  qualityCriteria?: string[];
+  integration?: { readsFrom: string[]; writesTo: string[]; triggers: string[]; dependsOn: string[] };
+}
+
 export interface AgentDefinition {
   id: string;
   name: string;
   icon: string;
   custom: string;
+  tasks?: AgentTask[];
+  deepConfig?: AgentDeepConfig;
 }
 
 export interface AgentState {
@@ -148,11 +184,35 @@ export interface PipelineStep {
   condition?: string;
   message?: string;
   options?: string[];
+  // Veto conditions
+  vetoConditions?: string[];
+  maxVetoRetries?: number;
+  // Review loops
+  onReject?: string;
+  maxReviewCycles?: number;
+  // Format injection (platform best practices)
+  format?: string;
+}
+
+export interface RunContext {
+  runId: string;
+  startedAt: string;
+  outputs: Map<string, RunStepOutput>;
+}
+
+export interface RunStepOutput {
+  stepId: string;
+  agentId: string;
+  version: number;
+  content: string;
+  timestamp: string;
+  vetoed: boolean;
+  reviewFeedback?: string;
 }
 
 export interface PipelineDefinition {
   name: string;
-  description: string;
+  description?: string;
   steps: PipelineStep[];
 }
 
@@ -188,8 +248,8 @@ export interface SkillDefinition {
 // Integration
 // ──────────────────────────────────────────────
 
-export type IntegrationType = "github" | "gitlab" | "discord" | "telegram" | "slack";
-export type IntegrationStatus = "active" | "inactive" | "error";
+export type IntegrationTier = "premium" | "generic";
+export type IntegrationStatus = "active" | "inactive" | "error" | "disconnected";
 
 // ──────────────────────────────────────────────
 // Audit

@@ -57,6 +57,14 @@ export const pipelineStepSchema = z.object({
   condition: z.string().optional(),
   message: z.string().optional(),
   options: z.array(z.string()).optional(),
+  // Veto conditions
+  veto_conditions: z.array(z.string()).optional(),
+  max_veto_retries: z.number().int().min(0).max(5).default(2),
+  // Review loops
+  on_reject: z.string().optional(),
+  max_review_cycles: z.number().int().min(1).max(10).default(3),
+  // Format injection
+  format: z.string().optional(),
 });
 
 export const pipelineSchema = z.object({
