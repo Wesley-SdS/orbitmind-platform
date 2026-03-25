@@ -36,6 +36,8 @@ export async function createExecution(data: {
   pipelineStep?: string;
   status?: "running" | "completed" | "failed" | "cancelled";
   inputData?: Record<string, unknown>;
+  runId?: string;
+  version?: number;
 }) {
   const [execution] = await db.insert(executions).values(data).returning();
   return execution!;

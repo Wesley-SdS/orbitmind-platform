@@ -13,7 +13,15 @@ export async function getOrganizationById(id: string) {
 
 export async function updateOrganization(
   id: string,
-  data: { name?: string; slug?: string; logoUrl?: string | null; settings?: Record<string, unknown> },
+  data: {
+    name?: string;
+    slug?: string;
+    logoUrl?: string | null;
+    settings?: Record<string, unknown>;
+    companyContext?: Record<string, unknown>;
+    onboardingCompleted?: boolean;
+    language?: string;
+  },
 ) {
   const [updated] = await db
     .update(organizations)
