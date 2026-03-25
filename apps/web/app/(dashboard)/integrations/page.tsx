@@ -85,9 +85,19 @@ export default function IntegrationsPage() {
     try {
       // Criar session Nango
       const resp = await fetch("/api/integrations/connect", { method: "POST" });
-      const { sessionToken } = await resp.json();
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: "Falha ao conectar" }));
+        alert(err.error ?? "Erro ao criar sessão de conexão. Verifique se NANGO_SECRET_KEY está configurada.");
+        return;
+      }
 
-      if (sessionToken && typeof window !== "undefined") {
+      const { sessionToken } = await resp.json();
+      if (!sessionToken) {
+        alert("Sessão de conexão inválida. Verifique as configurações do Nango.");
+        return;
+      }
+
+      if (typeof window !== "undefined") {
         // Importar Nango frontend dinamicamente (default export)
         const NangoFrontend = (await import("@nangohq/frontend")).default;
         const nango = new NangoFrontend({ connectSessionToken: sessionToken });
@@ -95,8 +105,8 @@ export default function IntegrationsPage() {
         nango.openConnectUI({
           onEvent: async (event) => {
             if (event.type === "connect") {
-              // Salvar no banco
-              await fetch("/api/integrations", {
+              // Salvar no banco apenas apos OAuth completar
+              const saveResp = await fetch("/api/integrations", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -106,13 +116,16 @@ export default function IntegrationsPage() {
                   connectedAt: new Date().toISOString(),
                 }),
               });
-              await loadData();
+              if (saveResp.ok) {
+                await loadData();
+              }
             }
           },
         });
       }
     } catch (error) {
       console.error("Connect error:", error);
+      alert("Erro ao conectar integração. Tente novamente.");
     } finally {
       setConnectingId(null);
     }
@@ -168,9 +181,9 @@ export default function IntegrationsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Integracoes</h1>
+        <h1 className="text-2xl font-bold">Integrações</h1>
         <p className="text-muted-foreground">
-          {connectedCount} conectadas de {catalog.totalAvailable}+ disponiveis via Nango
+          {connectedCount} conectadas de {catalog.totalAvailable}+ disponíveis via Nango
         </p>
       </div>
 
@@ -179,7 +192,7 @@ export default function IntegrationsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar integracao..."
+            placeholder="Buscar integração..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -221,10 +234,10 @@ export default function IntegrationsPage() {
       <div>
         <div className="flex items-center gap-2 mb-4">
           <Zap className="h-5 w-5 text-yellow-500" />
-          <h2 className="text-lg font-semibold">Integracoes Premium ({filteredPremium.length})</h2>
+          <h2 className="text-lg font-semibold">Integrações Premium ({filteredPremium.length})</h2>
         </div>
         <p className="text-sm text-muted-foreground mb-4">
-          Actions customizadas profundas com configuracao especifica
+          Actions customizadas profundas com configuração específica
         </p>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -320,7 +333,7 @@ export default function IntegrationsPage() {
           >
             <Link2 className="h-5 w-5 text-blue-500" />
             <h2 className="text-lg font-semibold">
-              Todas as Integracoes ({catalog.genericTotal}+)
+              Todas as Integrações ({catalog.genericTotal}+)
             </h2>
             {catalog.source === "nango-api" && (
               <Badge variant="outline" className="text-xs">via Nango API</Badge>
@@ -328,7 +341,7 @@ export default function IntegrationsPage() {
             {expandedGeneric ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </div>
           <p className="text-sm text-muted-foreground mb-4">
-            Conecte qualquer API via OAuth — autenticacao gerenciada pelo Nango
+            Conecte qualquer API via OAuth — autenticação gerenciada pelo Nango
           </p>
 
           {expandedGeneric && (
@@ -422,7 +435,7 @@ function ConfigDialog({
     try {
       const resp = await fetch(`/api/integrations/${orgIntegration.id}/test`, { method: "POST" });
       const data = await resp.json();
-      setTestResult(data.connected ? "Conexao OK" : "Falha na conexao");
+      setTestResult(data.connected ? "Conexão OK" : "Falha na conexão");
     } catch {
       setTestResult("Erro ao testar");
     } finally {
@@ -469,7 +482,7 @@ function ConfigDialog({
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleTest} disabled={testing || !orgIntegration}>
               {testing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-              Testar Conexao
+              Testar Conexão
             </Button>
             {testResult && (
               <span className={`text-xs ${testResult.includes("OK") ? "text-green-500" : "text-red-500"}`}>
