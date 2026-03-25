@@ -164,7 +164,7 @@ export default function MarketplacePage() {
             </div>
           )}
           {acquireItem?.type === "squad" && (
-            <p className="text-sm py-4">Um novo squad sera criado na sua organizacao com todos os agentes e pipeline configurados.</p>
+            <p className="text-sm py-4">Um novo squad será criado na sua organização com todos os agentes e pipeline configurados.</p>
           )}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAcquireItem(null)}>Cancelar</Button>

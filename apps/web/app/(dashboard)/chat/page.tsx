@@ -37,7 +37,7 @@ interface Conversation {
 const SUGGESTIONS = [
   { text: "Criar um novo squad de agentes", icon: Sparkles },
   { text: "Ver meus squads", icon: ClipboardList },
-  { text: "Como estao meus agentes?", icon: Bot },
+  { text: "Como estão meus agentes?", icon: Bot },
   { text: "Resumo do meu dashboard", icon: BarChart3 },
 ];
 
@@ -275,7 +275,7 @@ export default function ChatPage() {
               <div className="space-y-2">
                 <h2 className="text-xl font-bold">OrbitMind Assistant</h2>
                 <p className="text-sm text-muted-foreground max-w-md">
-                  Pergunte qualquer coisa — criar squads, editar agentes, ver status, consultar metricas.
+                  Pergunte qualquer coisa — criar squads, editar agentes, ver status, consultar métricas.
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-2 max-w-md w-full">

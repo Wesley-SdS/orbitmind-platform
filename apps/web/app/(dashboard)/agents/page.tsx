@@ -75,7 +75,7 @@ export default function AgentsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Agentes</h1>
-        <p className="text-muted-foreground">Todos os agentes da sua organizacao</p>
+        <p className="text-muted-foreground">Todos os agentes da sua organização</p>
       </div>
 
       <div className="flex flex-wrap gap-3">
