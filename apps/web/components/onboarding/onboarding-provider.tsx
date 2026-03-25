@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Onborda } from "onborda";
+import { Onborda, OnbordaProvider as OnbordaCtx } from "onborda";
 import { TourCard } from "./tour-card";
 import { mainTourSteps } from "@/lib/onboarding/tour-steps";
 
@@ -22,15 +22,17 @@ export function OnboardingProvider({ children, showTour = false }: OnboardingPro
   }, [showTour]);
 
   return (
-    <Onborda
-      steps={mainTourSteps}
-      showOnborda={show}
-      shadowRgb="83,74,183"
-      shadowOpacity="0.6"
-      cardComponent={TourCard as any}
-      cardTransition={{ duration: 0.3, type: "tween" }}
-    >
-      {children}
-    </Onborda>
+    <OnbordaCtx>
+      <Onborda
+        steps={mainTourSteps}
+        showOnborda={show}
+        shadowRgb="83,74,183"
+        shadowOpacity="0.6"
+        cardComponent={TourCard as any}
+        cardTransition={{ duration: 0.3, type: "tween" }}
+      >
+        {children}
+      </Onborda>
+    </OnbordaCtx>
   );
 }
