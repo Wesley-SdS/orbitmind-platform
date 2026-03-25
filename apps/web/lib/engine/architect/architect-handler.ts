@@ -5,6 +5,9 @@ import { createMessage, getMessagesByConversationId, getMessagesBySquadId } from
 import { getSquadsByOrgId, getSquadWithAgents, createSquad, updateSquad } from "@/lib/db/queries/squads";
 import { createAgent, getAgentsBySquadId } from "@/lib/db/queries/agents";
 import { createAuditLog } from "@/lib/db/queries/audit-logs";
+import { getOrganizationById, updateOrganization } from "@/lib/db/queries/organizations";
+import { getIntegrationsByOrgId } from "@/lib/db/queries/integrations";
+import { getTopMemories } from "@/lib/db/queries/squad-memories";
 import { ARCHITECT_AGENT, ARCHITECT_SQUAD_ID } from "./architect-agent";
 import type { ArchitectConversationState } from "./architect-state";
 import { detectIntent } from "./architect-state";
@@ -73,6 +76,25 @@ export async function handleArchitectMessage(
   // Set global conversationId for message tagging
   _currentConversationId = conversationId;
   setActionConversationId(conversationId);
+
+  // ── Company Wizard: coleta contexto da empresa antes de qualquer ação ──
+  const org = await getOrganizationById(orgId);
+  const companyCtx = org?.companyContext as Record<string, unknown> | null;
+
+  if (org && (!companyCtx || !companyCtx.name) && !state.wizardStep) {
+    state.wizardStep = 1;
+    await sendArchitectMessage(squadId,
+      "Bem-vindo ao OrbitMind! Antes de criarmos seu primeiro squad, preciso conhecer sua empresa. Sao 5 perguntas rapidas!\n\n**1/5 — Como se chama sua empresa ou projeto?**",
+    );
+    architectStates.set(stateKey, state);
+    return;
+  }
+
+  if (state.wizardStep && state.wizardStep >= 1 && state.wizardStep <= 5) {
+    await handleCompanyWizard(state, squadId, userMessage);
+    architectStates.set(stateKey, state);
+    return;
+  }
 
   const llmProvider = await getDefaultLlmProvider(orgId);
   if (!llmProvider) {
@@ -180,6 +202,137 @@ export async function handleArchitectMessage(
   architectStates.set(stateKey, state);
 }
 
+// ===================== COMPANY WIZARD =====================
+
+async function handleCompanyWizard(
+  state: ArchitectConversationState,
+  squadId: string,
+  userMessage: string,
+) {
+  if (!state.wizardData) state.wizardData = {};
+
+  const sectorOptions: Record<string, string> = {
+    "1": "Marketing Digital", "2": "SaaS / Tecnologia", "3": "E-commerce",
+    "4": "Educacao", "5": "Saude", "6": "Financeiro",
+  };
+  const audienceOptions: Record<string, string> = {
+    "1": "Empresas B2B", "2": "Consumidores (B2C)",
+    "3": "Empreendedores / startups", "4": "Ambos (B2B e B2C)",
+  };
+  const toneOptions: Record<string, string> = {
+    "1": "Profissional", "2": "Casual", "3": "Tecnico",
+    "4": "Divertido", "5": "Inspirador", "6": "Provocativo",
+  };
+
+  switch (state.wizardStep) {
+    case 1:
+      state.wizardData.name = userMessage.trim();
+      await sendArchitectMessage(squadId,
+        `Otimo, **${state.wizardData.name}**!\n\n**2/5 — Qual o setor de atuacao?**\n\n1. Marketing Digital\n2. SaaS / Tecnologia\n3. E-commerce\n4. Educacao\n5. Saude\n6. Financeiro\n7. Outro (descreva)`,
+      );
+      state.wizardStep = 2;
+      break;
+
+    case 2:
+      state.wizardData.sector = sectorOptions[userMessage.trim()] || userMessage.trim();
+      await sendArchitectMessage(squadId,
+        `**3/5 — Quem e seu publico-alvo principal?**\n\n1. Empresas B2B\n2. Consumidores (B2C)\n3. Empreendedores / startups\n4. Ambos (B2B e B2C)\n5. Outro (descreva)`,
+      );
+      state.wizardStep = 3;
+      break;
+
+    case 3:
+      state.wizardData.audience = audienceOptions[userMessage.trim()] || userMessage.trim();
+      await sendArchitectMessage(squadId,
+        `**4/5 — Qual tom de comunicacao voce prefere?**\n\n1. Profissional\n2. Casual\n3. Tecnico\n4. Divertido\n5. Inspirador\n6. Provocativo`,
+      );
+      state.wizardStep = 4;
+      break;
+
+    case 4:
+      state.wizardData.tone = toneOptions[userMessage.trim()] || userMessage.trim();
+      await sendArchitectMessage(squadId,
+        `**5/5 — Principais concorrentes ou referencias?** (opcional)\n\nDigite nomes de empresas ou perfis, ou "pular" se preferir.`,
+      );
+      state.wizardStep = 5;
+      break;
+
+    case 5: {
+      const skip = ["pular", "skip", "nao", "não", "nenhum", ""].includes(userMessage.trim().toLowerCase());
+      state.wizardData.competitors = skip ? null : userMessage.trim();
+
+      // Salvar no banco
+      await updateOrganization(state.orgId, {
+        companyContext: state.wizardData as Record<string, unknown>,
+      });
+
+      // Montar resumo
+      const summary = [
+        `**Empresa:** ${state.wizardData.name}`,
+        `**Setor:** ${state.wizardData.sector}`,
+        `**Publico:** ${state.wizardData.audience}`,
+        `**Tom:** ${state.wizardData.tone}`,
+        state.wizardData.competitors ? `**Referencias:** ${state.wizardData.competitors}` : null,
+      ].filter(Boolean).join("\n");
+
+      await sendArchitectMessage(squadId,
+        `Pronto! Agora conheco sua empresa.\n\n${summary}\n\nTodos os squads e agentes vao usar essas informacoes para personalizar o conteudo.\n\nQuer criar seu primeiro squad? E so me dizer o que precisa!`,
+      );
+
+      // Limpar wizard state
+      delete state.wizardStep;
+      delete state.wizardData;
+      state.phase = "idle";
+      break;
+    }
+  }
+}
+
+// ===================== CONTEXT BUILDERS =====================
+
+function buildCompanyPrompt(companyCtx: Record<string, unknown> | null): string {
+  if (!companyCtx?.name) return "";
+  return `
+## Contexto da empresa do usuario
+- Empresa: ${companyCtx.name}
+- Setor: ${companyCtx.sector}
+- Publico: ${companyCtx.audience}
+- Tom: ${companyCtx.tone}
+${companyCtx.competitors ? `- Referencias: ${companyCtx.competitors}` : ""}
+
+Use essas informacoes para personalizar todo conteudo e recomendacoes.`;
+}
+
+function buildIntegrationPrompt(integrations: Array<{ integrationId: string; status: string | null; enabledCapabilities: string[] | null }>): string {
+  const connected = integrations.filter(i => i.status === "active");
+  if (connected.length > 0) {
+    return `
+## Integracoes conectadas na organizacao
+${connected.map(i => `- **${i.integrationId}**: ${i.enabledCapabilities?.join(", ") || "conectado"}`).join("\n")}
+
+Voce pode sugerir acoes usando essas integracoes. Exemplos:
+- Se GitHub esta conectado: "Posso criar uma issue no GitHub para isso"
+- Se Slack esta conectado: "Vou notificar no Slack quando o pipeline terminar"
+- Se Jira esta conectado: "Posso sincronizar essas tasks com o Jira"`;
+  }
+  return `
+## Integracoes
+Nenhuma integracao conectada. Quando relevante, sugira ao usuario conectar ferramentas em Settings > Integracoes para:
+- GitHub/GitLab para esteira de desenvolvimento
+- Slack/Discord para notificacoes
+- Jira/Linear/Asana para sincronizar tasks`;
+}
+
+async function buildOrgContext(orgId: string): Promise<{ companyPrompt: string; integrationPrompt: string }> {
+  const org = await getOrganizationById(orgId);
+  const companyCtx = org?.companyContext as Record<string, unknown> | null;
+  const integrations = await getIntegrationsByOrgId(orgId);
+  return {
+    companyPrompt: buildCompanyPrompt(companyCtx),
+    integrationPrompt: buildIntegrationPrompt(integrations),
+  };
+}
+
 // ===================== DISCOVERY (create) =====================
 
 async function handleDiscovery(
@@ -193,6 +346,8 @@ async function handleDiscovery(
     providerConfig,
   );
 
+  const { companyPrompt, integrationPrompt } = await buildOrgContext(state.orgId);
+
   const history = await getHistory(squadId, 30);
   const conversationMessages = history.map((m) => ({
     role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
@@ -201,6 +356,8 @@ async function handleDiscovery(
   conversationMessages.push({ role: "user", content: userMessage });
 
   const systemPrompt = `${ARCHITECT_AGENT.systemPrompt}
+${companyPrompt}
+${integrationPrompt}
 
 ## Instrucoes — Fase Discovery
 Voce esta coletando informacoes para montar um squad novo.
@@ -466,7 +623,10 @@ async function handleEditModify(state: ArchitectConversationState, squadId: stri
   }));
   conversationMessages.push({ role: "user", content: userMessage });
 
+  const { companyPrompt } = await buildOrgContext(state.orgId);
+
   const result = await adapter.chat(conversationMessages, `${ARCHITECT_AGENT.systemPrompt}
+${companyPrompt}
 
 ## MODO: EDICAO DE SQUAD EXISTENTE
 Voce esta EDITANDO o squad "${state.editSquadName}" (ID: ${state.editSquadId}).
@@ -710,6 +870,8 @@ async function handleGeneral(state: ArchitectConversationState, squadId: string,
 - Custo estimado: R$ ${(metrics.estimatedCostCentsThisMonth / 100).toFixed(2)}`;
   } catch { /* metrics unavailable */ }
 
+  const { companyPrompt, integrationPrompt } = await buildOrgContext(orgId);
+
   const adapter = createAdapter({ name: ARCHITECT_AGENT.name, role: ARCHITECT_AGENT.role, config: {} }, providerConfig);
   const history = await getHistory(squadId, 15);
   const messages = history.map((m) => ({
@@ -719,6 +881,8 @@ async function handleGeneral(state: ArchitectConversationState, squadId: string,
   messages.push({ role: "user", content: userMessage });
 
   const result = await adapter.chat(messages, `${ARCHITECT_AGENT.systemPrompt}
+${companyPrompt}
+${integrationPrompt}
 
 ## Dados atuais da organizacao
 

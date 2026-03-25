@@ -53,6 +53,15 @@ export interface ArchitectConversationState {
   // For action-select-squad: what to do after selecting
   pendingAction?: string;
   pendingActionMessage?: string;
+  // Company wizard
+  wizardStep?: number;
+  wizardData?: {
+    name?: string;
+    sector?: string;
+    audience?: string;
+    tone?: string;
+    competitors?: string | null;
+  };
 }
 
 export type UserIntent =
