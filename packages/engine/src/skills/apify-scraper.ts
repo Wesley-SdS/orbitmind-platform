@@ -44,7 +44,7 @@ export class ApifyScraper {
         return { success: false, error: `Failed to start actor [${startRes.status}]: ${await startRes.text()}` };
       }
 
-      const { data: runData } = await startRes.json();
+      const { data: runData } = (await startRes.json()) as { data: { id: string } };
       const runId = runData.id;
 
       // Poll until complete
@@ -52,14 +52,14 @@ export class ApifyScraper {
       while (Date.now() < deadline) {
         const statusRes = await fetch(`${APIFY_BASE}/actor-runs/${runId}?token=${apiToken}`);
         if (!statusRes.ok) break;
-        const { data: status } = await statusRes.json();
+        const { data: status } = (await statusRes.json()) as { data: { status: string; defaultDatasetId: string } };
 
         if (status.status === "SUCCEEDED") {
           // Fetch results
           const datasetId = status.defaultDatasetId;
           const itemsRes = await fetch(`${APIFY_BASE}/datasets/${datasetId}/items?token=${apiToken}&limit=100`);
           if (!itemsRes.ok) return { success: false, error: "Failed to fetch results" };
-          const items = await itemsRes.json();
+          const items = (await itemsRes.json()) as Record<string, unknown>[];
           return { success: true, data: items, itemCount: items.length };
         }
 

@@ -39,10 +39,10 @@ export class ImageFetcher {
         };
       }
 
-      const data = await res.json();
+      const data = (await res.json()) as { results?: Record<string, unknown>[] };
       return {
         success: true,
-        images: (data.results ?? []).map((img: Record<string, unknown>) => ({
+        images: (data.results ?? []).map((img) => ({
           url: (img.urls as Record<string, string>)?.regular ?? "",
           alt: String(img.alt_description ?? query),
           source: "unsplash",
