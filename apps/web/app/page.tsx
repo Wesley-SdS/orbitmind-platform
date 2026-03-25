@@ -11,6 +11,20 @@ import {
   CheckCircle,
   Send,
   Sparkles,
+  Building2,
+  Store,
+  Link2,
+  Search,
+  ShieldCheck,
+  RefreshCw,
+  Brain,
+  Lightbulb,
+  Clock,
+  Webhook,
+  Target,
+  Rocket,
+  BarChart3,
+  Monitor,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -41,12 +55,36 @@ const FEATURES = [
     description:
       "Pipeline CI/CD validado com checkpoints de aprovação humana. Do research à publicação, 100% automatizado.",
   },
+  {
+    icon: Building2,
+    title: "Escritório Virtual",
+    description:
+      "Veja seus agentes trabalhando em tempo real num escritório 2D estilo Gather. Salas temáticas, animações de handoff e status visual de cada agente.",
+  },
+  {
+    icon: Store,
+    title: "Marketplace de Agentes",
+    description:
+      "Adquira agentes especializados e squads completos prontos para usar. 10+ agentes e 5+ squads pré-configurados. Um clique para adicionar à sua organização.",
+  },
+  {
+    icon: Link2,
+    title: "700+ Integrações",
+    description:
+      "Conecte GitHub, Slack, Jira, Discord, Notion, Google Drive, Figma e mais. Seus agentes interagem diretamente com suas ferramentas via Nango.",
+  },
+  {
+    icon: Search,
+    title: "Análise de Perfis Reais",
+    description:
+      "O Sherlock investiga perfis de Instagram, YouTube, Twitter e LinkedIn. Extrai padrões reais de conteúdo que calibram seus agentes com dados de verdade.",
+  },
 ];
 
 const CASE_STATS = [
-  { value: "41+", label: "PRs merged autonomamente" },
-  { value: "7", label: "agentes especializados" },
-  { value: "10", label: "steps no pipeline" },
+  { value: "700+", label: "integrações disponíveis" },
+  { value: "40+", label: "agentes no marketplace" },
+  { value: "10", label: "plataformas de publicação" },
   { value: "100%", label: "autônomo, zero terminal" },
 ];
 
@@ -80,6 +118,68 @@ const DEMO_MESSAGES = [
   {
     from: "system",
     text: "Pipeline em andamento: 3/10 steps completos. Próximo: checkpoint de aprovação.",
+  },
+];
+
+const PIPELINE_CARDS = [
+  {
+    icon: ShieldCheck,
+    title: "Veto Automático",
+    description:
+      "Condições de qualidade verificadas automaticamente via IA. Se o output não atende, o agente corrige sozinho.",
+  },
+  {
+    icon: RefreshCw,
+    title: "Review Loops",
+    description:
+      "Reviewer rejeita? O agente refaz com feedback específico. Até 3 ciclos automáticos antes de pedir sua aprovação.",
+  },
+  {
+    icon: Brain,
+    title: "Memória Persistente",
+    description:
+      "Agentes lembram o que você aprovou, rejeitou e preferiu. Cada execução fica melhor que a anterior.",
+  },
+];
+
+const INTEGRATIONS = {
+  rows: [
+    {
+      label: "Development & Communication",
+      items: ["GitHub", "GitLab", "Slack", "Discord", "Teams", "Telegram"],
+    },
+    {
+      label: "Project Management",
+      items: ["Jira", "Linear", "Asana", "Monday", "ClickUp", "Notion", "Trello"],
+    },
+    {
+      label: "Google, Microsoft & Design",
+      items: ["Gmail", "Drive", "Sheets", "Calendar", "Outlook", "OneDrive", "Figma"],
+    },
+  ],
+};
+
+const MARKETPLACE_SQUADS = [
+  {
+    emoji: "🚀",
+    name: "Instagram Carousel Factory",
+    agents: 5,
+    steps: 13,
+    description: "Pesquisa → Ângulos → Copy → Design → Publicação",
+  },
+  {
+    emoji: "🏭",
+    name: "Dev Pipeline — Esteira Autônoma",
+    agents: 6,
+    steps: 8,
+    description: "Issue → Implementação → Review → Auto-merge → Docs",
+  },
+  {
+    emoji: "📧",
+    name: "Email Marketing Automation",
+    agents: 4,
+    steps: 6,
+    description: "Segmentação → Copy → Design → A/B Test → Envio",
   },
 ];
 
@@ -120,7 +220,7 @@ export default function LandingPage() {
             <div className="mx-auto max-w-3xl space-y-6">
               <div className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-muted/50 px-4 py-1.5 text-sm">
                 <Zap className="h-3.5 w-3.5 text-yellow-500" />
-                Pipeline CI/CD autônomo validado com 41+ PRs merged
+                Produto completo: 7 grupos, 38 features, 700+ integrações
               </div>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
                 Squads de IA que{" "}
@@ -130,8 +230,10 @@ export default function LandingPage() {
               </h1>
               <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
                 Monte, configure e opere equipes autônomas de agentes IA.
-                Do chat à entrega: agências de marketing, times de dev, suporte ao cliente.
-                Tudo pelo browser, zero terminal.
+                Do chat à entrega: agências de marketing, times de dev, suporte ao cliente.{" "}
+                <span className="text-foreground font-medium">
+                  Com escritório virtual, marketplace, 700+ integrações e pipeline autônomo.
+                </span>
               </p>
               <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                 <Link
@@ -313,86 +415,445 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Planos */}
-        <section className="border-t border-border/50 bg-muted/30">
+        {/* Pipeline Inteligente */}
+        <section className="border-y border-border/50 bg-muted/30">
           <div className="mx-auto max-w-6xl px-6 py-20">
-            <div className="mx-auto max-w-2xl text-center space-y-4">
-              <h2 className="text-3xl font-bold">Planos para cada fase do seu negócio</h2>
-              <p className="text-muted-foreground">Comece grátis, escale quando precisar</p>
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-bold">Pipeline que aprende e melhora</h2>
+              <p className="mt-3 text-muted-foreground">
+                Cada execução gera memórias que tornam os agentes mais inteligentes na próxima vez.
+              </p>
             </div>
             <div className="mt-12 grid gap-6 md:grid-cols-3">
-              {[
-                {
-                  name: "Free",
-                  desc: "Para experimentar e validar",
-                  features: ["1 squad", "3 agentes", "100 execuções por mês", "Chat com agentes", "Board kanban"],
-                  cta: "Começar grátis",
-                  primary: false,
-                },
-                {
-                  name: "Pro",
-                  desc: "Para equipes em crescimento",
-                  features: ["5 squads", "15 agentes", "1.000 execuções por mês", "Integrações GitHub e Discord", "Pipeline com checkpoints", "Suporte prioritário"],
-                  cta: "Começar com Pro",
-                  primary: true,
-                },
-                {
-                  name: "Enterprise",
-                  desc: "Para operações em escala",
-                  features: ["Squads ilimitados", "Agentes ilimitados", "10.000 execuções por mês", "SSO e RBAC avançado", "SLA e suporte dedicado", "Escritório virtual"],
-                  cta: "Falar com vendas",
-                  primary: false,
-                },
-              ].map((plan) => (
+              {PIPELINE_CARDS.map((card) => (
                 <div
-                  key={plan.name}
-                  className={`rounded-xl border p-6 ${
-                    plan.primary
-                      ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
-                      : "border-border/50 bg-card"
-                  }`}
+                  key={card.title}
+                  className="group rounded-xl border border-border/50 bg-card p-6 transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
                 >
-                  <h3 className="text-lg font-semibold">{plan.name}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{plan.desc}</p>
-                  <ul className="mt-6 space-y-3">
-                    {plan.features.map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 shrink-0 text-green-500" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link
-                    href="/register"
-                    className={cn(
-                      "mt-8 w-full",
-                      buttonVariants({ variant: plan.primary ? "default" : "outline" }),
-                    )}
-                  >
-                    {plan.cta}
-                  </Link>
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                    <card.icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-semibold">{card.title}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                    {card.description}
+                  </p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* CTA Final */}
+        {/* Conteúdo Inteligente */}
         <section className="mx-auto max-w-6xl px-6 py-20">
-          <div className="mx-auto max-w-2xl text-center space-y-6">
-            <h2 className="text-3xl font-bold">
-              Pronto para montar seu primeiro squad?
-            </h2>
-            <p className="text-muted-foreground">
-              Crie sua conta em 30 segundos e comece a operar agentes autônomos hoje mesmo.
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold">Conteúdo criativo, não genérico</h2>
+            <p className="mt-3 text-muted-foreground">
+              Ângulos criativos, tom de voz e best-practices por plataforma.
             </p>
-            <Link
-              href="/register"
-              className={cn(buttonVariants({ size: "lg" }))}
-            >
-              Começar grátis
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
+          </div>
+          <div className="mx-auto mt-12 max-w-3xl">
+            <div className="rounded-2xl border border-border/50 bg-card p-8">
+              {/* Flow visual */}
+              <div className="flex flex-col items-center gap-6 md:flex-row md:gap-4">
+                {/* Step 1: Pesquisa */}
+                <div className="flex-1 rounded-xl bg-muted/50 p-5 text-center">
+                  <Search className="mx-auto mb-2 h-6 w-6 text-primary" />
+                  <p className="text-sm font-semibold">Pesquisa</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Tendências e dados reais do nicho</p>
+                </div>
+
+                <ArrowRight className="hidden h-5 w-5 shrink-0 text-muted-foreground md:block" />
+                <div className="h-5 w-px bg-border md:hidden" />
+
+                {/* Step 2: Ângulos */}
+                <div className="flex-1 rounded-xl bg-muted/50 p-5 text-center">
+                  <Lightbulb className="mx-auto mb-2 h-6 w-6 text-yellow-500" />
+                  <p className="text-sm font-semibold">5 Ângulos Criativos</p>
+                  <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+                    {["Medo", "Oportunidade", "Educacional", "Contrário", "Inspiracional"].map((angle) => (
+                      <span key={angle} className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs text-primary">
+                        {angle}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <ArrowRight className="hidden h-5 w-5 shrink-0 text-muted-foreground md:block" />
+                <div className="h-5 w-px bg-border md:hidden" />
+
+                {/* Step 3: Conteúdo Final */}
+                <div className="flex-1 rounded-xl bg-muted/50 p-5 text-center">
+                  <Sparkles className="mx-auto mb-2 h-6 w-6 text-primary" />
+                  <p className="text-sm font-semibold">Conteúdo Final</p>
+                  <p className="mt-1 text-xs text-muted-foreground italic">
+                    &ldquo;Em 6 meses, marketeiros sem IA serão substituídos&rdquo;
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                O agente pesquisa, gera 5 ângulos diferentes sobre o mesmo tema,
+                você escolhe o ângulo, e o conteúdo é criado naquela perspectiva.
+                Com tom de voz customizável e regras de plataforma injetadas automaticamente.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Integrações */}
+        <section className="border-y border-border/50 bg-muted/30">
+          <div className="mx-auto max-w-6xl px-6 py-20">
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-bold">Conecte com tudo que você já usa</h2>
+              <p className="mt-3 text-muted-foreground">
+                40 integrações premium com actions profundas + 700+ via catálogo Nango.
+              </p>
+            </div>
+            <div className="mx-auto mt-12 max-w-4xl space-y-6">
+              {INTEGRATIONS.rows.map((row) => (
+                <div key={row.label}>
+                  <p className="mb-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    {row.label}
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    {row.items.map((item) => (
+                      <div
+                        key={item}
+                        className="flex h-12 items-center gap-2 rounded-lg border border-border/50 bg-card px-4 transition-all hover:border-primary/30"
+                      >
+                        <Link2 className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <p className="text-center text-sm text-muted-foreground">
+                E mais 660+ integrações disponíveis. Conecte com 1 clique via OAuth.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Escritório Virtual */}
+        <section className="mx-auto max-w-6xl px-6 py-20">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold">Veja seus agentes trabalhando</h2>
+            <p className="mt-3 text-muted-foreground">
+              Escritório virtual 2D onde cada agente tem sua sala, mesa e animações em tempo real.
+            </p>
+          </div>
+          <div className="mx-auto mt-12 max-w-3xl">
+            <div className="rounded-2xl border border-border/50 bg-card overflow-hidden shadow-xl shadow-primary/5">
+              {/* Office mockup */}
+              <div className="relative bg-muted/30 p-8">
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { name: "Research Lab", emoji: "🔬", agents: ["Ana Insights"] },
+                    { name: "Creative Studio", emoji: "🎨", agents: ["Carlos Copy", "Diana Design"] },
+                    { name: "Strategy Room", emoji: "🧠", agents: ["Sofia Strategy"] },
+                    { name: "Review Room", emoji: "✅", agents: ["Vera Review", "Samuel SEO"] },
+                    { name: "Publishing", emoji: "📤", agents: ["Paula Post"] },
+                    { name: "Lobby", emoji: "🏢", agents: [] },
+                  ].map((room) => (
+                    <div
+                      key={room.name}
+                      className="rounded-lg border border-border/50 bg-card/80 p-4 text-center"
+                    >
+                      <span className="text-2xl">{room.emoji}</span>
+                      <p className="mt-2 text-xs font-semibold">{room.name}</p>
+                      {room.agents.length > 0 && (
+                        <div className="mt-2 flex flex-wrap justify-center gap-1">
+                          {room.agents.map((a) => (
+                            <span key={a} className="rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] text-green-500">
+                              {a}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="border-t border-border/50 px-6 py-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  6 salas temáticas. Acompanhe o pipeline em tempo real com animações de handoff entre agentes.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Marketplace */}
+        <section className="border-y border-border/50 bg-muted/30">
+          <div className="mx-auto max-w-6xl px-6 py-20">
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-bold">Marketplace de agentes e squads</h2>
+              <p className="mt-3 text-muted-foreground">
+                Comece em segundos com equipes pré-configuradas.
+              </p>
+            </div>
+            <div className="mt-12 grid gap-6 md:grid-cols-3">
+              {MARKETPLACE_SQUADS.map((squad) => (
+                <div
+                  key={squad.name}
+                  className="group rounded-xl border border-border/50 bg-card p-6 transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <span className="text-3xl">{squad.emoji}</span>
+                  <h3 className="mt-3 font-semibold">{squad.name}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {squad.agents} agentes · {squad.steps} steps
+                  </p>
+                  <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                    {squad.description}
+                  </p>
+                  <div className="mt-4">
+                    <span className="inline-flex items-center rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-500">
+                      Grátis
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-8 text-center text-sm text-muted-foreground">
+              15+ itens no marketplace. Agentes avulsos e squads completos. Tudo gratuito por enquanto.
+            </p>
+          </div>
+        </section>
+
+        {/* Scheduling & API */}
+        <section className="mx-auto max-w-6xl px-6 py-20">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold">Automatize completamente</h2>
+            <p className="mt-3 text-muted-foreground">
+              Agende execuções e dispare pipelines via API.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-6 md:grid-cols-2">
+            <div className="group rounded-xl border border-border/50 bg-card p-6 transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                <Clock className="h-5 w-5" />
+              </div>
+              <h3 className="font-semibold">Agendamento</h3>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                Agende pipelines: todo dia às 9h, toda segunda às 14h.
+                Seus agentes trabalham enquanto você dorme.
+              </p>
+            </div>
+            <div className="group rounded-xl border border-border/50 bg-card p-6 transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                <Webhook className="h-5 w-5" />
+              </div>
+              <h3 className="font-semibold">API & Webhooks</h3>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                Dispare pipelines via API com Bearer token.
+                Integre com Zapier, n8n, GitHub Actions.
+              </p>
+            </div>
+          </div>
+          <div className="mx-auto mt-8 max-w-2xl">
+            <div className="rounded-xl border border-border/50 bg-muted/50 p-5">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Exemplo de uso</p>
+              <pre className="overflow-x-auto text-sm leading-relaxed">
+                <code className="text-muted-foreground">
+{`curl -X POST https://app.orbitmind.com/api/v1/squads/{id}/run \\
+  -H "Authorization: Bearer om_xxx" \\
+  -d '{"input": "Tema: IA no marketing"}'`}
+                </code>
+              </pre>
+            </div>
+          </div>
+        </section>
+
+        {/* Onboarding */}
+        <section className="border-y border-border/50 bg-muted/30">
+          <div className="mx-auto max-w-6xl px-6 py-20">
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-bold">Setup em 5 minutos</h2>
+              <p className="mt-3 text-muted-foreground">
+                Tour guiado + wizard de empresa + primeiro squad pelo chat.
+              </p>
+            </div>
+            <div className="mt-12 grid gap-6 md:grid-cols-3">
+              {[
+                {
+                  icon: Target,
+                  step: "1",
+                  title: "Tour interativo",
+                  description: "11 steps guiados pela interface inteira",
+                },
+                {
+                  icon: Building2,
+                  step: "2",
+                  title: "Conte sobre sua empresa",
+                  description: "5 perguntas rápidas no chat",
+                },
+                {
+                  icon: Rocket,
+                  step: "3",
+                  title: "Crie seu squad",
+                  description: "Descreva o que precisa e o Architect monta tudo",
+                },
+              ].map((item) => (
+                <div
+                  key={item.step}
+                  className="group rounded-xl border border-border/50 bg-card p-6 text-center transition-all hover:border-primary/30"
+                >
+                  <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
+                    {item.step}
+                  </div>
+                  <h3 className="font-semibold">{item.title}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">{item.description}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-8 text-center text-sm text-muted-foreground">
+              Nenhuma configuração técnica. Nenhuma linha de código.
+            </p>
+          </div>
+        </section>
+
+        {/* Multi-Provider */}
+        <section className="mx-auto max-w-6xl px-6 py-20">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold">Use qualquer IA</h2>
+            <p className="mt-3 text-muted-foreground">
+              Configure Anthropic, OpenAI ou Google Gemini direto pela interface.
+            </p>
+          </div>
+          <div className="mx-auto mt-12 max-w-2xl">
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { name: "Anthropic", model: "Claude Opus 4.6", color: "text-orange-400" },
+                { name: "OpenAI", model: "GPT-5.4", color: "text-green-400" },
+                { name: "Google", model: "Gemini 3.1 Pro", color: "text-blue-400" },
+              ].map((provider) => (
+                <div
+                  key={provider.name}
+                  className="group rounded-xl border border-border/50 bg-card p-6 text-center transition-all hover:border-primary/30"
+                >
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
+                    <Monitor className={cn("h-6 w-6", provider.color)} />
+                  </div>
+                  <p className="font-semibold">{provider.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{provider.model}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-6 text-center text-sm text-muted-foreground">
+              Modelos atualizados março 2026. Troque de provider a qualquer momento sem reconfigurar nada.
+            </p>
+          </div>
+        </section>
+
+        {/* Analytics */}
+        <section className="border-y border-border/50 bg-muted/30">
+          <div className="mx-auto max-w-6xl px-6 py-20">
+            <div className="mx-auto max-w-2xl text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <BarChart3 className="h-6 w-6" />
+              </div>
+              <h2 className="text-3xl font-bold">Meça o impacto real</h2>
+              <p className="mt-3 text-muted-foreground">
+                Analytics pós-publicação com feedback loop automático.
+              </p>
+              <p className="mx-auto mt-4 max-w-xl text-sm text-muted-foreground leading-relaxed">
+                Após publicar, o OrbitMind busca métricas de engajamento (likes, comments, reach)
+                e alimenta de volta nas memórias do squad. Seus agentes aprendem o que funciona
+                e melhoram automaticamente.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Planos */}
+        <section className="mx-auto max-w-6xl px-6 py-20">
+          <div className="mx-auto max-w-2xl text-center space-y-4">
+            <h2 className="text-3xl font-bold">Planos para cada fase do seu negócio</h2>
+            <p className="text-muted-foreground">Comece grátis, escale quando precisar</p>
+          </div>
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            {[
+              {
+                name: "Free",
+                desc: "Para experimentar e validar",
+                features: ["1 squad", "3 agentes", "100 execuções por mês", "Chat com agentes", "Board kanban"],
+                cta: "Começar grátis",
+                primary: false,
+              },
+              {
+                name: "Pro",
+                desc: "Para equipes em crescimento",
+                features: ["5 squads", "15 agentes", "1.000 execuções por mês", "Integrações GitHub e Discord", "Pipeline com checkpoints", "Suporte prioritário"],
+                cta: "Começar com Pro",
+                primary: true,
+              },
+              {
+                name: "Enterprise",
+                desc: "Para operações em escala",
+                features: ["Squads ilimitados", "Agentes ilimitados", "10.000 execuções por mês", "SSO e RBAC avançado", "SLA e suporte dedicado", "Escritório virtual"],
+                cta: "Falar com vendas",
+                primary: false,
+              },
+            ].map((plan) => (
+              <div
+                key={plan.name}
+                className={`rounded-xl border p-6 ${
+                  plan.primary
+                    ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
+                    : "border-border/50 bg-card"
+                }`}
+              >
+                <h3 className="text-lg font-semibold">{plan.name}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{plan.desc}</p>
+                <ul className="mt-6 space-y-3">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 shrink-0 text-green-500" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/register"
+                  className={cn(
+                    "mt-8 w-full",
+                    buttonVariants({ variant: plan.primary ? "default" : "outline" }),
+                  )}
+                >
+                  {plan.cta}
+                </Link>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* CTA Final */}
+        <section className="border-t border-border/50 bg-muted/30">
+          <div className="mx-auto max-w-6xl px-6 py-20">
+            <div className="mx-auto max-w-2xl text-center space-y-6">
+              <h2 className="text-3xl font-bold">
+                Pronto para operar squads autônomos?
+              </h2>
+              <p className="text-muted-foreground">
+                Comece grátis. Configure em 5 minutos. Sem cartão de crédito.
+              </p>
+              <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+                <Link
+                  href="/register"
+                  className={cn(buttonVariants({ size: "lg" }))}
+                >
+                  Começar grátis
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+                <Link
+                  href="/docs"
+                  className={cn(buttonVariants({ size: "lg", variant: "outline" }))}
+                >
+                  Ver documentação
+                </Link>
+              </div>
+            </div>
           </div>
         </section>
       </main>
