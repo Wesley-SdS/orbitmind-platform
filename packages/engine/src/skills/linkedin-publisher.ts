@@ -79,7 +79,7 @@ export class LinkedInPublisher {
       body: JSON.stringify({ initializeUploadRequest: { owner: authorUrn } }),
     });
     if (!registerRes.ok) throw new Error(`Image register failed: ${await registerRes.text()}`);
-    const { value } = await registerRes.json();
+    const { value } = (await registerRes.json()) as { value: { uploadUrl: string; image: string } };
 
     const imageRes = await fetch(imageUrl);
     if (!imageRes.ok) throw new Error(`Failed to download image: ${imageUrl}`);

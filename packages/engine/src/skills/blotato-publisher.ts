@@ -65,10 +65,10 @@ export class BlotatoPublisher {
         return { success: false, error: `Blotato API [${res.status}]: ${await res.text()}` };
       }
 
-      const data = await res.json();
+      const data = (await res.json()) as Record<string, unknown>;
       return {
         success: true,
-        postIds: data.postIds ?? {},
+        postIds: (data.postIds ?? {}) as Record<string, string>,
       };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : "Erro desconhecido" };
@@ -81,8 +81,8 @@ export class BlotatoPublisher {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
       if (!res.ok) return { ok: false, error: `API error: ${res.status}` };
-      const data = await res.json();
-      return { ok: true, accounts: data.accounts ?? [] };
+      const data = (await res.json()) as Record<string, unknown>;
+      return { ok: true, accounts: (data.accounts ?? []) as Array<{ platform: string; name: string }> };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : "Erro" };
     }

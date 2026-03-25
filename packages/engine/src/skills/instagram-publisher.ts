@@ -54,7 +54,7 @@ export class InstagramPublisher {
     const params = new URLSearchParams({ image_url: imageUrl, is_carousel_item: "true", access_token: token });
     const res = await fetch(`${IG_BASE}/${userId}/media?${params}`, { method: "POST" });
     if (!res.ok) throw new Error(`createChild failed [${res.status}]: ${await res.text()}`);
-    return (await res.json()).id;
+    return ((await res.json()) as { id: string }).id;
   }
 
   private async poll(containerId: string, token: string, timeoutMs = 60000): Promise<void> {
@@ -63,7 +63,7 @@ export class InstagramPublisher {
       const params = new URLSearchParams({ fields: "status_code", access_token: token });
       const res = await fetch(`${IG_BASE}/${containerId}?${params}`);
       if (!res.ok) throw new Error(`Poll failed [${res.status}]`);
-      const { status_code } = await res.json();
+      const { status_code } = (await res.json()) as { status_code: string };
       if (status_code === "FINISHED") return;
       if (status_code === "ERROR") throw new Error(`Container ${containerId} ERROR`);
       await new Promise((r) => setTimeout(r, 3000));
@@ -75,28 +75,28 @@ export class InstagramPublisher {
     const params = new URLSearchParams({ media_type: "CAROUSEL", children: childIds.join(","), caption, access_token: token });
     const res = await fetch(`${IG_BASE}/${userId}/media?${params}`, { method: "POST" });
     if (!res.ok) throw new Error(`createCarousel failed [${res.status}]: ${await res.text()}`);
-    return (await res.json()).id;
+    return ((await res.json()) as { id: string }).id;
   }
 
   private async publish(userId: string, containerId: string, token: string): Promise<string> {
     const params = new URLSearchParams({ creation_id: containerId, access_token: token });
     const res = await fetch(`${IG_BASE}/${userId}/media_publish?${params}`, { method: "POST" });
     if (!res.ok) throw new Error(`publish failed [${res.status}]: ${await res.text()}`);
-    return (await res.json()).id;
+    return ((await res.json()) as { id: string }).id;
   }
 
   private async getPermalink(mediaId: string, token: string): Promise<string | null> {
     const params = new URLSearchParams({ fields: "permalink", access_token: token });
     const res = await fetch(`${IG_BASE}/${mediaId}?${params}`);
     if (!res.ok) return null;
-    return (await res.json()).permalink ?? null;
+    return ((await res.json()) as { permalink?: string }).permalink ?? null;
   }
 
   private async publishSingle(userId: string, imageUrl: string, caption: string, token: string, dryRun?: boolean): Promise<PublishResult> {
     const params = new URLSearchParams({ image_url: imageUrl, caption, access_token: token });
     const res = await fetch(`${IG_BASE}/${userId}/media?${params}`, { method: "POST" });
     if (!res.ok) throw new Error(`createMedia failed [${res.status}]: ${await res.text()}`);
-    const { id: containerId } = await res.json();
+    const { id: containerId } = (await res.json()) as { id: string };
     await this.poll(containerId, token);
     if (dryRun) return { success: true, postId: containerId, permalink: "(dry run)" };
     const postId = await this.publish(userId, containerId, token);
