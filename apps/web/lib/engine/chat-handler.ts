@@ -11,6 +11,8 @@ import {
   getDefaultLlmProvider,
   recordLlmUsage,
 } from "@/lib/db/queries";
+import { getOrganizationById } from "@/lib/db/queries/organizations";
+import { getTopMemories } from "@/lib/db/queries/squad-memories";
 
 interface ChatHandlerOptions {
   squadId: string;
@@ -70,12 +72,15 @@ export async function handleChatMessage(options: ChatHandlerOptions) {
   broadcastTyping(squadId, respondingAgent.name);
 
   // 5. Create execution for tracking
+  const runId = new Date().toISOString().replace(/[-:T.Z]/g, "").substring(0, 14);
   const execution = await createExecution({
     squadId,
     agentId: respondingAgent.id,
     pipelineStep: "chat-response",
     status: "running",
     inputData: { userMessage },
+    runId,
+    version: 1,
   });
 
   const startTime = Date.now();
@@ -108,7 +113,22 @@ export async function handleChatMessage(options: ChatHandlerOptions) {
       providerConfig,
     );
 
-    const result = await adapter.chat(conversationHistory);
+    // Build enriched system prompt with company context + memories
+    const org = await getOrganizationById(orgId);
+    const companyCtx = org?.companyContext as Record<string, unknown> | null;
+    const memories = await getTopMemories(squadId, 10);
+
+    let systemPrompt = `Voce e ${respondingAgent.name}, ${respondingAgent.role}.`;
+
+    if (companyCtx?.name) {
+      systemPrompt += `\n\n## Empresa do cliente\n${companyCtx.name} (${companyCtx.sector}). Publico: ${companyCtx.audience}. Tom: ${companyCtx.tone}.`;
+    }
+
+    if (memories.length > 0) {
+      systemPrompt += `\n\n## Memorias do squad (aprendizados de execucoes anteriores)\n${memories.map(m => `- [${m.type}] ${m.content}`).join("\n")}\n\nLeve essas memorias em consideracao na sua resposta.`;
+    }
+
+    const result = await adapter.chat(conversationHistory, systemPrompt);
 
     // 8. Save agent response
     const agentMsg = await createMessage({
