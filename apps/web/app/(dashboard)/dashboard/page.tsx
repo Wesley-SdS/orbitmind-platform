@@ -37,9 +37,9 @@ export default async function DashboardPage() {
 
   const stats = [
     { label: "Squads Ativos", value: String(metrics.squadsActive), change: "", icon: Bot, color: "text-blue-500" },
-    { label: "Tasks Completadas", value: String(metrics.tasksCompletedThisMonth), change: "este mes", icon: CheckCircle, color: "text-green-500" },
-    { label: "Execucoes Hoje", value: String(metrics.executionsToday), change: "", icon: Zap, color: "text-yellow-500" },
-    { label: "Custo Estimado", value: `R$ ${(metrics.estimatedCostCentsThisMonth / 100).toFixed(2)}`, change: "este mes", icon: DollarSign, color: "text-purple-500" },
+    { label: "Tasks Completadas", value: String(metrics.tasksCompletedThisMonth), change: "este mês", icon: CheckCircle, color: "text-green-500" },
+    { label: "Execuções Hoje", value: String(metrics.executionsToday), change: "", icon: Zap, color: "text-yellow-500" },
+    { label: "Custo Estimado", value: `R$ ${(metrics.estimatedCostCentsThisMonth / 100).toFixed(2)}`, change: "este mês", icon: DollarSign, color: "text-purple-500" },
   ];
 
   const maxExec = Math.max(8, ...metrics.executionsByDay.map((d) => d.completed + d.failed + d.cancelled));
@@ -48,7 +48,7 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Visao geral dos seus squads e metricas</p>
+        <p className="text-muted-foreground">Visão geral dos seus squads e métricas</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -71,7 +71,7 @@ export default async function DashboardPage() {
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle className="text-base">Execucoes - Ultimos 7 dias</CardTitle>
+            <CardTitle className="text-base">Execuções - Últimos 7 dias</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-end gap-3 h-40">
@@ -106,14 +106,14 @@ export default async function DashboardPage() {
                 })
               ) : (
                 <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                  Nenhuma execucao nos ultimos 7 dias
+                  Nenhuma execução nos últimos 7 dias
                 </div>
               )}
             </div>
             <div className="flex gap-4 mt-4 text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <div className="h-2 w-2 rounded-full bg-green-500/80" />
-                Concluidas
+                Concluídas
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="h-2 w-2 rounded-full bg-red-500/80" />

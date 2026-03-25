@@ -43,9 +43,9 @@ const navItems = [
   { title: "Squads", href: "/squads", icon: Bot, id: "sidebar-squads" },
   { title: "Agentes", href: "/agents", icon: Users, id: "sidebar-agents" },
   { title: "Marketplace", href: "/marketplace", icon: ShoppingBag, id: "sidebar-marketplace" },
-  { title: "Integracoes", href: "/integrations", icon: Link2, id: "sidebar-integrations" },
-  { title: "Settings", href: "/settings", icon: Settings, id: "sidebar-settings" },
-  { title: "Escritorio", href: "/office", icon: Building2, id: "sidebar-office", badge: undefined as string | undefined },
+  { title: "Integrações", href: "/integrations", icon: Link2, id: "sidebar-integrations" },
+  { title: "Configurações", href: "/settings", icon: Settings, id: "sidebar-settings" },
+  { title: "Escritório", href: "/office", icon: Building2, id: "sidebar-office", badge: undefined as string | undefined },
 ];
 
 export function AppSidebar({ user }: AppSidebarProps) {
@@ -66,7 +66,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navegacao</SidebarGroupLabel>
+          <SidebarGroupLabel>Navegação</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {
@@ -98,7 +98,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Plano Free</span>
-            <span className="text-muted-foreground">3/100 execucoes</span>
+            <span className="text-muted-foreground">3/100 execuções</span>
           </div>
           <Progress value={3} className="h-1.5" />
         </div>
