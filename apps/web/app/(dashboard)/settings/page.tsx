@@ -114,12 +114,12 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Gerencie sua organizacao e configuracoes</p>
+        <p className="text-muted-foreground">Gerencie sua organização e configurações</p>
       </div>
 
       <Tabs defaultValue="organization">
         <TabsList>
-          <TabsTrigger value="organization">Organizacao</TabsTrigger>
+          <TabsTrigger value="organization">Organização</TabsTrigger>
           <TabsTrigger value="members">Membros</TabsTrigger>
           <TabsTrigger value="ai-providers">Provedores de IA</TabsTrigger>
           <TabsTrigger value="skills">Skills</TabsTrigger>
@@ -130,8 +130,8 @@ export default function SettingsPage() {
         <TabsContent value="organization" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Informacoes da Organizacao</CardTitle>
-              <CardDescription>Atualize os dados da sua organizacao</CardDescription>
+              <CardTitle>Informações da Organização</CardTitle>
+              <CardDescription>Atualize os dados da sua organização</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -151,19 +151,19 @@ export default function SettingsPage() {
           <Card className="border-destructive/50">
             <CardHeader>
               <CardTitle className="text-destructive">Danger Zone</CardTitle>
-              <CardDescription>Acoes irreversiveis</CardDescription>
+              <CardDescription>Ações irreversíveis</CardDescription>
             </CardHeader>
             <CardContent>
               <AlertDialog>
                 <AlertDialogTrigger render={<Button variant="destructive" />}>
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Deletar Organizacao
+                  Deletar Organização
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Esta acao nao pode ser desfeita. Todos os dados serao permanentemente deletados.
+                      Esta ação não pode ser desfeita. Todos os dados serão permanentemente deletados.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -183,7 +183,7 @@ export default function SettingsPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>Membros</CardTitle>
-                <CardDescription>{members.length} membros na organizacao</CardDescription>
+                <CardDescription>{members.length} membros na organização</CardDescription>
               </div>
               <Button size="sm">
                 <Plus className="mr-2 h-4 w-4" />
@@ -227,8 +227,8 @@ export default function SettingsPage() {
           <div className="grid gap-4 md:grid-cols-3">
             {[
               { name: "Free", price: "R$ 0", squads: 1, agents: 3, executions: 100 },
-              { name: "Pro", price: "R$ 49/mes", squads: 5, agents: 15, executions: 1000 },
-              { name: "Enterprise", price: "R$ 199/mes", squads: "Ilimitado", agents: "Ilimitado", executions: 10000 },
+              { name: "Pro", price: "R$ 49/mês", squads: 5, agents: 15, executions: 1000 },
+              { name: "Enterprise", price: "R$ 199/mês", squads: "Ilimitado", agents: "Ilimitado", executions: 10000 },
             ].map((plan) => {
               const isCurrent = plan.name.toLowerCase() === currentPlan;
               return (
@@ -243,7 +243,7 @@ export default function SettingsPage() {
                   <CardContent className="space-y-2 text-sm text-muted-foreground">
                     <p>{typeof plan.squads === "number" ? `${plan.squads} squad${plan.squads > 1 ? "s" : ""}` : plan.squads}</p>
                     <p>{typeof plan.agents === "number" ? `${plan.agents} agentes` : plan.agents}</p>
-                    <p>{plan.executions.toLocaleString()} execucoes/mes</p>
+                    <p>{plan.executions.toLocaleString()} execuções/mês</p>
                     <Separator className="my-3" />
                     {isCurrent ? (
                       <Button variant="outline" className="w-full" disabled>Plano Atual</Button>
@@ -261,7 +261,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Audit Log</CardTitle>
-              <CardDescription>Historico de acoes da organizacao</CardDescription>
+              <CardDescription>Histórico de ações da organização</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
