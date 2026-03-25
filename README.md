@@ -1,13 +1,13 @@
 <div align="center">
   <h1>OrbitMind Platform</h1>
-  <p><strong>Squads de IA que trabalham para voce — do chat a entrega.</strong></p>
-  <p>Plataforma de orquestracao de agentes IA autonomos. Monte equipes que pesquisam, criam, revisam e publicam — 100% pelo browser, sem terminal.</p>
+  <p><strong>Squads de IA que trabalham para você — do chat à entrega.</strong></p>
+  <p>Plataforma de orquestração de agentes IA autônomos. Monte equipes que pesquisam, criam, revisam e publicam — 100% pelo browser, sem terminal.</p>
 
   <p>
     <a href="#-features">Features</a> ·
     <a href="#-quick-start">Quick Start</a> ·
     <a href="#-arquitetura">Arquitetura</a> ·
-    <a href="#-integracoes-700">Integracoes</a> ·
+    <a href="#-integrações-700">Integrações</a> ·
     <a href="#-marketplace">Marketplace</a> ·
     <a href="#-roadmap">Roadmap</a> ·
     <a href="#-contribuindo">Contribuindo</a>
@@ -38,37 +38,37 @@
 | | |
 |---|---|
 | **7 agentes especializados** | Researcher, Strategist, Copywriter, Designer, SEO, Reviewer, Publisher |
-| **700+ integracoes** | GitHub, Slack, Jira, Linear, Notion, Google, Microsoft e mais via Nango |
-| **Marketplace** | 10 agentes e 6 squads pre-configurados prontos para usar |
-| **Escritorio Virtual 3D** | Acompanhe seus agentes trabalhando em tempo real com React Three Fiber |
-| **Pipeline autonomo** | Veto conditions, review loops, checkpoints automaticos |
-| **42 integracoes premium** | Actions profundas com UI de configuracao, tipadas e testadas |
+| **700+ integrações** | GitHub, Slack, Jira, Linear, Notion, Google, Microsoft e mais via Nango |
+| **Marketplace** | 10 agentes e 6 squads pré-configurados prontos para usar |
+| **Escritório Virtual 3D** | Acompanhe seus agentes trabalhando em tempo real com React Three Fiber |
+| **Pipeline autônomo** | Veto conditions, review loops, checkpoints automáticos |
+| **42 integrações premium** | Actions profundas com UI de configuração, tipadas e testadas |
 | **Sherlock Investigator** | Analisa perfis reais de Instagram, YouTube, Twitter/X e LinkedIn |
-| **i18n** | Portugues, English, Espanol |
+| **i18n** | Português, English, Español |
 
 ---
 
-## Indice
+## Índice
 
 - [Features](#-features)
   - [Chat com Architect](#chat-com-architect)
   - [Board Kanban](#board-kanban)
   - [Virtual Office 3D](#virtual-office-3d)
   - [Pipeline Inteligente](#pipeline-inteligente)
-  - [Conteudo Inteligente](#conteudo-inteligente)
+  - [Conteúdo Inteligente](#conteúdo-inteligente)
   - [Marketplace](#marketplace)
-  - [Integracoes (700+)](#integracoes-700)
+  - [Integrações (700+)](#integrações-700)
   - [Sherlock Investigator](#sherlock-investigator)
   - [Scheduling e API](#scheduling-e-api)
   - [Analytics](#analytics)
   - [Multi-Provider LLM](#multi-provider-llm)
 - [Quick Start](#-quick-start)
 - [Arquitetura](#-arquitetura)
-- [Stack Tecnico](#-stack-tecnico)
+- [Stack Técnico](#-stack-técnico)
 - [Comparativo](#-comparativo)
 - [Roadmap](#-roadmap)
 - [Contribuindo](#-contribuindo)
-- [Licenca](#-licenca)
+- [Licença](#-licença)
 
 ---
 
@@ -76,53 +76,53 @@
 
 ### Chat com Architect
 
-O Architect e o agente central que entende o que voce precisa e monta o squad inteiro via chat. Descreva seu objetivo e ele cria agentes, define o pipeline e comeca a executar.
+O Architect é o agente central que entende o que você precisa e monta o squad inteiro via chat. Descreva seu objetivo e ele cria agentes, define o pipeline e começa a executar.
 
 - **14 capacidades**: criar, editar, deletar, listar, pausar, ativar, duplicar, exportar squads
-- **Chat universal**: input sempre ativo, sugestoes clicaveis, roteamento inteligente
+- **Chat universal**: input sempre ativo, sugestões clicáveis, roteamento inteligente
 - **Company wizard**: 5 perguntas no primeiro acesso para personalizar tudo
-- **Context-aware**: sabe as integracoes conectadas e sugere acoes
+- **Context-aware**: sabe as integrações conectadas e sugere ações
 
 ### Board Kanban
 
-Gestao visual de tasks com drag & drop entre colunas.
+Gestão visual de tasks com drag & drop entre colunas.
 
 - Colunas: Backlog → In Progress → Review → Done
 - Drag & drop nativo com `@dnd-kit`
-- Atribuicao por agente
-- Sincronizacao com Jira, Linear, Asana, ClickUp (via integracoes)
+- Atribuição por agente
+- Sincronização com Jira, Linear, Asana, ClickUp (via integrações)
 
 ### Virtual Office 3D
 
-Escritorio virtual futurista com React Three Fiber. Veja seus agentes trabalhando em tempo real.
+Escritório virtual futurista com React Three Fiber. Veja seus agentes trabalhando em tempo real.
 
-- **6 salas tematicas**: Research Lab, Creative Studio, Review Room, Strategy Room, Publishing, Lobby
-- **Agentes 3D**: robos metalicos com olhos neon, animacoes por status (working/idle/delivering)
-- **Efeitos visuais**: chao reflexivo, bloom, particulas, hologramas flutuantes
-- **Handoff animado**: particula voando entre agentes quando entregam trabalho
-- **Camera orbital**: rotacao automatica, zoom, pan
+- **6 salas temáticas**: Research Lab, Creative Studio, Review Room, Strategy Room, Publishing, Lobby
+- **Agentes 3D**: robôs metálicos com olhos neon, animações por status (working/idle/delivering)
+- **Efeitos visuais**: chão reflexivo, bloom, partículas, hologramas flutuantes
+- **Handoff animado**: partícula voando entre agentes quando entregam trabalho
+- **Câmera orbital**: rotação automática, zoom, pan
 - **Interativo**: clique no agente para ver detalhes
 
 ### Pipeline Inteligente
 
-Pipeline de execucao com checkpoints automaticos, veto conditions e review loops.
+Pipeline de execução com checkpoints automáticos, veto conditions e review loops.
 
 - **Task chains**: agentes executam tarefas sequenciais com output encadeado
-- **Veto conditions**: LLM verifica qualidade semanticamente, retry automatico 2x
-- **Review loops**: reviewer rejeita → agente refaz com feedback, ate 3 ciclos
-- **Run folders**: cada execucao gera runId + versionamento de outputs
+- **Veto conditions**: LLM verifica qualidade semanticamente, retry automático 2x
+- **Review loops**: reviewer rejeita → agente refaz com feedback, até 3 ciclos
+- **Run folders**: cada execução gera runId + versionamento de outputs
 - **Autonomy modes**: `interactive` (pausa a cada step) ou `autonomous` (roda tudo)
-- **Performance mode**: Alta Performance (3-5x tokens, multiplos passes) ou Economico
-- **Checkpoints**: `approve`, `select`, `skip` — configuravel por step
+- **Performance mode**: Alta Performance (3-5x tokens, múltiplos passes) ou Econômico
+- **Checkpoints**: `approve`, `select`, `skip` — configurável por step
 
-### Conteudo Inteligente
+### Conteúdo Inteligente
 
-Nao e conteudo generico — sao angulos criativos, tom de voz e regras de plataforma.
+Não é conteúdo genérico — são ângulos criativos, tom de voz e regras de plataforma.
 
-- **5 angulos criativos** gerados por IA para cada tema (medo, oportunidade, educacional, contrario, inspiracional)
-- **6 tons de voz**: profissional, casual, tecnico, divertido, inspirador, provocativo
-- **22 best-practices** injetadas automaticamente (7 disciplinas + 14 plataformas)
-- **Memoria persistente**: squad lembra preferencias e melhora a cada execucao
+- **5 ângulos criativos** gerados por IA para cada tema (medo, oportunidade, educacional, contrário, inspiracional)
+- **6 tons de voz**: profissional, casual, técnico, divertido, inspirador, provocativo
+- **22 best practices** injetadas automaticamente (7 disciplinas + 14 plataformas)
+- **Memória persistente**: squad lembra preferências e melhora a cada execução
 
 ### Marketplace
 
@@ -131,15 +131,15 @@ Adquira agentes especializados e squads completos prontos para usar.
 - **16 itens**: 10 agentes avulsos + 6 squads completos
 - **Squads prontos**: Instagram Carousel Factory, YouTube Content Machine, Email Marketing, LinkedIn Thought Leader, Customer Support, Dev Pipeline
 - **Squads completos**: cria squad inteiro na sua org com 1 clique
-- **Dev Pipeline**: squad que replica a esteira de desenvolvimento autonoma (Issue → PR → Review → Merge)
+- **Dev Pipeline**: squad que replica a esteira de desenvolvimento autônoma (Issue → PR → Review → Merge)
 
-### Integracoes (700+)
+### Integrações (700+)
 
-42 integracoes premium com actions profundas + 700+ genericas via Nango.
+42 integrações premium com actions profundas + 700+ genéricas via Nango.
 
-**Premium (com UI de configuracao e actions tipadas):**
+**Premium (com UI de configuração e actions tipadas):**
 
-| Categoria | Integracoes |
+| Categoria | Integrações |
 |-----------|------------|
 | Development | GitHub, GitLab, Bitbucket, Azure DevOps, Confluence |
 | Communication | Slack, Discord, Telegram, Microsoft Teams, Intercom |
@@ -152,23 +152,23 @@ Adquira agentes especializados e squads completos prontos para usar.
 | Storage & Design | Figma, Dropbox, Airtable |
 | Payments | Stripe, Shopify |
 
-**+ 670+ genericas** disponiveis via catalogo Nango com OAuth em 1 clique.
+**+ 670+ genéricas** disponíveis via catálogo Nango com OAuth em 1 clique.
 
 ### Sherlock Investigator
 
 Analisa perfis reais de redes sociais para calibrar seus agentes com dados de verdade.
 
 - **4 plataformas**: Instagram, YouTube, Twitter/X, LinkedIn
-- **Extracao**: carrosseis, reels, posts, videos, artigos, threads
-- **Pattern analysis**: hooks, CTAs, vocabulario, tom, engagement drivers via LLM
-- **Consolidacao**: multiplos perfis → relatorio unificado de padroes
+- **Extração**: carrosséis, reels, posts, vídeos, artigos, threads
+- **Pattern analysis**: hooks, CTAs, vocabulário, tom, engagement drivers via LLM
+- **Consolidação**: múltiplos perfis → relatório unificado de padrões
 
 ### Scheduling e API
 
-Automatize completamente — agende execucoes e dispare pipelines via API.
+Automatize completamente: agende execuções e dispare pipelines via API.
 
-- **Agendamento cron**: "todo dia as 9h", "toda segunda as 14h"
-- **API publica**: `POST /api/v1/squads/{id}/run` com Bearer token
+- **Agendamento cron**: "todo dia às 9h", "toda segunda às 14h"
+- **API pública**: `POST /api/v1/squads/{id}/run` com Bearer token
 - **API tokens**: SHA-256 hash, gerar/revogar em Settings
 - **Webhooks**: receba eventos de GitHub, Slack, Jira e processe automaticamente
 
@@ -180,11 +180,11 @@ curl -X POST https://app.orbitmind.com/api/v1/squads/{id}/run \
 
 ### Analytics
 
-Metricas pos-publicacao com feedback loop automatico.
+Métricas pós-publicação com feedback loop automático.
 
-- **Metricas**: likes, comments, shares, saves, views, reach, engagement rate
-- **Feedback loop**: apos coletar metricas, gera memorias automaticamente
-- **Por plataforma**: Instagram, LinkedIn, YouTube (extensivel)
+- **Métricas**: likes, comments, shares, saves, views, reach, engagement rate
+- **Feedback loop**: após coletar métricas, gera memórias automaticamente
+- **Por plataforma**: Instagram, LinkedIn, YouTube (extensível)
 
 ### Multi-Provider LLM
 
@@ -197,7 +197,7 @@ Configure o provider de IA direto pela interface — sem `.env`, sem terminal.
 
 ### Onboarding
 
-Setup em 5 minutos, zero configuracao tecnica.
+Setup em 5 minutos, zero configuração técnica.
 
 - **Tour interativo**: 11 steps guiados pela interface (Onborda)
 - **Company wizard**: 5 perguntas no chat para personalizar o produto
@@ -209,45 +209,45 @@ Setup em 5 minutos, zero configuracao tecnica.
 npx orbitmind init
 ```
 
-Wizard interativo: nome da org, template, provider de IA, database URL, gera `.env` automatico.
+Wizard interativo: nome da org, template, provider de IA, database URL, gera `.env` automático.
 
 ### i18n
 
-Suporte a 3 idiomas: Portugues (BR), English, Espanol. Configuravel por organizacao.
+Suporte a 3 idiomas: Português (BR), English, Español. Configurável por organização.
 
 ### Pipeline Logging
 
-Logs estruturados de cada execucao para debugging e auditoria.
+Logs estruturados de cada execução para debugging e auditoria.
 
 - **Eventos**: step_start, step_complete, veto_triggered, review_rejected, handoff, pipeline_complete
-- **Filtros**: por nivel (info/warn/error), por run, por step
+- **Filtros**: por nível (info/warn/error), por run, por step
 - **Token tracking**: consumo por step e por agente
 
 ---
 
 ## Quick Start
 
-### Pre-requisitos
+### Pré-requisitos
 
 - Node.js 20+
 - pnpm 9+
 - Docker (para PostgreSQL)
 - Uma chave de API: Anthropic, OpenAI ou Google Gemini
 
-### Instalacao
+### Instalação
 
 ```bash
-# Clone o repositorio
+# Clone o repositório
 git clone https://github.com/Wesley-SdS/orbitmind-platform.git
 cd orbitmind-platform
 
-# Instale dependencias
+# Instale dependências
 pnpm install
 
 # Suba o PostgreSQL
 docker compose up -d
 
-# Configure variaveis de ambiente
+# Configure variáveis de ambiente
 cp apps/web/.env.example apps/web/.env
 # Edite .env com suas credenciais
 
@@ -259,7 +259,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-Acesse `http://localhost:3000` e faca login com `admin@orbitmind.com / admin123`.
+Acesse `http://localhost:3000` e faça login com `admin@orbitmind.com / admin123`.
 
 ### Ou via CLI
 
@@ -279,21 +279,21 @@ orbitmind-platform/
 │       │   ├── (dashboard)/    # Chat, Board, Office, Marketplace, Settings
 │       │   ├── (marketing)/    # Landing page
 │       │   └── api/            # REST API + WebSocket + Webhooks
-│       ├── components/         # 57 React components
-│       │   ├── chat/           # Chat interface
+│       ├── components/         # 57 componentes React
+│       │   ├── chat/           # Interface de chat
 │       │   ├── board/          # Kanban board
 │       │   ├── office/         # Virtual Office 3D (R3F)
-│       │   └── ui/             # 28 shadcn/ui components
+│       │   └── ui/             # 28 componentes shadcn/ui
 │       └── lib/
 │           ├── db/             # Drizzle ORM — 24 tabelas
 │           ├── engine/         # Architect, chat handler
-│           └── integrations/   # Nango client + 42 premium integrations
+│           └── integrations/   # Nango client + 42 integrações premium
 ├── packages/
 │   ├── engine/                 # Core: PipelineRunner, Sherlock, Skills
 │   ├── shared/                 # Types, constants, validators
 │   └── cli/                    # npx orbitmind init
 ├── templates/                  # 4 squad + 5 skill templates
-└── docs/                       # Analise, arquitetura, PRDs
+└── docs/                       # Análise, arquitetura, PRDs
 ```
 
 ### Database Schema (24 tabelas)
@@ -318,7 +318,7 @@ organizations ─┬── users
 
 ---
 
-## Stack Tecnico
+## Stack Técnico
 
 | Camada | Tecnologia |
 |--------|-----------|
@@ -328,7 +328,7 @@ organizations ─┬── users
 | **Database** | PostgreSQL 16 + Drizzle ORM |
 | **Auth** | NextAuth v5 |
 | **Real-time** | WebSocket (native) |
-| **Integracoes** | Nango (700+ APIs) |
+| **Integrações** | Nango (700+ APIs) |
 | **i18n** | next-intl (PT-BR, EN, ES) |
 | **Monorepo** | Turborepo + pnpm |
 | **Language** | TypeScript (strict mode) |
@@ -343,21 +343,21 @@ organizations ─┬── users
 | Feature | OrbitMind | CrewAI | AutoGen | Paperclip |
 |---------|-----------|--------|---------|-----------|
 | Interface Web completa | Full UI | CLI only | CLI only | Dashboard |
-| Chat com Architect | 14 acoes | — | — | — |
+| Chat com Architect | 14 ações | — | — | — |
 | Board Kanban | Drag & drop | — | — | — |
 | Virtual Office 3D | Three.js | — | — | — |
 | Marketplace | 16 itens | — | — | — |
-| 700+ Integracoes | Nango | — | — | — |
-| Pipeline autonomo | Validado | Basico | Basico | Basico |
+| 700+ Integrações | Nango | — | — | — |
+| Pipeline autônomo | Validado | Básico | Básico | Básico |
 | Veto conditions | LLM-based | — | — | — |
 | Review loops | 3 ciclos | — | — | — |
 | Checkpoints | 3 tipos | — | — | — |
-| Sherlock (analise perfis) | 4 redes | — | — | — |
-| Angulos criativos | 5 angulos | — | — | — |
-| Memoria persistente | Por squad | — | — | — |
+| Sherlock (análise de perfis) | 4 redes | — | — | — |
+| Ângulos criativos | 5 ângulos | — | — | — |
+| Memória persistente | Por squad | — | — | — |
 | Scheduling (cron) | Nativo | — | — | — |
-| API publica + webhooks | REST + WS | — | — | — |
-| Analytics pos-publicacao | Nativo | — | — | — |
+| API pública + webhooks | REST + WS | — | — | — |
+| Analytics pós-publicação | Nativo | — | — | — |
 | Multi-provider LLM | 3 providers | Sim | Sim | — |
 | Multi-tenant (orgs) | Nativo | — | — | Sim |
 | i18n (3 idiomas) | PT, EN, ES | — | — | — |
@@ -371,20 +371,20 @@ organizations ─┬── users
 ### Implementado
 
 - [x] Core Pipeline (task chains, veto, review loops, run folders)
-- [x] Conteudo Inteligente (angulos, tons, format injection)
-- [x] Aprendizado (tour, company wizard, memoria persistente)
+- [x] Conteúdo Inteligente (ângulos, tons, format injection)
+- [x] Aprendizado (tour, company wizard, memória persistente)
 - [x] Virtual Office 3D (React Three Fiber, 6 salas, agentes animados)
-- [x] Features Avancadas (Sherlock, parallel execution, i18n, CLI)
+- [x] Features Avançadas (Sherlock, parallel execution, i18n, CLI)
 - [x] Marketplace + SaaS (marketplace, scheduling, API, analytics, logging)
-- [x] Integracoes (42 premium + 700+ via Nango, webhooks, dev pipeline template)
+- [x] Integrações (42 premium + 700+ via Nango, webhooks, dev pipeline template)
 
-### Proximos passos
+### Próximos passos
 
 - [ ] Deploy (Vercel + VPS para WebSocket/workers)
 - [ ] Testes E2E
 - [ ] Mobile responsive
 - [ ] Billing/subscription (Stripe)
-- [ ] White-label para agencias
+- [ ] White-label para agências
 - [ ] AI image generation (DALL-E, Midjourney API)
 - [ ] Video content pipeline (YouTube Shorts, Reels)
 
@@ -398,34 +398,34 @@ organizations ─┬── users
 
 ## Contribuindo
 
-Contribuicoes sao bem-vindas!
+Contribuições são bem-vindas!
 
-1. Fork o repositorio
+1. Fork o repositório
 2. Crie uma branch: `git checkout -b feat/minha-feature`
-3. Commit com mensagem semantica: `git commit -m "feat: add nova feature"`
+3. Commit com mensagem semântica: `git commit -m "feat: add nova feature"`
 4. Push: `git push origin feat/minha-feature`
 5. Abra um Pull Request
 
-### Convencoes de commit
+### Convenções de commit
 
 - `feat:` nova feature
-- `fix:` correcao de bug
-- `docs:` documentacao
-- `refactor:` refatoracao sem mudanca de comportamento
+- `fix:` correção de bug
+- `docs:` documentação
+- `refactor:` refatoração sem mudança de comportamento
 - `test:` testes
-- `chore:` manutencao
+- `chore:` manutenção
 
 ---
 
-## Licenca
+## Licença
 
 MIT License — veja [LICENSE](LICENSE) para detalhes.
 
 ---
 
 <div align="center">
-  <p><strong>OrbitMind Platform</strong> — Squads de IA que trabalham para voce.</p>
-  <p>Feito com TypeScript, Next.js 15, React Three Fiber e muito cafe.</p>
+  <p><strong>OrbitMind Platform</strong> — Squads de IA que trabalham para você.</p>
+  <p>Feito com TypeScript, Next.js 15, React Three Fiber e muito café.</p>
   <p>
     <a href="https://github.com/Wesley-SdS/orbitmind-platform">GitHub</a>
   </p>
