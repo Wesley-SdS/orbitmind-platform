@@ -44,7 +44,7 @@ export const SKILL_REGISTRY: SkillDefinition[] = [
       try {
         const res = await fetch(`https://graph.facebook.com/v21.0/${config.INSTAGRAM_USER_ID}?fields=username,followers_count&access_token=${config.INSTAGRAM_ACCESS_TOKEN}`);
         if (!res.ok) return { ok: false, detail: `API error: ${res.status}` };
-        const data = await res.json();
+        const data = (await res.json()) as Record<string, unknown>;
         return { ok: true, detail: `@${data.username} (${data.followers_count} seguidores)` };
       } catch (e) { return { ok: false, detail: e instanceof Error ? e.message : "Erro" }; }
     },
@@ -69,7 +69,7 @@ export const SKILL_REGISTRY: SkillDefinition[] = [
       try {
         const res = await fetch("https://api.linkedin.com/v2/userinfo", { headers: { Authorization: `Bearer ${config.LINKEDIN_ACCESS_TOKEN}` } });
         if (!res.ok) return { ok: false, detail: `API error: ${res.status}` };
-        const data = await res.json();
+        const data = (await res.json()) as Record<string, unknown>;
         return { ok: true, detail: `${data.name} (${data.email})` };
       } catch (e) { return { ok: false, detail: e instanceof Error ? e.message : "Erro" }; }
     },
@@ -117,7 +117,7 @@ export const SKILL_REGISTRY: SkillDefinition[] = [
       try {
         const res = await fetch("https://api.canva.com/rest/v1/users/me", { headers: { Authorization: `Bearer ${config.CANVA_ACCESS_TOKEN}` } });
         if (!res.ok) return { ok: false, detail: `API error: ${res.status}` };
-        const data = await res.json();
+        const data = (await res.json()) as Record<string, unknown>;
         return { ok: true, detail: `${data.display_name ?? "Conectado"}` };
       } catch (e) { return { ok: false, detail: e instanceof Error ? e.message : "Erro" }; }
     },
@@ -142,7 +142,7 @@ export const SKILL_REGISTRY: SkillDefinition[] = [
       try {
         const res = await fetch(`https://api.apify.com/v2/users/me?token=${config.APIFY_API_TOKEN}`);
         if (!res.ok) return { ok: false, detail: `API error: ${res.status}` };
-        const data = await res.json();
+        const data = (await res.json()) as { data?: { username?: string } };
         return { ok: true, detail: `${data.data?.username ?? "Conectado"}` };
       } catch (e) { return { ok: false, detail: e instanceof Error ? e.message : "Erro" }; }
     },

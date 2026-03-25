@@ -61,10 +61,10 @@ export class CanvaDesigner {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return { success: false, error: `Search failed [${res.status}]` };
-    const data = await res.json();
+    const data = (await res.json()) as Record<string, unknown>;
     return {
       success: true,
-      templates: (data.items ?? []).map((t: Record<string, unknown>) => ({
+      templates: ((data.items ?? []) as Array<{ id: string; title: string; thumbnail: string }>).map((t) => ({
         id: t.id, title: t.title, thumbnail: t.thumbnail,
       })),
     };
@@ -80,7 +80,7 @@ export class CanvaDesigner {
       body: JSON.stringify(body),
     });
     if (!res.ok) return { success: false, error: `Create failed [${res.status}]` };
-    const data = await res.json();
+    const data = (await res.json()) as { design?: { id: string } };
     return { success: true, designId: data.design?.id };
   }
 
@@ -91,7 +91,7 @@ export class CanvaDesigner {
       body: JSON.stringify({ brand_template_id: designId, data: brandData }),
     });
     if (!res.ok) return { success: false, error: `Autofill failed [${res.status}]` };
-    const data = await res.json();
+    const data = (await res.json()) as { job?: { result?: { design?: { id: string } } } };
     return { success: true, designId: data.job?.result?.design?.id };
   }
 
@@ -102,7 +102,7 @@ export class CanvaDesigner {
       body: JSON.stringify({ design_id: designId, format: { type: format } }),
     });
     if (!res.ok) return { success: false, error: `Export failed [${res.status}]` };
-    const data = await res.json();
+    const data = (await res.json()) as { job?: { id: string } };
 
     // Poll for export completion
     const jobId = data.job?.id;
@@ -114,7 +114,7 @@ export class CanvaDesigner {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!pollRes.ok) continue;
-      const pollData = await pollRes.json();
+      const pollData = (await pollRes.json()) as { job?: { status: string; result?: { url: string } } };
       if (pollData.job?.status === "success") {
         return { success: true, exportUrl: pollData.job.result?.url };
       }
