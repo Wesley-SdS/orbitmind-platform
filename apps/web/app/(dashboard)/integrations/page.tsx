@@ -258,7 +258,7 @@ export default function IntegrationsPage() {
                         <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[integration.category]}</p>
                       </div>
                     </div>
-                    <Badge variant={connected ? "default" : "secondary"}>
+                    <Badge variant={connected ? "default" : "secondary"} className={connected ? "bg-green-600/20 hover:bg-green-600/30 text-green-400 border-green-600/30" : ""}>
                       {connected ? "Conectado" : "Desconectado"}
                     </Badge>
                   </div>
