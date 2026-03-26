@@ -405,6 +405,7 @@ export default function IntegrationsPage() {
           orgIntegration={configOrgIntegration}
           onClose={() => setConfigModal(null)}
           onSave={handleSaveConfig}
+          onRefresh={loadData}
         />
       )}
     </div>
@@ -416,17 +417,26 @@ function ConfigDialog({
   orgIntegration,
   onClose,
   onSave,
+  onRefresh,
 }: {
   integration: PremiumIntegration;
   orgIntegration: OrgIntegration | null;
   onClose: () => void;
   onSave: (id: string, capabilities: string[]) => void;
+  onRefresh: () => Promise<void>;
 }) {
   const [enabledCaps, setEnabledCaps] = useState<Set<string>>(
     new Set(orgIntegration?.enabledCapabilities ?? integration.capabilities.map((c) => c.id)),
   );
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string; account?: { email?: string; name?: string; login?: string; avatar_url?: string }; debug?: unknown } | null>(null);
+
+  // Read saved account from config (persisted from previous test)
+  const savedAccount = (orgIntegration?.config as Record<string, unknown> | undefined)?.connectedAccount as
+    { login?: string; name?: string; email?: string; avatar_url?: string } | undefined;
+
+  // The account to display: test result takes priority, fallback to saved
+  const displayAccount = testResult?.ok ? testResult.account : savedAccount;
 
   async function handleTest() {
     if (!orgIntegration) return;
@@ -435,9 +445,26 @@ function ConfigDialog({
     try {
       const resp = await fetch(`/api/integrations/${orgIntegration.id}/test`, { method: "POST" });
       const data = await resp.json();
-      setTestResult(data.connected ? "Conexão OK" : "Falha na conexão");
+      console.log("[integrations] test result:", data);
+      if (data.connected) {
+        const acct = data.account;
+        const label = acct?.login || acct?.name || acct?.email || "";
+        setTestResult({
+          ok: true,
+          message: label ? `Conectado como ${label}` : "Conexão OK",
+          account: acct,
+        });
+        // Refresh parent data so account info is persisted in state
+        await onRefresh();
+      } else {
+        setTestResult({
+          ok: false,
+          message: data.error || "Nenhuma conexão encontrada no Nango",
+          debug: data.debug,
+        });
+      }
     } catch {
-      setTestResult("Erro ao testar");
+      setTestResult({ ok: false, message: "Erro ao testar" });
     } finally {
       setTesting(false);
     }
@@ -485,11 +512,44 @@ function ConfigDialog({
               Testar Conexão
             </Button>
             {testResult && (
-              <span className={`text-xs ${testResult.includes("OK") ? "text-green-500" : "text-red-500"}`}>
-                {testResult}
+              <span className={`text-xs ${testResult.ok ? "text-green-500" : "text-red-500"}`}>
+                {testResult.message}
               </span>
             )}
           </div>
+
+          {/* Connected account info — shows saved data instantly, updated on test */}
+          {(orgIntegration?.connectedAt || displayAccount) && (
+            <div className="rounded-lg border border-border/50 bg-muted/30 p-3 space-y-2">
+              {displayAccount && (displayAccount.login || displayAccount.name || displayAccount.email) && (
+                <div className="flex items-center gap-2">
+                  {displayAccount.avatar_url && (
+                    <img src={displayAccount.avatar_url} alt="" className="h-6 w-6 rounded-full" />
+                  )}
+                  <div>
+                    {displayAccount.login && <p className="text-sm font-medium">{displayAccount.login}</p>}
+                    {displayAccount.name && displayAccount.name !== displayAccount.login && (
+                      <p className="text-xs text-muted-foreground">{displayAccount.name}</p>
+                    )}
+                    {displayAccount.email && (
+                      <p className="text-xs text-muted-foreground">{displayAccount.email}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              {orgIntegration?.connectedAt && (
+                <p className="text-xs text-muted-foreground">
+                  Conectado em {new Date(orgIntegration.connectedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </p>
+              )}
+              {testResult !== null && !testResult.ok && testResult.debug != null && (
+                <details className="text-xs text-muted-foreground">
+                  <summary className="cursor-pointer">Debug info</summary>
+                  <pre className="mt-1 text-[10px] overflow-auto max-h-24">{JSON.stringify(testResult.debug as Record<string, unknown>, null, 2)}</pre>
+                </details>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>Cancelar</Button>

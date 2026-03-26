@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
-import { getIntegrationsByOrgId, createIntegration } from "@/lib/db/queries";
+import { getIntegrationsByOrgId, upsertIntegration } from "@/lib/db/queries";
 
 export async function GET(): Promise<Response> {
   try {
@@ -20,6 +20,8 @@ export async function GET(): Promise<Response> {
 const createSchema = z.object({
   integrationId: z.string().min(1).max(50),
   tier: z.enum(["premium", "generic"]).optional(),
+  status: z.enum(["active", "inactive", "error", "disconnected"]).optional(),
+  connectedAt: z.string().datetime().optional(),
   config: z.record(z.unknown()).optional(),
   enabledCapabilities: z.array(z.string()).optional(),
 });
@@ -37,9 +39,11 @@ export async function POST(req: Request): Promise<Response> {
       return NextResponse.json({ error: "Dados invalidos." }, { status: 400 });
     }
 
-    const integration = await createIntegration({
+    const { connectedAt, ...rest } = parsed.data;
+    const integration = await upsertIntegration({
       orgId: session.user.orgId,
-      ...parsed.data,
+      ...rest,
+      connectedAt: connectedAt ? new Date(connectedAt) : undefined,
     });
 
     return NextResponse.json(integration, { status: 201 });

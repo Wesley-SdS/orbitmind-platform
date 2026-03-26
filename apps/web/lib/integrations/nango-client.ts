@@ -21,12 +21,15 @@ export async function createConnectSession(orgId: string): Promise<{ sessionToke
 
 export async function isIntegrationConnected(
   orgId: string,
-  providerConfigKey: string,
+  providerKey: string,
 ): Promise<boolean> {
   try {
-    const nango = getNango();
-    const connection = await nango.getConnection(providerConfigKey, orgId);
-    return !!connection;
+    const connections = await listConnections(orgId);
+    return connections.some(
+      (c) => c.provider_config_key === providerKey
+        || c.provider_config_key.includes(providerKey)
+        || c.provider === providerKey,
+    );
   } catch {
     return false;
   }
@@ -72,10 +75,10 @@ export async function nangoRequest<T = unknown>(opts: {
   return response.data as T;
 }
 
-export async function listConnections(orgId: string): Promise<Array<{ id: number; connection_id: string; provider_config_key: string }>> {
+export async function listConnections(orgId: string): Promise<Array<{ id: number; connection_id: string; provider_config_key: string; provider?: string }>> {
   const nango = getNango();
   const response = await nango.listConnections({ userId: orgId });
-  return response.connections as unknown as Array<{ id: number; connection_id: string; provider_config_key: string }>;
+  return response.connections as unknown as Array<{ id: number; connection_id: string; provider_config_key: string; provider?: string }>;
 }
 
 // ──────────────────────────────────────────────
