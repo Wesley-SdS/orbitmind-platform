@@ -14,56 +14,79 @@ export interface OfficeAgent3D {
   color: number;
 }
 
-// Map room IDs to 3D positions
-const ROOM_3D_POSITIONS: Record<string, { x: number; z: number }> = {
-  research:   { x: -6, z: -2 },
-  creative:   { x: 0,  z: -2 },
-  review:     { x: 6,  z: -2 },
-  strategy:   { x: -5, z: 4 },
-  publishing: { x: 1,  z: 4 },
-  lobby:      { x: 6,  z: 4 },
+// Desk positions per room — must match DESKS in office-scene.tsx
+// Agent sits BEHIND the desk at Z+0.8 (facing the monitor at Z-0.2)
+const ROOM_DESKS: Record<string, Array<{ deskX: number; deskZ: number }>> = {
+  research:   [{ deskX: -7, deskZ: -2 }, { deskX: -5, deskZ: -2 }],
+  creative:   [{ deskX: -1.2, deskZ: -2 }, { deskX: 1.2, deskZ: -2 }, { deskX: 0, deskZ: -3 }],
+  review:     [{ deskX: 6, deskZ: -2 }],
+  strategy:   [{ deskX: -6, deskZ: 4 }, { deskX: -4, deskZ: 4 }],
+  publishing: [{ deskX: 1, deskZ: 4 }],
+  lobby:      [{ deskX: 7, deskZ: 3 }],
 };
+
+const AGENT_SIT_OFFSET_Z = 0.8; // Agent sits behind desk
+
+// Demo statuses — used when all agents come as "idle" from backend
+const DEMO_STATUSES: OfficeAgent3D["status"][] = [
+  "working", "working", "idle", "done", "checkpoint", "working", "idle",
+];
 
 function mapAgentsToPositions(
   data: Array<{ id: string; name: string; role: string; icon: string | null; status: string }>,
 ): OfficeAgent3D[] {
   const roomDeskCounters: Record<string, number> = {};
 
-  return data.map((a) => {
+  const mapped = data.map((a, i) => {
     const roomId = getRoomForRole(a.role);
-    const roomPos = ROOM_3D_POSITIONS[roomId] ?? { x: 6, z: 4 };
+    const desks = ROOM_DESKS[roomId] ?? ROOM_DESKS.lobby!;
 
-    // Offset desks within the room
     const deskIdx = roomDeskCounters[roomId] ?? 0;
     roomDeskCounters[roomId] = deskIdx + 1;
 
-    const offsets = [
-      { dx: -1.2, dz: 0 },
-      { dx: 1.2, dz: 0 },
-      { dx: 0, dz: -1 },
-      { dx: 0, dz: 1 },
-    ];
-    const offset = offsets[deskIdx % offsets.length]!;
-
+    const desk = desks[deskIdx % desks.length]!;
     const colors = AGENT_COLORS[a.role.toLowerCase().split(" ")[0] ?? "default"] ?? AGENT_COLORS.default!;
+
+    // Use real status from backend, fallback to demo status if all idle
+    const realStatus = (a.status as OfficeAgent3D["status"]) || "idle";
 
     return {
       id: a.id,
       name: a.name,
       role: a.role,
       icon: a.icon ?? "🤖",
-      status: (a.status as OfficeAgent3D["status"]) || "idle",
+      status: realStatus,
       roomId,
       position: {
-        x: roomPos.x + offset.dx,
+        x: desk.deskX,
         y: 0,
-        z: roomPos.z + offset.dz,
+        z: desk.deskZ + AGENT_SIT_OFFSET_Z,
       },
       targetPosition: null,
       targetAgentId: null,
       color: colors.primary,
     };
   });
+
+  // If ALL agents are idle (no pipeline running), assign demo statuses for visual variety
+  const allIdle = mapped.every((a) => a.status === "idle");
+  if (allIdle) {
+    mapped.forEach((a, i) => {
+      a.status = DEMO_STATUSES[i % DEMO_STATUSES.length]!;
+    });
+
+    // Demo handoff: last "working" agent delivers to next
+    const deliveringIdx = mapped.findIndex((a) => a.status === "idle");
+    if (deliveringIdx >= 0 && mapped.length > 1) {
+      const target = mapped[(deliveringIdx + 1) % mapped.length]!;
+      const deliverer = mapped[deliveringIdx]!;
+      deliverer.status = "delivering";
+      (deliverer as { targetAgentId: string | null }).targetAgentId = target.id;
+      (deliverer as { targetPosition: { x: number; y: number; z: number } | null }).targetPosition = { ...target.position };
+    }
+  }
+
+  return mapped;
 }
 
 export function useOfficeState(squadId: string | null) {
