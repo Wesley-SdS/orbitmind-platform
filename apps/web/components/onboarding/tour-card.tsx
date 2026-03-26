@@ -1,19 +1,12 @@
 "use client";
 
 import { X } from "lucide-react";
+import { useOnborda } from "onborda";
 import { Button } from "@/components/ui/button";
+import type { CardComponentProps } from "onborda";
 
-interface TourCardProps {
-  step: { icon: React.ReactNode; title: string; content: React.ReactNode };
-  currentStep: number;
-  totalSteps: number;
-  nextStep: () => void;
-  prevStep: () => void;
-  arrow: React.ReactNode;
-  close: () => void;
-}
-
-export function TourCard({ step, currentStep, totalSteps, nextStep, prevStep, arrow, close }: TourCardProps) {
+export function TourCard({ step, currentStep, totalSteps, nextStep, prevStep, arrow }: CardComponentProps) {
+  const { closeOnborda } = useOnborda();
   const isFirst = currentStep === 0;
   const isLast = currentStep === totalSteps - 1;
   const progress = ((currentStep + 1) / totalSteps) * 100;
@@ -23,10 +16,10 @@ export function TourCard({ step, currentStep, totalSteps, nextStep, prevStep, ar
       await fetch("/api/organizations", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings: { onboardingCompleted: true } }),
+        body: JSON.stringify({ onboardingCompleted: true }),
       });
     } catch { /* */ }
-    close();
+    closeOnborda();
   }
 
   return (

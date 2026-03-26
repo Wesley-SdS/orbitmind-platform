@@ -28,7 +28,7 @@ export function OnboardingProvider({ children, showTour = false }: OnboardingPro
         showOnborda={show}
         shadowRgb="83,74,183"
         shadowOpacity="0.6"
-        cardComponent={TourCard as any}
+        cardComponent={TourCard}
         cardTransition={{ duration: 0.3, type: "tween" }}
       >
         {children}

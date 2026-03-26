@@ -26,6 +26,8 @@ const updateSchema = z.object({
   slug: z.string().min(1).max(100).optional(),
   logoUrl: z.string().url().nullable().optional(),
   settings: z.record(z.unknown()).optional(),
+  onboardingCompleted: z.boolean().optional(),
+  language: z.string().min(2).max(10).optional(),
 });
 
 export async function PATCH(req: Request): Promise<Response> {
