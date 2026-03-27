@@ -119,16 +119,18 @@ export function PipelineView({ squadId, pipeline, agents }: PipelineViewProps) {
     return "pending";
   }
 
+  function toKebab(s: string): string {
+    return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, "-");
+  }
+
   function resolveAgent(step: PipelineStep): Agent | null {
     if (step.type === "checkpoint") return null;
     if (!step.agentId) return null;
     // Try direct UUID match
     const direct = agentMap.get(step.agentId);
     if (direct) return direct;
-    // Fallback: match kebab-case to agent name
-    const found = agents.find(a =>
-      a.name.toLowerCase().replace(/\s+/g, "-") === step.agentId
-    );
+    // Fallback: match kebab-case to agent name (accent-insensitive)
+    const found = agents.find(a => toKebab(a.name) === step.agentId);
     return found ?? null;
   }
 

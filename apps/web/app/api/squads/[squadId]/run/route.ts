@@ -49,7 +49,7 @@ export async function POST(
       if (!id) return undefined;
       if (/^[0-9a-f]{8}-/.test(id)) return id;
       const found = squad.agents.find(a =>
-        a.name.toLowerCase().replace(/\s+/g, "-") === id || a.id === id
+        a.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, "-") === id || a.id === id
       );
       return found?.id ?? agentsList[0]?.id;
     };
