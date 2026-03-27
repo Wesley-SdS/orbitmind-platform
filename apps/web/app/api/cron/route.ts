@@ -154,11 +154,15 @@ export async function POST(req: Request): Promise<Response> {
             executionMap.set(step.id, execution.id);
           },
           onStepComplete: async (step, output) => {
+            const metrics = runner.getStepMetrics(step.id);
             const execId = executionMap.get(step.id);
             if (execId) {
               await updateExecution(execId, {
                 status: "completed",
                 outputData: { content: output.substring(0, 10000) },
+                tokensUsed: metrics?.tokensUsed ?? 0,
+                estimatedCost: metrics?.costCents ?? 0,
+                durationMs: metrics?.durationMs ?? 0,
                 completedAt: new Date(),
               });
             }

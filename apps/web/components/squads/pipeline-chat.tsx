@@ -138,7 +138,7 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
       {/* Summary modal */}
       {summary && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="flex w-full max-w-3xl flex-col gap-4 rounded-xl border border-border bg-background p-6 shadow-2xl" style={{ maxHeight: "80vh" }}>
+          <div className="flex w-full max-w-5xl flex-col gap-4 rounded-xl border border-border bg-background p-6 shadow-2xl" style={{ height: "85vh" }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
@@ -148,8 +148,8 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <ScrollArea className="flex-1">
-              <div className="prose prose-sm prose-invert max-w-none pr-4">
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="prose prose-sm prose-invert max-w-none pr-4 pb-4">
                 <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(summary) }} />
               </div>
             </ScrollArea>

@@ -142,12 +142,12 @@ export default async function SquadDetailPage({
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Hash className="h-4 w-4" />
-                  Execucoes
+                  Execuções
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold">{executions.length}</p>
-                <p className="text-xs text-muted-foreground">{completed} concluidas</p>
+                <p className="text-xs text-muted-foreground">{completed} concluídas</p>
               </CardContent>
             </Card>
             <Card>
@@ -171,19 +171,19 @@ export default async function SquadDetailPage({
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold">R$ {(totalCost / 100).toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">estimado este mes</p>
+                <p className="text-xs text-muted-foreground">estimado este mês</p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Clock className="h-4 w-4" />
-                  Duracao media
+                  Duração média
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold">{avgDuration}s</p>
-                <p className="text-xs text-muted-foreground">por execucao</p>
+                <p className="text-xs text-muted-foreground">por execução</p>
               </CardContent>
             </Card>
           </div>
@@ -194,7 +194,7 @@ export default async function SquadDetailPage({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
-                Configuracao do Squad
+                Configuração do Squad
               </CardTitle>
             </CardHeader>
             <CardContent>

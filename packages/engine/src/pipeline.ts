@@ -50,6 +50,7 @@ export class PipelineRunner {
   private reviewCycles: Map<string, number> = new Map();
   private runContext: RunContext;
   private versionTracker: Map<string, number> = new Map();
+  private stepMetrics: Map<string, { tokensUsed: number; costCents: number; durationMs: number }> = new Map();
   private selectedTone: string | null = null;
   private selectedAngle: AngleOption | null = null;
   private lastResearchOutput: string = "";
@@ -295,6 +296,7 @@ ${context}`;
 
     // Fallback: simple text chat
     const result = await this.adapter!.chat([{ role: "user", content: basePrompt }]);
+    this.stepMetrics.set(step.id, { tokensUsed: result.tokensUsed, costCents: result.costCents, durationMs: result.durationMs });
     return result.output;
   }
 
@@ -621,6 +623,10 @@ ${output.substring(0, 2000)}`;
 
   getState(): SquadState {
     return this.stateMachine.getState();
+  }
+
+  getStepMetrics(stepId: string): { tokensUsed: number; costCents: number; durationMs: number } | undefined {
+    return this.stepMetrics.get(stepId);
   }
 
   // ════════════════════════════════════════════════
