@@ -1,6 +1,7 @@
 export type ArchitectPhase =
   | "idle"
   | "discovery"
+  | "naming"
   | "design"
   | "list-action"
   | "edit-select"
@@ -47,6 +48,7 @@ export interface ArchitectConversationState {
     }>;
     skills: string[];
   };
+  nameSuggestions?: string[];
   createdSquadId?: string;
   editSquadId?: string;
   editSquadName?: string;

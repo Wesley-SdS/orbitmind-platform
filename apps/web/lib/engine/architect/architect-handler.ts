@@ -119,6 +119,8 @@ export async function handleArchitectMessage(
   // If in active flow (discovery/design/edit), continue that flow
   if (state.phase === "discovery") {
     await handleDiscovery(state, squadId, userMessage, providerConfig);
+  } else if (state.phase === "naming") {
+    await handleNaming(state, squadId, userMessage);
   } else if (state.phase === "design") {
     await handleDesignApproval(state, squadId, userMessage, providerConfig);
   } else if (state.phase === "list-action") {
@@ -441,24 +443,90 @@ Pergunte: "Posso **criar agora**, ou quer **ajustar**?"
 ## REGRAS
 - UMA pergunta por vez, DIFERENTE das anteriores
 - Todo squad TEM Reviewer
-- Nomes aliterativos, letras iniciais diferentes`;
+- Nomes aliterativos, letras iniciais diferentes
+
+## Skills disponíveis para o campo "skills" do design
+- "web_search" — pesquisa web
+- "web_fetch" — fetch de URLs
+- "instagram_publisher" — publicação no Instagram (requer integração)
+- "linkedin_publisher" — publicação no LinkedIn (requer integração)
+- "blotato_publisher" — publicação multi-plataforma
+- "canva_designer" — criação de artes/design
+- "apify_scraper" — scraping/pesquisa de concorrentes
+- "image_fetcher" — busca de imagens
+
+## IMPORTANTE sobre publicação em redes sociais
+Se o usuário mencionar publicação em Instagram, LinkedIn ou qualquer rede social:
+1. INCLUA as skills correspondentes (instagram_publisher, linkedin_publisher, etc.) no campo "skills"
+2. CRIE um agente DEDICADO para publicação/distribuição (ex: "Paulo Publisher") separado do agente de criação de conteúdo
+3. No pipeline, a etapa de publicação deve vir APÓS a revisão/aprovação`;
 
   const result = await adapter.chat(conversationMessages, systemPrompt);
   const design = extractDesignJson(result.output);
 
   if (design) {
     state.proposedDesign = design;
-    state.phase = "design";
+    state.phase = "naming";
     const display = stripJsonFromOutput(result.output);
     await sendArchitectMessageWithMeta(squadId, display, {
       agentName: "Arquiteto", agentIcon: "🧠", isArchitect: true,
       proposedDesign: design,
     });
+    // Ask the user to name the squad — use LLM for creative suggestions
+    const nameAdapter = createAdapter({ name: ARCHITECT_AGENT.name, role: ARCHITECT_AGENT.role, config: {} }, providerConfig);
+    const nameResult = await nameAdapter.chat([{
+      role: "user",
+      content: `Você é o Arquiteto do OrbitMind. O usuário acabou de aprovar o design de um squad.\n\nDesign:\n- Nome provisório: ${design.name}\n- Descrição: ${design.description}\n- Agentes: ${design.agents.map(a => a.name + " (" + a.role + ")").join(", ")}\n\nSugira 3 nomes criativos e profissionais em português para esse squad. Os nomes devem ser curtos (2-4 palavras), memoráveis e refletir a função do squad.\n\nResponda EXATAMENTE neste formato (sem mais nada):\n**Como você quer chamar esse squad?**\n\nAlgumas sugestões:\n1. **Nome 1**\n2. **Nome 2**\n3. **Nome 3**\n\nVocê pode escolher uma dessas ou digitar o nome que preferir!`,
+    }]);
+    // Store suggestions in state for number selection
+    const sugMatches = [...nameResult.output.matchAll(/\d+\.\s+\*\*(.+?)\*\*/g)];
+    state.nameSuggestions = sugMatches.map(m => m[1]!);
+    await sendArchitectMessage(squadId, nameResult.output);
   } else {
     state.discoveryStep++;
     if (!state.discovery.purpose) state.discovery.purpose = userMessage;
     await sendArchitectMessage(squadId, result.output);
   }
+}
+
+// ===================== NAMING =====================
+
+async function handleNaming(
+  state: ArchitectConversationState,
+  squadId: string,
+  userMessage: string,
+) {
+  const lower = userMessage.trim().toLowerCase();
+
+  // If the user picks a number (1, 2, 3), map to the suggestion
+  if (!state.proposedDesign) {
+    state.phase = "idle";
+    await sendArchitectMessage(squadId, "Não tenho um design pronto. Me descreva o que você precisa!");
+    return;
+  }
+
+  let chosenName: string;
+  const numberMatch = lower.match(/^(\d)$/);
+  if (numberMatch && numberMatch[1] && state.nameSuggestions?.length) {
+    const idx = parseInt(numberMatch[1], 10) - 1;
+    chosenName = (idx >= 0 && idx < state.nameSuggestions.length)
+      ? state.nameSuggestions[idx]!
+      : userMessage.trim();
+  } else {
+    // User typed a custom name
+    chosenName = userMessage.trim();
+  }
+
+  state.proposedDesign!.name = chosenName;
+  state.phase = "design";
+
+  await sendArchitectMessageWithMeta(squadId,
+    `Ótimo! O squad vai se chamar **"${chosenName}"** ✨\n\nPosso **criar agora**, ou quer **ajustar** algo antes? Você também pode:\n- **Detalhar** as responsabilidades dos agentes\n- **Trocar o nome** de algum agente (ex: "troca o nome do revisor para X")`,
+    {
+      agentName: "Arquiteto", agentIcon: "🧠", isArchitect: true,
+      proposedDesign: state.proposedDesign,
+    }
+  );
 }
 
 // ===================== DESIGN APPROVAL =====================
@@ -488,8 +556,20 @@ async function handleDesignApproval(
       state.createdSquadId = created.id;
       state.phase = "idle";
       const d = state.proposedDesign!;
+      // Check if the squad needs integrations to be configured
+      const publishingSkills = (d.skills || []).filter(s =>
+        s.includes("instagram") || s.includes("linkedin") || s.includes("blotato")
+      );
+      const skillNames: Record<string, string> = {
+        instagram_publisher: "Instagram",
+        linkedin_publisher: "LinkedIn",
+        blotato_publisher: "Blotato (multi-plataforma)",
+      };
+      const integrationHint = publishingSkills.length > 0
+        ? `\n\n**Próximo passo importante:** Para que a publicação funcione, você precisa configurar as integrações:\n${publishingSkills.map(s => `- **${skillNames[s] || s}** — diga "configurar ${(skillNames[s] || s).toLowerCase()}" para eu te guiar`).join("\n")}`
+        : "";
       await sendArchitectMessage(squadId,
-        `**Squad "${d.name}" criado com sucesso!**\n\n${d.agents.length} agentes configurados\n${d.pipeline.length} etapas no pipeline\n\nVocê já pode encontrá-lo na aba **Squads** ou selecionar aqui no chat.\n\nO que mais posso fazer? Posso **editar** esse squad, **criar outro**, ou **listar** seus squads.`
+        `**Squad "${d.name}" criado com sucesso!**\n\n${d.agents.length} agentes configurados\n${d.pipeline.length} etapas no pipeline\n\nVocê já pode encontrá-lo na aba **Squads** ou selecionar aqui no chat.${integrationHint}\n\nO que mais posso fazer? Posso **editar** esse squad, **criar outro**, ou **listar** seus squads.`
       );
       try {
         const { wsManager } = await import("@/lib/realtime/ws-manager");
@@ -505,12 +585,28 @@ async function handleDesignApproval(
     const adapter = createAdapter({ name: ARCHITECT_AGENT.name, role: ARCHITECT_AGENT.role, config: {} }, providerConfig);
     const isDetailRequest = /\b(detalh|explic|descrev|o que cada|responsabilidad|funcionalidad|papel de cada|quem faz o qu[eê]|como funciona)\b/i.test(lower);
 
+    const isRenameRequest = /\b(troc|muda|renome|chama|nome d[oae])\b.*\b(agente|revis|brief|social|cria|estrat|conteud|multi)\b/i.test(lower)
+      || /\b(agente|revis|brief|social|cria|estrat|conteud|multi)\b.*\b(troc|muda|renome|chama|nome)\b/i.test(lower);
+
     if (isDetailRequest && state.proposedDesign) {
       // Detail/explain — describe agents and pipeline without re-presenting JSON
       const result = await adapter.chat([{
         role: "user",
         content: `${ARCHITECT_AGENT.systemPrompt}\n\nDesign atual:\n${JSON.stringify(state.proposedDesign, null, 2)}\n\nO usuário pediu: "${userMessage}"\n\nDetalhe as responsabilidades de cada agente do squad, explicando:\n- O que cada agente faz especificamente\n- Por que esse agente é necessário no pipeline\n- Que tipo de output ele produz\n- Como ele se conecta com o próximo agente\n\nExplique também o fluxo completo do pipeline passo a passo.\n\nNÃO re-apresente o JSON do design. Apenas explique de forma clara e didática.\nNo final, pergunte se o usuário quer criar o squad, fazer ajustes, ou tem mais dúvidas.`,
       }]);
+      const display = stripJsonFromOutput(result.output);
+      await sendArchitectMessageWithMeta(squadId, display, {
+        agentName: "Arquiteto", agentIcon: "🧠", isArchitect: true,
+        proposedDesign: state.proposedDesign,
+      });
+    } else if (isRenameRequest && state.proposedDesign) {
+      // Rename agent — use LLM to interpret which agent and the new name
+      const result = await adapter.chat([{
+        role: "user",
+        content: `${ARCHITECT_AGENT.systemPrompt}\n\nDesign atual:\n${JSON.stringify(state.proposedDesign, null, 2)}\n\nO usuário pediu: "${userMessage}"\n\nO usuário quer trocar o nome de um ou mais agentes do squad. Identifique qual agente ele quer renomear e qual o novo nome.\n\nResponda com o bloco JSON atualizado:\n\`\`\`json:squad-design\n{...design completo com o nome atualizado...}\n\`\`\`\n\nDepois apresente a equipe atualizada visualmente e confirme a mudança.\nPergunte se quer criar o squad ou ajustar mais.`,
+      }]);
+      const newDesign = extractDesignJson(result.output);
+      if (newDesign) state.proposedDesign = newDesign;
       const display = stripJsonFromOutput(result.output);
       await sendArchitectMessageWithMeta(squadId, display, {
         agentName: "Arquiteto", agentIcon: "🧠", isArchitect: true,
