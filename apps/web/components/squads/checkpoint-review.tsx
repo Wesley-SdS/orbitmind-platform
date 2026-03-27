@@ -89,7 +89,7 @@ export function CheckpointReview({
               Checkpoint: {checkpointStepName}
             </h3>
             <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30">
-              Aguardando aprovacao
+              Aguardando aprovação
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
