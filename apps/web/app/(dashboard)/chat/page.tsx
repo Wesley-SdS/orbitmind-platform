@@ -105,12 +105,10 @@ export default function ChatPage() {
   }, [currentConversationId, selectedSquadId]);
 
   function startNewConversation() {
-    const newId = crypto.randomUUID();
-    setCurrentConversationId(newId);
+    setCurrentConversationId(null);
     setSelectedSquadId(null);
     setMessages([]);
-    setAgents([{ id: "system-architect", name: "Arquiteto", icon: "🧠", role: "Squad Architect" }]);
-    skipNextLoad.current = true;
+    setAgents([]);
   }
 
   function selectConversation(convId: string) {
