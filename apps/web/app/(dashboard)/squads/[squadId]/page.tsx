@@ -13,6 +13,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getSquadWithAgents } from "@/lib/db/queries/squads";
 import { getExecutionsBySquadId } from "@/lib/db/queries/executions";
 import { PipelineSection } from "@/components/squads/pipeline-section";
+import { SquadConfig } from "@/components/squads/squad-config";
 
 const STATUS_COLORS: Record<string, string> = {
   idle: "bg-muted-foreground",
@@ -190,19 +191,12 @@ export default async function SquadDetailPage({
         </TabsContent>
 
         <TabsContent value="config" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Configuração do Squad
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="rounded-lg bg-muted p-4 text-sm overflow-auto">
-                {JSON.stringify(squad.config, null, 2)}
-              </pre>
-            </CardContent>
-          </Card>
+          <SquadConfig
+            squad={squad}
+            config={config}
+            agents={agents}
+            pipelineSteps={pipelineSteps}
+          />
         </TabsContent>
       </Tabs>
     </div>
