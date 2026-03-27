@@ -102,7 +102,13 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
             <MessageSquare className="h-4 w-4" />
             Comunicação dos agentes
             {runStatus === "running" && (
-              <Badge className="bg-primary/10 text-primary ml-2">Ao vivo</Badge>
+              <Badge className="bg-green-500/10 text-green-400 border-green-500/30 ml-2 gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+                </span>
+                Ao vivo
+              </Badge>
             )}
             {runStatus === "waiting_approval" && (
               <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30 ml-2">Pausado</Badge>
