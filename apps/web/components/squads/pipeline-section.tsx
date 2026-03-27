@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { SectionLoader } from "@/components/ui/page-loader";
 import { PipelineChat } from "./pipeline-chat";
 import { PipelineStepsView } from "./pipeline-view";
+import { CheckpointReview } from "./checkpoint-review";
 
 interface PipelineStep {
   step: number;
@@ -99,22 +100,38 @@ export function PipelineSection({ squadId, pipeline, agents }: PipelineSectionPr
 
   if (loading) return <SectionLoader text="Carregando pipeline..." />;
 
+  const isWaitingApproval = pipelineRun?.status === "waiting_approval";
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[350px_1fr]">
-      <PipelineStepsView
-        pipeline={pipeline}
-        agents={agents}
-        latestRun={latestRun}
-        pipelineRun={pipelineRun}
-        squadId={squadId}
-        onRefresh={loadData}
-      />
-      <PipelineChat
-        squadId={squadId}
-        pipeline={pipeline}
-        stepOutputs={pipelineRun?.stepOutputs ?? {}}
-        runStatus={pipelineRun?.status ?? null}
-      />
+    <div className="space-y-6">
+      {isWaitingApproval && pipelineRun && (
+        <CheckpointReview
+          squadId={squadId}
+          runId={pipelineRun.runId}
+          checkpointStepName={
+            pipeline.find(s => `step-${s.step}` === pipelineRun.checkpointStepId)?.name ?? "Checkpoint"
+          }
+          stepOutputs={pipelineRun.stepOutputs}
+          onApproved={loadData}
+          onRejected={loadData}
+        />
+      )}
+      <div className="grid gap-6 lg:grid-cols-[350px_1fr]">
+        <PipelineStepsView
+          pipeline={pipeline}
+          agents={agents}
+          latestRun={latestRun}
+          pipelineRun={pipelineRun}
+          squadId={squadId}
+          onRefresh={loadData}
+        />
+        <PipelineChat
+          squadId={squadId}
+          pipeline={pipeline}
+          stepOutputs={pipelineRun?.stepOutputs ?? {}}
+          runStatus={pipelineRun?.status ?? null}
+        />
+      </div>
     </div>
   );
 }

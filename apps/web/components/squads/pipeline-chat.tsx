@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Sparkles, Loader2 } from "lucide-react";
+import { MessageSquare, Sparkles, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { PostPreview } from "./post-preview";
 
@@ -135,15 +135,24 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
         </div>
       </CardHeader>
 
-      {/* Summary panel */}
+      {/* Summary modal */}
       {summary && (
-        <div className="mx-6 mb-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">Resumo executivo</span>
-          </div>
-          <div className="text-sm prose prose-sm prose-invert max-w-none">
-            <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(summary) }} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="flex w-full max-w-3xl flex-col gap-4 rounded-xl border border-border bg-background p-6 shadow-2xl" style={{ maxHeight: "80vh" }}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <span className="text-base font-semibold">Resumo Executivo</span>
+              </div>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSummary(null)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="prose prose-sm prose-invert max-w-none pr-4">
+                <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(summary) }} />
+              </div>
+            </ScrollArea>
           </div>
         </div>
       )}

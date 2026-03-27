@@ -3,7 +3,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Circle, Loader2, XCircle, User, Pause } from "lucide-react";
-import { CheckpointReview } from "@/components/squads/checkpoint-review";
 
 interface PipelineStep {
   step: number;
@@ -187,16 +186,6 @@ export function PipelineStepsView({ pipeline, agents, latestRun, pipelineRun, sq
         </CardContent>
       </Card>
 
-      {isWaitingApproval && pipelineRun && (
-        <CheckpointReview
-          squadId={squadId}
-          runId={pipelineRun.runId}
-          checkpointStepName={pipeline.find(s => `step-${s.step}` === checkpointStepId)?.name ?? "Checkpoint"}
-          stepOutputs={pipelineRun.stepOutputs}
-          onApproved={onRefresh}
-          onRejected={onRefresh}
-        />
-      )}
     </>
   );
 }
