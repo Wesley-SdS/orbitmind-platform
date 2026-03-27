@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SectionLoader } from "@/components/ui/page-loader";
-import { CheckCircle2, Circle, Loader2, XCircle, User } from "lucide-react";
+import { CheckCircle2, Circle, Loader2, XCircle, User, Pause } from "lucide-react";
+import { CheckpointReview } from "@/components/squads/checkpoint-review";
 
 interface PipelineStep {
   step: number;
@@ -28,6 +29,14 @@ interface RunStep {
   durationMs: number | null;
   tokensUsed: number;
   error: string | null;
+  output?: string | null;
+}
+
+interface PipelineRun {
+  runId: string;
+  status: string;
+  checkpointStepId: string | null;
+  stepOutputs: Record<string, { agentName: string; agentIcon: string; content: string; completedAt: string }>;
 }
 
 interface PipelineViewProps {
@@ -36,10 +45,11 @@ interface PipelineViewProps {
   agents: Agent[];
 }
 
-type StepStatus = "done" | "running" | "failed" | "pending";
+type StepStatus = "done" | "running" | "failed" | "pending" | "waiting_approval";
 
 export function PipelineView({ squadId, pipeline, agents }: PipelineViewProps) {
   const [latestRun, setLatestRun] = useState<RunStep[] | null>(null);
+  const [pipelineRun, setPipelineRun] = useState<PipelineRun | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasActiveRun, setHasActiveRun] = useState(false);
 
@@ -68,7 +78,15 @@ export function PipelineView({ squadId, pipeline, agents }: PipelineViewProps) {
       if (execRes.ok) {
         const steps = await execRes.json();
         setLatestRun(Array.isArray(steps) ? steps : null);
-        setHasActiveRun(steps.some((s: RunStep) => s.status === "running"));
+        const isRunning = steps.some((s: RunStep) => s.status === "running");
+        setHasActiveRun(isRunning);
+      }
+
+      // Fetch pipeline run metadata (status, checkpoint info)
+      const pipelineRunRes = await fetch(`/api/squads/${squadId}/pipeline-run`);
+      if (pipelineRunRes.ok) {
+        const prData = await pipelineRunRes.json();
+        setPipelineRun(prData ?? null);
       }
     } catch {
       // ignore
@@ -122,7 +140,18 @@ export function PipelineView({ squadId, pipeline, agents }: PipelineViewProps) {
     }
   }
 
+  const isWaitingApproval = pipelineRun?.status === "waiting_approval";
+  const checkpointStepId = pipelineRun?.checkpointStepId;
+
   function getStepStatus(step: PipelineStep): StepStatus {
+    // If this is the checkpoint step that is waiting for approval
+    if (
+      isWaitingApproval &&
+      step.type === "checkpoint" &&
+      checkpointStepId === `step-${step.step}`
+    ) {
+      return "waiting_approval";
+    }
     const exec = runMap.get(`step-${step.step}`);
     if (!exec) return "pending";
     if (exec.status === "completed") return "done";
@@ -157,6 +186,7 @@ export function PipelineView({ squadId, pipeline, agents }: PipelineViewProps) {
   }
 
   return (
+    <>
     <Card>
       <CardContent className="p-6">
         <div className="flex flex-col items-center gap-4">
@@ -168,27 +198,33 @@ export function PipelineView({ squadId, pipeline, agents }: PipelineViewProps) {
               <div key={step.step} className="flex w-full max-w-md flex-col items-center">
                 <div
                   className={`flex w-full items-center gap-3 rounded-lg border p-3 ${
-                    status === "running"
-                      ? "border-primary bg-primary/5"
-                      : status === "done"
-                        ? "border-green-500/30 bg-green-500/5"
-                        : status === "failed"
-                          ? "border-red-500/30 bg-red-500/5"
-                          : "border-border"
+                    status === "waiting_approval"
+                      ? "border-amber-500/30 bg-amber-500/5 animate-pulse"
+                      : status === "running"
+                        ? "border-primary bg-primary/5"
+                        : status === "done"
+                          ? "border-green-500/30 bg-green-500/5"
+                          : status === "failed"
+                            ? "border-red-500/30 bg-red-500/5"
+                            : "border-border"
                   }`}
                 >
                   <div
                     className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                      status === "done"
-                        ? "bg-green-500 text-white"
-                        : status === "running"
-                          ? "bg-primary text-primary-foreground"
-                          : status === "failed"
-                            ? "bg-red-500 text-white"
-                            : "bg-muted text-muted-foreground"
+                      status === "waiting_approval"
+                        ? "bg-amber-500 text-white"
+                        : status === "done"
+                          ? "bg-green-500 text-white"
+                          : status === "running"
+                            ? "bg-primary text-primary-foreground"
+                            : status === "failed"
+                              ? "bg-red-500 text-white"
+                              : "bg-muted text-muted-foreground"
                     }`}
                   >
-                    {status === "done" ? (
+                    {status === "waiting_approval" ? (
+                      <Pause className="h-4 w-4" />
+                    ) : status === "done" ? (
                       <CheckCircle2 className="h-4 w-4" />
                     ) : status === "running" ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -211,6 +247,11 @@ export function PipelineView({ squadId, pipeline, agents }: PipelineViewProps) {
                       )}
                     </p>
                   </div>
+                  {status === "waiting_approval" && (
+                    <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30">
+                      Aguardando aprovacao
+                    </Badge>
+                  )}
                   {status === "running" && (
                     <Badge className="bg-primary/10 text-primary">Em andamento</Badge>
                   )}
@@ -237,5 +278,22 @@ export function PipelineView({ squadId, pipeline, agents }: PipelineViewProps) {
         )}
       </CardContent>
     </Card>
+
+    {/* Checkpoint review panel */}
+    {isWaitingApproval && pipelineRun && (
+      <CheckpointReview
+        squadId={squadId}
+        runId={pipelineRun.runId}
+        checkpointStepName={
+          pipeline.find(
+            (s) => `step-${s.step}` === checkpointStepId
+          )?.name ?? "Checkpoint"
+        }
+        stepOutputs={pipelineRun.stepOutputs}
+        onApproved={loadLatestRun}
+        onRejected={loadLatestRun}
+      />
+    )}
+    </>
   );
 }
