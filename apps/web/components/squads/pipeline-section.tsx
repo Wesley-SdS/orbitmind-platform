@@ -110,6 +110,7 @@ export function PipelineSection({ squadId, pipeline, agents }: PipelineSectionPr
         onRefresh={loadData}
       />
       <PipelineChat
+        squadId={squadId}
         pipeline={pipeline}
         stepOutputs={pipelineRun?.stepOutputs ?? {}}
         runStatus={pipelineRun?.status ?? null}
