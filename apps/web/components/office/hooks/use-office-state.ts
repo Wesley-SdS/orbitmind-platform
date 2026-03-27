@@ -143,6 +143,20 @@ export function useOfficeState(squadId: string | null) {
               agentsRef.current = [...agentsRef.current];
               setAgents(agentsRef.current);
             }
+          } else if (data.type === "PIPELINE_AGENT_STATUS") {
+            // Fix 6: GitHub workflow status → update Office agent
+            const agent = agentsRef.current.find((a) =>
+              (a as unknown as { config?: Record<string, unknown> }).config?.workflowId === data.data?.workflowId
+              || a.name.toLowerCase().includes((data.data?.agentName as string ?? "").toLowerCase()),
+            );
+            if (agent) {
+              const statusMap: Record<string, OfficeAgent3D["status"]> = {
+                working: "working", done: "done", error: "idle",
+              };
+              agent.status = statusMap[data.data?.status as string] ?? "idle";
+              agentsRef.current = [...agentsRef.current];
+              setAgents(agentsRef.current);
+            }
           }
         } catch { /* ignore */ }
       };

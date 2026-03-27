@@ -14,6 +14,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import type { PremiumIntegration } from "@/lib/integrations/types";
 import { CATEGORY_LABELS, type IntegrationCategory } from "@/lib/integrations/types";
+import { GitHubConfigDialog } from "@/components/integrations/github-config-dialog";
 
 interface OrgIntegration {
   id: string;
@@ -59,6 +60,7 @@ export default function IntegrationsPage() {
   const [configModal, setConfigModal] = useState<PremiumIntegration | null>(null);
   const [configOrgIntegration, setConfigOrgIntegration] = useState<OrgIntegration | null>(null);
   const [connectingId, setConnectingId] = useState<string | null>(null);
+  const [githubConfigOpen, setGithubConfigOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     const [intResp, catResp] = await Promise.all([
@@ -287,8 +289,12 @@ export default function IntegrationsPage() {
                           size="sm"
                           className="flex-1"
                           onClick={() => {
-                            setConfigModal(integration);
-                            setConfigOrgIntegration(orgInt ?? null);
+                            if (integration.id === "github") {
+                              setGithubConfigOpen(true);
+                            } else {
+                              setConfigModal(integration);
+                              setConfigOrgIntegration(orgInt ?? null);
+                            }
                           }}
                         >
                           <Settings2 className="h-4 w-4 mr-1" /> Configurar
@@ -408,6 +414,14 @@ export default function IntegrationsPage() {
           onRefresh={loadData}
         />
       )}
+
+      {/* GitHub Config Dialog */}
+      <GitHubConfigDialog
+        open={githubConfigOpen}
+        onClose={() => setGithubConfigOpen(false)}
+        onImported={() => { setGithubConfigOpen(false); loadData(); }}
+        currentConfig={(getOrgIntegration("github")?.config as Record<string, unknown>) ?? {}}
+      />
     </div>
   );
 }

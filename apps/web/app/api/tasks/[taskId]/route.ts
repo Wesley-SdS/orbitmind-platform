@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { getTaskById, updateTask, deleteTask } from "@/lib/db/queries";
+import { syncTaskStatusToGitHub } from "@/lib/integrations/github-sync";
 
 export async function GET(
   _req: Request,
@@ -51,7 +52,13 @@ export async function PATCH(
       return NextResponse.json({ error: "Dados invalidos." }, { status: 400 });
     }
 
+    const taskBefore = await getTaskById(taskId);
     const updated = await updateTask(taskId, parsed.data);
+
+    // Fix 7: Sync status change to GitHub (non-blocking)
+    if (updated && parsed.data.status && taskBefore && parsed.data.status !== taskBefore.status) {
+      syncTaskStatusToGitHub(updated, session.user.orgId).catch(console.error);
+    }
 
     // Broadcast task update via WebSocket
     if (updated) {

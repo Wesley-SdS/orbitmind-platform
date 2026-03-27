@@ -203,16 +203,34 @@ export const AGENT_COLORS: Record<string, { primary: number; hair: number }> = {
   "seo-analyst": { primary: 0x22c55e, hair: 0xa67c52 },
   reviewer: { primary: 0x10b981, hair: 0xb0b0b0 },
   publisher: { primary: 0xf59e0b, hair: 0x1a1a2e },
+  // Dev pipeline roles
+  developer: { primary: 0x3b82f6, hair: 0x1a1a2e },
+  autofix: { primary: 0xf97316, hair: 0x6b4423 },
+  architect: { primary: 0x8b5cf6, hair: 0xa67c52 },
+  docs: { primary: 0x14b8a6, hair: 0xf0d58c },
+  ideator: { primary: 0xeab308, hair: 0x1a1a2e },
+  taskmaster: { primary: 0x6366f1, hair: 0xb0b0b0 },
+  qa: { primary: 0xef4444, hair: 0x6b4423 },
+  release: { primary: 0x22c55e, hair: 0x1a1a2e },
+  rebase: { primary: 0x64748b, hair: 0xa67c52 },
+  "project-sync": { primary: 0x0ea5e9, hair: 0xf0d58c },
   default: { primary: 0x8b5cf6, hair: 0x6b4423 },
 };
 
 /** Assign agent to a room based on role */
 export function getRoomForRole(role: string): string {
   const lower = role.toLowerCase();
+  // Marketing roles
   if (lower.includes("pesquis") || lower.includes("research") || lower.includes("analista") || lower.includes("seo")) return "research";
   if (lower.includes("estrat") || lower.includes("strateg") || lower.includes("planej")) return "strategy";
-  if (lower.includes("copy") || lower.includes("conteud") || lower.includes("design") || lower.includes("cri")) return "creative";
+  if (lower.includes("copy") || lower.includes("conteud") || lower.includes("cri")) return "creative";
   if (lower.includes("revis") || lower.includes("review") || lower.includes("qualid")) return "review";
   if (lower.includes("public") || lower.includes("post") || lower.includes("social") || lower.includes("midia")) return "publishing";
+  // Dev pipeline roles (Fix 5)
+  if (lower.includes("developer") || lower.includes("autofix") || lower.includes("design")) return "creative";
+  if (lower.includes("architect") || lower.includes("taskmaster") || lower.includes("ideator")) return "strategy";
+  if (lower.includes("docs")) return "research";
+  if (lower.includes("qa")) return "review";
+  if (lower.includes("release") || lower.includes("rebase") || lower.includes("project-sync")) return "publishing";
   return "lobby";
 }
