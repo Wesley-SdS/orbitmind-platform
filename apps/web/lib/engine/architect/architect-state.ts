@@ -72,6 +72,9 @@ export type UserIntent =
   | "view-agents" | "duplicate-squad" | "export-squad"
   | "install-skill"
   | "run-pipeline"
+  | "pipeline-list" | "pipeline-edit" | "pipeline-create"
+  | "pipeline-toggle" | "pipeline-trigger"
+  | "pipeline-runs" | "pipeline-detail"
   | "general";
 
 export function detectIntent(message: string): UserIntent {
@@ -94,6 +97,16 @@ export function detectIntent(message: string): UserIntent {
   if (/\b(mudar? modelo|trocar? modelo|modelo.*haiku|modelo.*opus|modelo.*sonnet|model tier)\b/.test(lower)) return "change-model";
   if (/\b(budget|orcamento|token.*limit|aumentar? budget|limite de token)\b/.test(lower)) return "change-budget";
   if (/\b(ver agentes?|mostrar? agentes?|quais agentes?|listar? agentes?)\b/.test(lower)) return "view-agents";
+
+  // Pipeline / Esteira management
+  if (/\b(mostre? os agentes da esteira|liste? os agentes|agentes do repo|agentes da esteira|mostre? a esteira|quais workflows|mostre? os workflows)\b/.test(lower)) return "pipeline-list";
+  if (/\b(edite? o (reviewer|architect|developer|autofix|designer|docs|ideator|taskmaster|qa|release)|mais rigoroso|menos rigoroso)\b/.test(lower)) return "pipeline-edit";
+  if (/\b(crie? um agente|novo agente|adicione? um workflow|crie? um workflow|novo workflow)\b/.test(lower)) return "pipeline-create";
+  if (/\b(desabilite?|habilite?|pause? o|ative? o|desligue?|ligue?)\b.*\b(agente|workflow|esteira)\b/.test(lower)) return "pipeline-toggle";
+  if (/\b(desabilite?|habilite?)\b.*\b(reviewer|architect|developer|autofix|designer|docs|ideator|taskmaster|qa|release)\b/.test(lower)) return "pipeline-toggle";
+  if (/\b(rode? o|execute? o|dispare? o|trigger)\b.*\b(reviewer|architect|developer|autofix|designer|docs|ideator|taskmaster|qa|release|workflow|esteira|pipeline)\b/.test(lower)) return "pipeline-trigger";
+  if (/\b(mostre? os runs|ultimo run|status do run|historico de runs)\b/.test(lower)) return "pipeline-runs";
+  if (/\b(mostre? o skill|mostre? o prompt|como esta configurado|o que o \w+ faz)\b/.test(lower)) return "pipeline-detail";
 
   // Skills
   if (/\b(instalar? skill|adicionar? skill|skill.*instagram|skill.*linkedin|configurar? skill)\b/.test(lower)) return "install-skill";

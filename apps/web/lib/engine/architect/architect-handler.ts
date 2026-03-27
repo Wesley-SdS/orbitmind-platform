@@ -18,6 +18,12 @@ import {
   handleChangeModel, handleChangeBudget, handleViewAgents,
   handleInstallSkill, handleRunPipeline, handleActionSelectSquad,
 } from "./architect-actions";
+import {
+  setPipelineConversationId,
+  handleListPipelineAgents, handleShowAgentDetail,
+  handleEditAgent, handleConfirmPipelineEdit, handleConfirmPipelineCreate,
+  handleToggleAgent, handleTriggerAgent, handleShowRuns, handleCreateAgent,
+} from "./architect-pipeline-actions";
 
 const architectStates = new Map<string, ArchitectConversationState>();
 
@@ -121,7 +127,17 @@ export async function handleArchitectMessage(
   } else if (state.phase === "edit-modify") {
     await handleEditModify(state, squadId, userMessage, providerConfig);
   } else if (state.phase === "edit-confirm") {
-    await handleEditConfirm(state, squadId, userMessage, providerConfig);
+    // Route pipeline confirms vs squad confirms
+    const pendingType = (state.pendingChanges as Record<string, unknown> | undefined)?.type;
+    if (pendingType === "edit-agent") {
+      setPipelineConversationId(conversationId);
+      await handleConfirmPipelineEdit(state, userMessage);
+    } else if (pendingType === "create-agent") {
+      setPipelineConversationId(conversationId);
+      await handleConfirmPipelineCreate(state);
+    } else {
+      await handleEditConfirm(state, squadId, userMessage, providerConfig);
+    }
   } else if (state.phase === "delete-confirm") {
     await handleDeleteConfirm(state, squadId, userMessage);
   } else if (state.phase === "action-select-squad") {
@@ -189,6 +205,36 @@ export async function handleArchitectMessage(
         break;
       case "run-pipeline":
         await handleRunPipeline(state, userMessage);
+        break;
+
+      // Pipeline / Esteira management
+      case "pipeline-list":
+        setPipelineConversationId(conversationId);
+        await handleListPipelineAgents(state);
+        break;
+      case "pipeline-edit":
+        setPipelineConversationId(conversationId);
+        await handleEditAgent(state, userMessage, providerConfig);
+        break;
+      case "pipeline-create":
+        setPipelineConversationId(conversationId);
+        await handleCreateAgent(state, userMessage, providerConfig);
+        break;
+      case "pipeline-toggle":
+        setPipelineConversationId(conversationId);
+        await handleToggleAgent(state, userMessage);
+        break;
+      case "pipeline-trigger":
+        setPipelineConversationId(conversationId);
+        await handleTriggerAgent(state, userMessage);
+        break;
+      case "pipeline-runs":
+        setPipelineConversationId(conversationId);
+        await handleShowRuns(state, userMessage);
+        break;
+      case "pipeline-detail":
+        setPipelineConversationId(conversationId);
+        await handleShowAgentDetail(state, userMessage);
         break;
 
       case "general":
