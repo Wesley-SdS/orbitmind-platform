@@ -9,6 +9,8 @@ import { getSquadWithAgents } from "@/lib/db/queries/squads";
 import { getDefaultLlmProvider } from "@/lib/db/queries/llm-providers";
 import { createExecution, updateExecution } from "@/lib/db/queries/executions";
 import { createAuditLog } from "@/lib/db/queries/audit-logs";
+import { createPipelineRun, updatePipelineRun, saveStepOutput } from "@/lib/db/queries/pipeline-runs";
+import { waitForCheckpoint } from "@/lib/engine/checkpoint-manager";
 import { stringify as yamlStringify } from "yaml";
 
 function getNextRunAt(cronExpression: string, timezone: string): Date {
@@ -112,10 +114,33 @@ export async function POST(req: Request): Promise<Response> {
 
         // Create PipelineRunner with event handlers
         const executionMap = new Map<string, string>();
+        const isAutonomous = schedule.autonomy === "autonomous";
 
         const events: PipelineEvents = {
           onStateChange: () => {},
-          onCheckpoint: async () => schedule.autonomy === "autonomous" ? "continuar" : "continuar",
+          onCheckpoint: async (step) => {
+            // Autonomous schedules skip checkpoints automatically
+            if (isAutonomous) return "continuar";
+
+            await updatePipelineRun(runner.runId, {
+              status: "waiting_approval",
+              checkpointStepId: step.id,
+              currentStepIndex: pipelineSteps.findIndex((s) => `step-${s.step}` === step.id),
+              pausedAt: new Date(),
+            });
+            // Notify connected clients via WebSocket
+            try {
+              const { wsManager } = await import("@/lib/realtime/ws-manager");
+              wsManager.broadcastToSquad(schedule.squadId, {
+                type: "CHECKPOINT_REACHED",
+                runId: runner.runId,
+                stepId: step.id,
+              });
+            } catch {
+              // WebSocket may not be available
+            }
+            return waitForCheckpoint(runner.runId, step.id);
+          },
           onStepStart: async (step) => {
             const agentId = step.agent ?? agentsList[0]?.id ?? "";
             const execution = await createExecution({
@@ -137,6 +162,16 @@ export async function POST(req: Request): Promise<Response> {
                 completedAt: new Date(),
               });
             }
+            const agent = squad.agents.find((a) => a.id === step.agent);
+            await saveStepOutput(runner.runId, step.id, {
+              agentName: agent?.name ?? "Agente",
+              agentIcon: agent?.icon ?? "🤖",
+              content: output,
+              completedAt: new Date().toISOString(),
+            });
+            await updatePipelineRun(runner.runId, {
+              currentStepIndex: pipelineSteps.findIndex((s) => `step-${s.step}` === step.id) + 1,
+            });
           },
           onError: async (step, error) => {
             const execId = executionMap.get(step.id);
@@ -153,10 +188,20 @@ export async function POST(req: Request): Promise<Response> {
         const runner = new PipelineRunner(pipelineYaml, agentsList, events, adapter);
         const runId = runner.runId;
 
+        // Persist pipeline run record
+        await createPipelineRun({
+          squadId: schedule.squadId,
+          orgId: schedule.orgId,
+          runId,
+          totalSteps: pipelineSteps.length,
+          pipelineConfig: pipelineSteps,
+        });
+
         // Dispatch pipeline async (don't block the cron response)
         void (async () => {
           try {
             await runner.run();
+            await updatePipelineRun(runId, { status: "completed", completedAt: new Date() });
             await createAuditLog({
               orgId: schedule.orgId,
               squadId: schedule.squadId,
@@ -166,6 +211,7 @@ export async function POST(req: Request): Promise<Response> {
               metadata: { runId, scheduleId: schedule.id },
             });
           } catch (error) {
+            await updatePipelineRun(runId, { status: "failed", completedAt: new Date() });
             await createAuditLog({
               orgId: schedule.orgId,
               squadId: schedule.squadId,
