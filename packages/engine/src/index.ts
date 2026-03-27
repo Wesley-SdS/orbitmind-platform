@@ -15,7 +15,7 @@ export {
   AVAILABLE_MODELS,
   buildSystemPrompt,
 } from "./adapters";
-export type { LlmAdapter, AdapterResult, AgentInfo, LlmProviderType, ProviderConfig } from "./adapters";
+export type { LlmAdapter, AdapterResult, AdapterToolResult, AgentInfo, LlmProviderType, ProviderConfig, ToolDefinition, ToolCall, ToolResult } from "./adapters";
 export {
   InstagramPublisher, LinkedInPublisher, ApifyScraper, BlotatoPublisher, CanvaDesigner, ImageFetcher,
   SKILL_REGISTRY, getSkillById, getSkillsByCategory,
@@ -26,6 +26,7 @@ export {
 } from "./best-practices";
 export type { BestPractice } from "./best-practices";
 export { TONE_OF_VOICE_OPTIONS, getToneById, buildToneInstructions } from "./best-practices/tone-of-voice";
+export { skillsToTools, executeToolCall } from "./tools";
 export type { ToneDefinition } from "./best-practices/tone-of-voice";
 export { IntegrationHookManager } from "./integration-hooks";
 export type { IntegrationHookConfig, IntegrationHookContext, HookEvent, HookNotifier } from "./integration-hooks";

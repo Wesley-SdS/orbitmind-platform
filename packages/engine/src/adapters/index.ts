@@ -1,4 +1,4 @@
-export type { LlmAdapter, AdapterResult, AgentInfo } from "./types";
+export type { LlmAdapter, AdapterResult, AdapterToolResult, AgentInfo, ToolDefinition, ToolCall, ToolResult } from "./types";
 export { buildSystemPrompt } from "./types";
 export { AnthropicAdapter } from "./anthropic-adapter";
 export { OpenAIAdapter } from "./openai-adapter";

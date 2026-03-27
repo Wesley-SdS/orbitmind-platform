@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { LlmAdapter, AdapterResult, AgentInfo } from "./types";
+import type { LlmAdapter, AdapterResult, AdapterToolResult, AgentInfo, ToolDefinition, ToolCall } from "./types";
 import { buildSystemPrompt } from "./types";
 
 export class AnthropicAdapter implements LlmAdapter {
@@ -42,6 +42,71 @@ export class AnthropicAdapter implements LlmAdapter {
       tokensUsed: inputTokens + outputTokens,
       costCents: this.estimateCost(inputTokens, outputTokens),
       durationMs: Date.now() - startTime,
+    };
+  }
+
+  async chatWithTools(
+    messages: Array<{ role: "user" | "assistant" | "tool"; content: string; toolCallId?: string }>,
+    tools: ToolDefinition[],
+    systemPrompt?: string,
+  ): Promise<AdapterToolResult> {
+    const start = Date.now();
+    const system = systemPrompt || buildSystemPrompt(this.agent);
+
+    const anthropicTools = tools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.parameters as Anthropic.Tool.InputSchema,
+    }));
+
+    const anthropicMessages: Anthropic.MessageParam[] = messages.map((m) => {
+      if (m.role === "tool") {
+        return {
+          role: "user" as const,
+          content: [
+            {
+              type: "tool_result" as const,
+              tool_use_id: m.toolCallId!,
+              content: m.content,
+            },
+          ],
+        };
+      }
+      return { role: m.role as "user" | "assistant", content: m.content };
+    });
+
+    const response = await this.client.messages.create({
+      model: this.model,
+      max_tokens: this.maxTokens,
+      system,
+      messages: anthropicMessages,
+      tools: anthropicTools,
+    });
+
+    let output = "";
+    const toolCalls: ToolCall[] = [];
+    for (const block of response.content) {
+      if (block.type === "text") output += block.text;
+      if (block.type === "tool_use") {
+        toolCalls.push({
+          id: block.id,
+          name: block.name,
+          arguments: block.input as Record<string, unknown>,
+        });
+      }
+    }
+
+    const inputTokens = response.usage?.input_tokens ?? 0;
+    const outputTokens = response.usage?.output_tokens ?? 0;
+    const totalTokens = inputTokens + outputTokens;
+
+    return {
+      output,
+      tokensUsed: totalTokens,
+      costCents: this.estimateCost(inputTokens, outputTokens),
+      durationMs: Date.now() - start,
+      toolCalls,
+      stopReason: response.stop_reason === "tool_use" ? "tool_use" : "end_turn",
     };
   }
 

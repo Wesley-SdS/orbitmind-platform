@@ -1,4 +1,4 @@
-import type { LlmAdapter, AdapterResult, AgentInfo } from "./types";
+import type { LlmAdapter, AdapterResult, AdapterToolResult, AgentInfo, ToolDefinition, ToolCall } from "./types";
 import { buildSystemPrompt } from "./types";
 
 export class OpenAIAdapter implements LlmAdapter {
@@ -36,6 +36,61 @@ export class OpenAIAdapter implements LlmAdapter {
       tokensUsed: inputTokens + outputTokens,
       costCents: this.estimateCost(inputTokens, outputTokens),
       durationMs: Date.now() - startTime,
+    };
+  }
+
+  async chatWithTools(
+    messages: Array<{ role: "user" | "assistant" | "tool"; content: string; toolCallId?: string }>,
+    tools: ToolDefinition[],
+    systemPrompt?: string,
+  ): Promise<AdapterToolResult> {
+    const start = Date.now();
+    const system = systemPrompt || buildSystemPrompt(this.agent);
+    const { default: OpenAI } = await import("openai");
+    const client = new OpenAI({ apiKey: this.apiKey });
+
+    const openaiTools = tools.map((t) => ({
+      type: "function" as const,
+      function: { name: t.name, description: t.description, parameters: t.parameters },
+    }));
+
+    const openaiMessages: Array<Record<string, unknown>> = [
+      { role: "system", content: system },
+      ...messages.map((m) => {
+        if (m.role === "tool") {
+          return { role: "tool", tool_call_id: m.toolCallId, content: m.content };
+        }
+        return { role: m.role, content: m.content };
+      }),
+    ];
+
+    const response = await client.chat.completions.create({
+      model: this.model,
+      max_completion_tokens: 4096,
+      messages: openaiMessages as any,
+      tools: openaiTools,
+    });
+
+    const choice = response.choices[0];
+    const output = choice?.message?.content ?? "";
+    const toolCalls: ToolCall[] = (choice?.message?.tool_calls ?? [])
+      .filter((tc): tc is Extract<typeof tc, { type: "function" }> => tc.type === "function")
+      .map((tc) => ({
+        id: tc.id,
+        name: tc.function.name,
+        arguments: JSON.parse(tc.function.arguments),
+      }));
+
+    const inputTokens = response.usage?.prompt_tokens ?? 0;
+    const outputTokens = response.usage?.completion_tokens ?? 0;
+
+    return {
+      output,
+      tokensUsed: inputTokens + outputTokens,
+      costCents: this.estimateCost(inputTokens, outputTokens),
+      durationMs: Date.now() - start,
+      toolCalls,
+      stopReason: choice?.finish_reason === "tool_calls" ? "tool_use" : "end_turn",
     };
   }
 

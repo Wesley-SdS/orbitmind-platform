@@ -1,8 +1,31 @@
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>; // JSON Schema
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface ToolResult {
+  toolCallId: string;
+  content: string;
+}
+
 export interface LlmAdapter {
   chat(
     messages: Array<{ role: "user" | "assistant"; content: string }>,
     systemPrompt?: string,
   ): Promise<AdapterResult>;
+
+  chatWithTools?(
+    messages: Array<{ role: "user" | "assistant" | "tool"; content: string; toolCallId?: string }>,
+    tools: ToolDefinition[],
+    systemPrompt?: string,
+  ): Promise<AdapterToolResult>;
 }
 
 export interface AdapterResult {
@@ -10,6 +33,11 @@ export interface AdapterResult {
   tokensUsed: number;
   costCents: number;
   durationMs: number;
+}
+
+export interface AdapterToolResult extends AdapterResult {
+  toolCalls: ToolCall[];
+  stopReason: "end_turn" | "tool_use";
 }
 
 export interface AgentInfo {

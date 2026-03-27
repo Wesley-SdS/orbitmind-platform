@@ -1,4 +1,4 @@
-import type { LlmAdapter, AdapterResult, AgentInfo } from "./types";
+import type { LlmAdapter, AdapterResult, AdapterToolResult, AgentInfo, ToolDefinition, ToolCall } from "./types";
 import { buildSystemPrompt } from "./types";
 
 export class GeminiAdapter implements LlmAdapter {
@@ -42,6 +42,73 @@ export class GeminiAdapter implements LlmAdapter {
       tokensUsed: inputTokens + outputTokens,
       costCents: this.estimateCost(inputTokens, outputTokens),
       durationMs: Date.now() - startTime,
+    };
+  }
+
+  async chatWithTools(
+    messages: Array<{ role: "user" | "assistant" | "tool"; content: string; toolCallId?: string }>,
+    tools: ToolDefinition[],
+    systemPrompt?: string,
+  ): Promise<AdapterToolResult> {
+    const start = Date.now();
+    const system = systemPrompt || buildSystemPrompt(this.agent);
+    const { GoogleGenAI } = await import("@google/genai");
+    const genai = new GoogleGenAI({ apiKey: this.apiKey });
+
+    const geminiTools = [
+      {
+        functionDeclarations: tools.map((t) => ({
+          name: t.name,
+          description: t.description,
+          parameters: t.parameters,
+        })),
+      },
+    ];
+
+    const contents = messages
+      .filter((m) => m.role !== "tool")
+      .map((m) => ({
+        role: m.role === "assistant" ? ("model" as const) : ("user" as const),
+        parts: [{ text: m.content }],
+      }));
+
+    const response = await genai.models.generateContent({
+      model: this.model,
+      contents,
+      config: {
+        systemInstruction: system,
+        maxOutputTokens: 4096,
+        tools: geminiTools,
+      },
+    });
+
+    const output = response.text ?? "";
+    const toolCalls: ToolCall[] = [];
+
+    const candidates = response.candidates ?? [];
+    for (const candidate of candidates) {
+      for (const part of candidate.content?.parts ?? []) {
+        if (part.functionCall) {
+          toolCalls.push({
+            id: `gemini-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: part.functionCall.name!,
+            arguments: (part.functionCall.args ?? {}) as Record<string, unknown>,
+          });
+        }
+      }
+    }
+
+    const usage = response.usageMetadata;
+    const inputTokens = usage?.promptTokenCount ?? 0;
+    const outputTokens = usage?.candidatesTokenCount ?? 0;
+
+    return {
+      output,
+      tokensUsed: inputTokens + outputTokens,
+      costCents: this.estimateCost(inputTokens, outputTokens),
+      durationMs: Date.now() - start,
+      toolCalls,
+      stopReason: toolCalls.length > 0 ? "tool_use" : "end_turn",
     };
   }
 

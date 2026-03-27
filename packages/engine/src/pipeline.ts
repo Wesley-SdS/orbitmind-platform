@@ -2,7 +2,9 @@ import type { PipelineDefinition, PipelineStep, SquadState, AgentDefinition, Age
 import { pipelineSchema } from "@orbitmind/shared";
 import { parse as parseYaml } from "yaml";
 import { StateMachine } from "./state";
-import type { LlmAdapter } from "./adapters/types";
+import type { LlmAdapter, ToolDefinition } from "./adapters/types";
+import { buildSystemPrompt } from "./adapters/types";
+import { executeToolCall } from "./tools/tool-executor";
 import { getBestPracticeById } from "./best-practices/catalog";
 import { buildToneInstructions } from "./best-practices/tone-of-voice";
 
@@ -58,6 +60,8 @@ export class PipelineRunner {
     events: PipelineEvents,
     adapter?: LlmAdapter,
     agentDefinitions?: AgentDefinition[],
+    private availableTools?: ToolDefinition[],
+    private skillConfigs?: Record<string, Record<string, string>>,
   ) {
     const raw = parseYaml(yamlContent);
     this.pipeline = pipelineSchema.parse(raw);
@@ -275,7 +279,7 @@ Produza o output seguindo o processo e criterios acima.`;
   private async executeMonolithic(step: PipelineStep, agent?: { name: string; custom: string }): Promise<string> {
     const context = this.buildStepContext(step, agent);
     const previousOutputs = this.buildPreviousOutputsContext(step);
-    const prompt = `Voce e o agente "${agent?.name ?? step.agent ?? "Agente"}" executando o step "${step.name}" do pipeline "${this.pipeline.name}".
+    const basePrompt = `Voce e o agente "${agent?.name ?? step.agent ?? "Agente"}" executando o step "${step.name}" do pipeline "${this.pipeline.name}".
 
 ${previousOutputs}
 
@@ -283,8 +287,65 @@ ${previousOutputs}
 Execute o step "${step.name}". Use o contexto dos steps anteriores como base para seu trabalho. Produza um resultado concreto e detalhado — NAO peca mais informacoes, trabalhe com o que tem.
 
 ${context}`;
-    const result = await this.adapter!.chat([{ role: "user", content: prompt }]);
+
+    // If adapter supports tool calling and tools are available, use agentic loop
+    if (this.adapter?.chatWithTools && this.availableTools?.length) {
+      return this.executeWithTools(basePrompt, agent);
+    }
+
+    // Fallback: simple text chat
+    const result = await this.adapter!.chat([{ role: "user", content: basePrompt }]);
     return result.output;
+  }
+
+  /**
+   * Agentic tool use loop: LLM can call tools, get results, and continue.
+   * Max 5 tool call rounds to prevent infinite loops.
+   */
+  private async executeWithTools(prompt: string, agent?: { name: string; custom: string }): Promise<string> {
+    const messages: Array<{ role: "user" | "assistant" | "tool"; content: string; toolCallId?: string }> = [
+      { role: "user", content: prompt },
+    ];
+    const systemPrompt = buildSystemPrompt(agent ? { name: agent.name, role: "", config: null } : { name: "Agente", role: "", config: null });
+
+    let finalOutput = "";
+    const maxRounds = 5;
+
+    for (let round = 0; round < maxRounds; round++) {
+      const result = await this.adapter!.chatWithTools!(messages, this.availableTools!, systemPrompt);
+
+      if (result.stopReason === "end_turn" || result.toolCalls.length === 0) {
+        finalOutput = result.output;
+        break;
+      }
+
+      // LLM wants to use tools - add assistant message with tool calls indicator
+      if (result.output) {
+        messages.push({ role: "assistant", content: result.output });
+      }
+
+      // Execute each tool call and add results
+      for (const toolCall of result.toolCalls) {
+        const toolResult = await executeToolCall(toolCall, this.skillConfigs ?? {});
+        messages.push({
+          role: "tool",
+          content: toolResult.content,
+          toolCallId: toolResult.toolCallId,
+        });
+      }
+
+      // If this is the last round, force a text response
+      if (round === maxRounds - 1) {
+        messages.push({ role: "user", content: "Agora gere sua resposta final com base nos resultados das ferramentas." });
+        const finalResult = await this.adapter!.chat(
+          messages.filter(m => m.role !== "tool").map(m => ({ role: m.role === "tool" ? "user" : m.role, content: m.content })),
+          systemPrompt,
+        );
+        finalOutput = finalResult.output;
+      }
+    }
+
+    return finalOutput;
   }
 
   /**
