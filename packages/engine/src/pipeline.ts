@@ -291,7 +291,7 @@ ${context}`;
 
     // If adapter supports tool calling and tools are available, use agentic loop
     if (this.adapter?.chatWithTools && this.availableTools?.length) {
-      return this.executeWithTools(basePrompt, agent);
+      return this.executeWithTools(step.id, basePrompt, agent);
     }
 
     // Fallback: simple text chat
@@ -304,17 +304,22 @@ ${context}`;
    * Agentic tool use loop: LLM can call tools, get results, and continue.
    * Max 5 tool call rounds to prevent infinite loops.
    */
-  private async executeWithTools(prompt: string, agent?: { name: string; custom: string }): Promise<string> {
+  private async executeWithTools(stepId: string, prompt: string, agent?: { name: string; custom: string }): Promise<string> {
     const messages: Array<{ role: "user" | "assistant" | "tool"; content: string; toolCallId?: string }> = [
       { role: "user", content: prompt },
     ];
     const systemPrompt = buildSystemPrompt(agent ? { name: agent.name, role: "", config: null } : { name: "Agente", role: "", config: null });
 
     let finalOutput = "";
+    let totalTokens = 0;
+    let totalCost = 0;
+    const startTime = Date.now();
     const maxRounds = 5;
 
     for (let round = 0; round < maxRounds; round++) {
       const result = await this.adapter!.chatWithTools!(messages, this.availableTools!, systemPrompt);
+      totalTokens += result.tokensUsed;
+      totalCost += result.costCents;
 
       if (result.stopReason === "end_turn" || result.toolCalls.length === 0) {
         finalOutput = result.output;
@@ -344,9 +349,12 @@ ${context}`;
           systemPrompt,
         );
         finalOutput = finalResult.output;
+        totalTokens += finalResult.tokensUsed;
+        totalCost += finalResult.costCents;
       }
     }
 
+    this.stepMetrics.set(stepId, { tokensUsed: totalTokens, costCents: totalCost, durationMs: Date.now() - startTime });
     return finalOutput;
   }
 

@@ -39,6 +39,7 @@ export async function GET(
       pipelineRun: pipelineRun
         ? {
             id: pipelineRun.id,
+            runId: pipelineRun.runId,
             status: pipelineRun.status,
             currentStepIndex: pipelineRun.currentStepIndex,
             totalSteps: pipelineRun.totalSteps,
