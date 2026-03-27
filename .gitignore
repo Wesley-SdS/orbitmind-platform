@@ -34,3 +34,10 @@ npm-debug.log*
 
 # Testing
 coverage/
+
+# Tools
+.playwright-cli/
+.claude/skills/
+
+# Duplicated
+apps/web/apps/
