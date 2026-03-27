@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 import { Bot, CheckCircle, Zap, DollarSign, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,8 +9,9 @@ import { getDashboardMetrics } from "@/lib/db/queries/metrics";
 
 const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
 
-function formatRelativeTime(date: Date): string {
-  const diff = Date.now() - date.getTime();
+function formatRelativeTime(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const diff = Date.now() - d.getTime();
   const minutes = Math.floor(diff / 60000);
   if (minutes < 1) return "agora";
   if (minutes < 60) return `${minutes} min`;

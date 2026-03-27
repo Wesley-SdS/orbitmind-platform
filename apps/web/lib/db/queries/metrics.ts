@@ -1,8 +1,15 @@
 import { eq, sql, and, gte } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { db } from "@/lib/db";
 import { squads, agents, tasks, executions, auditLogs } from "@/lib/db/schema";
+import { CacheTags } from "@/lib/cache";
 
-export async function getDashboardMetrics(orgId: string) {
+// ---------------------------------------------------------------------------
+// Uncached variant
+// ---------------------------------------------------------------------------
+
+export async function _uncachedGetDashboardMetrics(orgId: string) {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -111,3 +118,15 @@ export async function getDashboardMetrics(orgId: string) {
     activeSquads,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Cached variant
+// ---------------------------------------------------------------------------
+
+export const getDashboardMetrics = cache((orgId: string) =>
+  unstable_cache(
+    () => _uncachedGetDashboardMetrics(orgId),
+    ["dashboard-metrics", orgId],
+    { tags: [CacheTags.metrics(orgId)], revalidate: 30 },
+  )(),
+);

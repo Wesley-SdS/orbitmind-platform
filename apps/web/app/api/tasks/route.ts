@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { getTasksBySquadId, createTask } from "@/lib/db/queries";
+import { invalidateTasks } from "@/lib/cache";
 
 export async function GET(req: Request): Promise<Response> {
   try {
@@ -53,6 +54,7 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const task = await createTask(parsed.data);
+    invalidateTasks(parsed.data.squadId, session.user.orgId);
     return NextResponse.json(task, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });

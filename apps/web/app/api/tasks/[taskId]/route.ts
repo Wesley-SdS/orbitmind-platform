@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { getTaskById, updateTask, deleteTask } from "@/lib/db/queries";
 import { syncTaskStatusToGitHub } from "@/lib/integrations/github-sync";
+import { invalidateTasks } from "@/lib/cache";
 
 export async function GET(
   _req: Request,
@@ -55,6 +56,10 @@ export async function PATCH(
     const taskBefore = await getTaskById(taskId);
     const updated = await updateTask(taskId, parsed.data);
 
+    if (updated) {
+      invalidateTasks(updated.squadId, session.user.orgId);
+    }
+
     // Fix 7: Sync status change to GitHub (non-blocking)
     if (updated && parsed.data.status && taskBefore && parsed.data.status !== taskBefore.status) {
       syncTaskStatusToGitHub(updated, session.user.orgId).catch(console.error);
@@ -92,7 +97,11 @@ export async function DELETE(
     }
 
     const { taskId } = await params;
+    const taskToDelete = await getTaskById(taskId);
     await deleteTask(taskId);
+    if (taskToDelete) {
+      invalidateTasks(taskToDelete.squadId, session.user.orgId);
+    }
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });

@@ -1,8 +1,15 @@
 import { eq, and } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { db } from "@/lib/db";
 import { tasks } from "@/lib/db/schema";
+import { CacheTags } from "@/lib/cache";
 
-export async function getTasksBySquadId(
+// ---------------------------------------------------------------------------
+// Uncached variants
+// ---------------------------------------------------------------------------
+
+export async function _uncachedGetTasksBySquadId(
   squadId: string,
   filters?: { status?: string; priority?: string; type?: string; assignedAgentId?: string },
 ) {
@@ -24,7 +31,7 @@ export async function getTasksBySquadId(
   return db.select().from(tasks).where(and(...conditions));
 }
 
-export async function getTaskById(taskId: string) {
+export async function _uncachedGetTaskById(taskId: string) {
   const [task] = await db
     .select()
     .from(tasks)
@@ -32,6 +39,33 @@ export async function getTaskById(taskId: string) {
     .limit(1);
   return task ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// Cached variants
+// ---------------------------------------------------------------------------
+
+export const getTasksBySquadId = cache((
+  squadId: string,
+  filters?: { status?: string; priority?: string; type?: string; assignedAgentId?: string },
+) =>
+  unstable_cache(
+    () => _uncachedGetTasksBySquadId(squadId, filters),
+    ["tasks-by-squad", squadId, JSON.stringify(filters ?? {})],
+    { tags: [CacheTags.tasks(squadId)], revalidate: 30 },
+  )(),
+);
+
+export const getTaskById = cache((taskId: string) =>
+  unstable_cache(
+    () => _uncachedGetTaskById(taskId),
+    ["task-by-id", taskId],
+    { tags: [`task-${taskId}`], revalidate: 60 },
+  )(),
+);
+
+// ---------------------------------------------------------------------------
+// Mutations (not cached)
+// ---------------------------------------------------------------------------
 
 export async function createTask(data: {
   squadId: string;

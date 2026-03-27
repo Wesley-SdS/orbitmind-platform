@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Search, ExternalLink, Check, Settings2, Zap, Link2, ChevronDown, ChevronUp, Loader2,
 } from "lucide-react";
+import { PageLoader } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -153,11 +154,7 @@ export default function IntegrationsPage() {
   }
 
   if (loading || !catalog) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <PageLoader text="Carregando integrações..." />;
   }
 
   const filteredPremium = catalog.premium.filter((i) => {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { getSquadWithAgents, updateSquad } from "@/lib/db/queries";
+import { invalidateSquad } from "@/lib/cache";
 
 export async function GET(
   _req: Request,
@@ -51,6 +52,7 @@ export async function PATCH(
     }
 
     const updated = await updateSquad(squadId, parsed.data);
+    invalidateSquad(squadId, session.user.orgId);
     return NextResponse.json(updated);
   } catch {
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
@@ -69,6 +71,7 @@ export async function DELETE(
 
     const { squadId } = await params;
     await updateSquad(squadId, { status: "archived" });
+    invalidateSquad(squadId, session.user.orgId);
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });

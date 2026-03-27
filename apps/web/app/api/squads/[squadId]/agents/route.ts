@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { getAgentsBySquadId, createAgent, updateAgent } from "@/lib/db/queries";
+import { invalidateAgents } from "@/lib/cache";
 
 export async function GET(
   _req: Request,
@@ -49,6 +50,7 @@ export async function POST(
     }
 
     const agent = await createAgent({ ...parsed.data, squadId });
+    invalidateAgents(squadId, session.user.orgId);
     return NextResponse.json(agent, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
@@ -80,6 +82,9 @@ export async function PATCH(req: Request): Promise<Response> {
 
     const { agentId, ...data } = parsed.data;
     const updated = await updateAgent(agentId, data);
+    if (updated) {
+      invalidateAgents(updated.squadId, session.user.orgId);
+    }
     return NextResponse.json(updated);
   } catch {
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });

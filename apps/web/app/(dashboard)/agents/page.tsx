@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
+import { PageLoader } from "@/components/ui/page-loader";
 
 interface AgentWithSquad {
   id: string;
@@ -43,6 +44,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 export default function AgentsPage() {
   const [agents, setAgents] = useState<AgentWithSquad[]>([]);
   const [squads, setSquads] = useState<Squad[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterSquad, setFilterSquad] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -60,6 +62,7 @@ export default function AgentsPage() {
         );
         Promise.all(agentPromises).then((results) => {
           setAgents(results.flat());
+          setLoading(false);
         });
       });
   }, []);
@@ -70,6 +73,8 @@ export default function AgentsPage() {
     if (filterStatus !== "all" && agent.status !== filterStatus) return false;
     return true;
   });
+
+  if (loading) return <PageLoader text="Carregando agentes..." />;
 
   return (
     <div className="space-y-6">

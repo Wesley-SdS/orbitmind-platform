@@ -1,8 +1,10 @@
 import { eq } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { db } from "@/lib/db";
 import { organizations } from "@/lib/db/schema";
 
-export async function getOrganizationById(id: string) {
+async function _uncachedGetOrganizationById(id: string) {
   const [org] = await db
     .select()
     .from(organizations)
@@ -10,6 +12,14 @@ export async function getOrganizationById(id: string) {
     .limit(1);
   return org ?? null;
 }
+
+export const getOrganizationById = cache((id: string) =>
+  unstable_cache(
+    () => _uncachedGetOrganizationById(id),
+    ["org-by-id", id],
+    { tags: [`org-${id}`], revalidate: 120 },
+  )(),
+);
 
 export async function updateOrganization(
   id: string,

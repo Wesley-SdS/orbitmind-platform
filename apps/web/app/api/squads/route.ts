@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { getSquadsByOrgId, createSquad } from "@/lib/db/queries";
+import { invalidateSquads } from "@/lib/cache";
 
 export async function GET(): Promise<Response> {
   try {
@@ -45,6 +46,8 @@ export async function POST(req: Request): Promise<Response> {
       orgId: session.user.orgId,
       createdBy: session.user.id,
     });
+
+    invalidateSquads(session.user.orgId);
 
     return NextResponse.json(squad, { status: 201 });
   } catch {

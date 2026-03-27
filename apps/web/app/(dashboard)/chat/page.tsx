@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus, Sparkles, ClipboardList, Bot, BarChart3, MessageSquare, Trash2 } from "lucide-react";
+import { PageLoader } from "@/components/ui/page-loader";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ export default function ChatPage() {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(true);
   const skipNextLoad = useRef(false);
 
   const isArchitectConversation = !!currentConversationId;
@@ -64,16 +66,18 @@ export default function ChatPage() {
   }, [searchParams]);
 
   const loadSquads = useCallback(() => {
-    fetch("/api/squads").then((r) => r.json()).then((data) => setSquads(data));
+    return fetch("/api/squads").then((r) => r.json()).then((data) => setSquads(data));
   }, []);
 
   const loadConversations = useCallback(() => {
-    fetch("/api/chat/architect/history?list=true")
+    return fetch("/api/chat/architect/history?list=true")
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setConversations(data); });
   }, []);
 
-  useEffect(() => { loadSquads(); loadConversations(); }, [loadSquads, loadConversations]);
+  useEffect(() => {
+    Promise.all([loadSquads(), loadConversations()]).finally(() => setLoading(false));
+  }, [loadSquads, loadConversations]);
 
   // Load messages when selecting a conversation or squad
   useEffect(() => {
@@ -172,6 +176,8 @@ export default function ChatPage() {
   const selectedName = isArchitectConversation
     ? "Arquiteto"
     : squads.find((s) => s.id === selectedSquadId)?.name ?? "";
+
+  if (loading) return <PageLoader text="Carregando chat..." />;
 
   return (
     <div className="-m-6 flex h-[calc(100vh-3.5rem)]">

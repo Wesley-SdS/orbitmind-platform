@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { Plus } from "lucide-react";
+import { PageLoader } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
 import { KanbanBoard } from "@/components/board/kanban-board";
 import { TaskDetailDialog } from "@/components/board/task-detail-dialog";
@@ -34,6 +35,7 @@ export default function BoardPage() {
   const [squad, setSquad] = useState<Squad | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Load first squad
@@ -41,18 +43,16 @@ export default function BoardPage() {
       .then((r) => r.json())
       .then((squads: Squad[]) => {
         const first = squads[0];
-        if (!first) return;
+        if (!first) { setLoading(false); return; }
         setSquad(first);
 
         // Load tasks and agents for this squad
-        fetch(`/api/tasks?squadId=${first.id}`)
-          .then((r) => r.json())
-          .then((data) => setTasks(data));
-
-        fetch(`/api/squads/${first.id}/agents`)
-          .then((r) => r.json())
-          .then((data: Agent[]) => setAgents(data.map((a) => ({ id: a.id, name: a.name, icon: a.icon }))));
-      });
+        Promise.all([
+          fetch(`/api/tasks?squadId=${first.id}`).then((r) => r.json()).then((data) => setTasks(data)),
+          fetch(`/api/squads/${first.id}/agents`).then((r) => r.json()).then((data: Agent[]) => setAgents(data.map((a) => ({ id: a.id, name: a.name, icon: a.icon })))),
+        ]).finally(() => setLoading(false));
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   const handleTaskClick = useCallback((task: Task) => {
@@ -84,6 +84,8 @@ export default function BoardPage() {
       body: JSON.stringify(data),
     });
   }, []);
+
+  if (loading) return <PageLoader text="Carregando board..." />;
 
   return (
     <div className="space-y-4">

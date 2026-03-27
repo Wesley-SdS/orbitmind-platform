@@ -1,9 +1,15 @@
 import { eq, and, sql, count, ne } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { db } from "@/lib/db";
 import { squads, agents, tasks } from "@/lib/db/schema";
+import { CacheTags } from "@/lib/cache";
 
-export async function getSquadsByOrgId(orgId: string) {
-  // Get squads first
+// ---------------------------------------------------------------------------
+// Uncached variants (use after mutations that need fresh data)
+// ---------------------------------------------------------------------------
+
+export async function _uncachedGetSquadsByOrgId(orgId: string) {
   const squadRows = await db
     .select()
     .from(squads)
@@ -13,7 +19,6 @@ export async function getSquadsByOrgId(orgId: string) {
       ne(squads.code, "system-architect"),
     ));
 
-  // Get counts separately (avoids Drizzle subquery parameter issue)
   const agentCounts = await db
     .select({ squadId: agents.squadId, count: count() })
     .from(agents)
@@ -34,7 +39,7 @@ export async function getSquadsByOrgId(orgId: string) {
   }));
 }
 
-export async function getSquadById(squadId: string) {
+export async function _uncachedGetSquadById(squadId: string) {
   const [squad] = await db
     .select()
     .from(squads)
@@ -43,8 +48,8 @@ export async function getSquadById(squadId: string) {
   return squad ?? null;
 }
 
-export async function getSquadWithAgents(squadId: string) {
-  const squad = await getSquadById(squadId);
+export async function _uncachedGetSquadWithAgents(squadId: string) {
+  const squad = await _uncachedGetSquadById(squadId);
   if (!squad) return null;
 
   const squadAgents = await db
@@ -54,6 +59,51 @@ export async function getSquadWithAgents(squadId: string) {
 
   return { ...squad, agents: squadAgents };
 }
+
+// ---------------------------------------------------------------------------
+// Cached variants (unstable_cache + React cache for request dedup)
+// ---------------------------------------------------------------------------
+
+export const getSquadsByOrgId = cache((orgId: string) =>
+  unstable_cache(
+    () => _uncachedGetSquadsByOrgId(orgId),
+    ["squads-by-org", orgId],
+    { tags: [CacheTags.squads(orgId)], revalidate: 30 },
+  )(),
+);
+
+export const getSquadById = cache((squadId: string) =>
+  unstable_cache(
+    () => _uncachedGetSquadById(squadId),
+    ["squad-by-id", squadId],
+    { tags: [CacheTags.squad(squadId)], revalidate: 60 },
+  )(),
+);
+
+export const getSquadWithAgents = cache((squadId: string) =>
+  unstable_cache(
+    async () => {
+      const squad = await _uncachedGetSquadById(squadId);
+      if (!squad) return null;
+
+      const squadAgents = await db
+        .select()
+        .from(agents)
+        .where(eq(agents.squadId, squadId));
+
+      return { ...squad, agents: squadAgents };
+    },
+    ["squad-with-agents", squadId],
+    {
+      tags: [CacheTags.squad(squadId), CacheTags.agents(squadId)],
+      revalidate: 30,
+    },
+  )(),
+);
+
+// ---------------------------------------------------------------------------
+// Mutations (not cached)
+// ---------------------------------------------------------------------------
 
 export async function createSquad(data: {
   orgId: string;

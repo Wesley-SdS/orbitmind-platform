@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { PageLoader } from "@/components/ui/page-loader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -75,27 +76,28 @@ export default function SettingsPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/organizations")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data && !data.error) {
-          setOrg({ name: data.name ?? "", slug: data.slug ?? "", plan: data.plan ?? "free" });
-        }
-      });
-
-    fetch("/api/users")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setMembers(data);
-      });
-
-    fetch("/api/audit-logs?limit=10")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setAuditLogs(data);
-      });
+    Promise.all([
+      fetch("/api/organizations")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data && !data.error) {
+            setOrg({ name: data.name ?? "", slug: data.slug ?? "", plan: data.plan ?? "free" });
+          }
+        }),
+      fetch("/api/users")
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) setMembers(data);
+        }),
+      fetch("/api/audit-logs?limit=10")
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) setAuditLogs(data);
+        }),
+    ]).finally(() => setLoading(false));
   }, []);
 
   async function handleSave() {
@@ -109,6 +111,8 @@ export default function SettingsPage() {
   }
 
   const currentPlan = org.plan;
+
+  if (loading) return <PageLoader text="Carregando configurações..." />;
 
   return (
     <div className="space-y-6">

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Search, Download, Bot, Users } from "lucide-react";
+import { PageLoader } from "@/components/ui/page-loader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,10 +41,13 @@ export default function MarketplacePage() {
   const [acquireItem, setAcquireItem] = useState<MarketplaceItem | null>(null);
   const [selectedSquadId, setSelectedSquadId] = useState("");
   const [acquiring, setAcquiring] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/marketplace").then((r) => r.json()).then(setItems);
-    fetch("/api/squads").then((r) => r.json()).then(setSquads);
+    Promise.all([
+      fetch("/api/marketplace").then((r) => r.json()).then(setItems),
+      fetch("/api/squads").then((r) => r.json()).then(setSquads),
+    ]).finally(() => setLoading(false));
   }, []);
 
   const filtered = items.filter((i) => {
@@ -74,6 +78,8 @@ export default function MarketplacePage() {
     }
     setAcquiring(false);
   }
+
+  if (loading) return <PageLoader text="Carregando marketplace..." />;
 
   return (
     <div className="space-y-6">

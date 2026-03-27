@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { revalidateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { getOrganizationById, updateOrganization } from "@/lib/db/queries";
 
@@ -48,6 +49,7 @@ export async function PATCH(req: Request): Promise<Response> {
     }
 
     const updated = await updateOrganization(session.user.orgId, parsed.data);
+    revalidateTag(`org-${session.user.orgId}`);
     return NextResponse.json(updated);
   } catch {
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });

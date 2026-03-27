@@ -5,6 +5,7 @@ import {
   Loader2, Play, Pause, Settings2, History, RefreshCw, Plus, ArrowLeft,
   Save, X, GitBranch, Clock, CheckCircle2, XCircle, AlertCircle,
 } from "lucide-react";
+import { PageLoader } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -105,11 +106,7 @@ export default function PipelinePage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <PageLoader text="Carregando pipeline..." />;
   }
 
   if (!config.repository) {
@@ -491,11 +488,7 @@ function RunsTab({ workflowId }: { workflowId: number }) {
   }, [workflowId]);
 
   if (loading) {
-    return (
-      <div className="flex items-center gap-2 py-8 justify-center text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" /> Carregando runs...
-      </div>
-    );
+    return <PageLoader text="Carregando runs..." />;
   }
 
   if (runs.length === 0) {
