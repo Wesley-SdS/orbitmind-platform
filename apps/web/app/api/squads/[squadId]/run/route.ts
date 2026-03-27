@@ -6,6 +6,7 @@ import { getSquadWithAgents } from "@/lib/db/queries/squads";
 import { getDefaultLlmProvider } from "@/lib/db/queries/llm-providers";
 import { createExecution, updateExecution } from "@/lib/db/queries/executions";
 import { createAuditLog } from "@/lib/db/queries/audit-logs";
+import { getOrganizationById } from "@/lib/db/queries/organizations";
 import { createPipelineRun, updatePipelineRun, saveStepOutput } from "@/lib/db/queries/pipeline-runs";
 import { waitForCheckpoint } from "@/lib/engine/checkpoint-manager";
 import { stringify as yamlStringify } from "yaml";
@@ -73,8 +74,16 @@ export async function POST(
       defaultModel: llmProvider.defaultModel || "",
     };
 
+    // Build company context for the adapter
+    const org = await getOrganizationById(orgId);
+    const companyCtx = org?.companyContext as Record<string, unknown> | null;
+    let systemContext = `Squad: ${squad.name}. ${squad.description ?? ""}`;
+    if (companyCtx?.name) {
+      systemContext += `\nEmpresa: ${companyCtx.name} (${companyCtx.sector}). Publico: ${companyCtx.audience}. Tom: ${companyCtx.tone}.`;
+    }
+
     const adapter = createAdapter(
-      { name: squad.name, role: "pipeline-executor", config: {} },
+      { name: squad.name, role: "pipeline-executor", config: { custom: systemContext } },
       providerConfig,
     );
 

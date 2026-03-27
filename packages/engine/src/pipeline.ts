@@ -274,9 +274,46 @@ Produza o output seguindo o processo e criterios acima.`;
 
   private async executeMonolithic(step: PipelineStep, agent?: { name: string; custom: string }): Promise<string> {
     const context = this.buildStepContext(step, agent);
-    const prompt = `Execute o step "${step.name}" do pipeline.\n\n${context}`;
+    const previousOutputs = this.buildPreviousOutputsContext(step);
+    const prompt = `Voce e o agente "${agent?.name ?? step.agent ?? "Agente"}" executando o step "${step.name}" do pipeline "${this.pipeline.name}".
+
+${previousOutputs}
+
+## Sua tarefa
+Execute o step "${step.name}". Use o contexto dos steps anteriores como base para seu trabalho. Produza um resultado concreto e detalhado — NAO peca mais informacoes, trabalhe com o que tem.
+
+${context}`;
     const result = await this.adapter!.chat([{ role: "user", content: prompt }]);
     return result.output;
+  }
+
+  /**
+   * Build context from previous step outputs so each agent sees what came before.
+   */
+  private buildPreviousOutputsContext(currentStep: PipelineStep): string {
+    const outputs: string[] = [];
+    for (const step of this.pipeline.steps) {
+      if (step.id === currentStep.id) break;
+      if (step.type === "checkpoint") continue;
+
+      // Find the latest version of this step's output
+      const versions = [...this.runContext.outputs.entries()]
+        .filter(([key]) => key.startsWith(step.id + "-v"))
+        .sort(([a], [b]) => b.localeCompare(a));
+
+      const latest = versions[0]?.[1];
+      if (latest?.content) {
+        const agentInfo = this.agents.get(step.agent ?? "");
+        const agentName = agentInfo?.name ?? step.agent ?? "Agente";
+        outputs.push(`### ${step.name} (${agentName})\n${latest.content.substring(0, 3000)}`);
+      }
+    }
+
+    if (outputs.length === 0) {
+      return "## Contexto\nEste e o primeiro step do pipeline. Nao ha outputs anteriores.";
+    }
+
+    return `## Resultados dos steps anteriores\n\n${outputs.join("\n\n---\n\n")}`;
   }
 
   // ════════════════════════════════════════════════
