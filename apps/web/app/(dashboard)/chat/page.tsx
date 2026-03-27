@@ -90,12 +90,14 @@ export default function ChatPage() {
         .then((data) => { if (Array.isArray(data)) setMessages(parseMessages(data)); });
       setSelectedSquadId(null);
     } else if (selectedSquadId) {
-      fetch(`/api/squads/${selectedSquadId}/agents`)
-        .then((r) => r.json())
-        .then((data) => setAgents(data.map((a: Agent) => ({ id: a.id, name: a.name, icon: a.icon ?? "🤖", role: a.role }))));
-      fetch(`/api/chat/${selectedSquadId}`)
-        .then((r) => r.json())
-        .then((data) => setMessages(parseMessages(data)));
+      Promise.all([
+        fetch(`/api/squads/${selectedSquadId}/agents`)
+          .then((r) => r.json())
+          .then((data) => setAgents(data.map((a: Agent) => ({ id: a.id, name: a.name, icon: a.icon ?? "🤖", role: a.role })))),
+        fetch(`/api/chat/${selectedSquadId}`)
+          .then((r) => r.json())
+          .then((data) => setMessages(parseMessages(data))),
+      ]);
     } else {
       setMessages([]);
       setAgents([]);

@@ -68,8 +68,7 @@ export default function PipelinePage() {
   }, []);
 
   useEffect(() => {
-    loadConfig();
-    loadAgents();
+    Promise.all([loadConfig(), loadAgents()]);
   }, [loadConfig, loadAgents]);
 
   async function handleRefresh() {

@@ -50,21 +50,15 @@ export default function AgentsPage() {
   const [filterStatus, setFilterStatus] = useState("all");
 
   useEffect(() => {
-    fetch("/api/squads")
-      .then((r) => r.json())
-      .then((data) => {
-        setSquads(data);
-        // Fetch agents from each squad
-        const agentPromises = data.map((s: Squad) =>
-          fetch(`/api/squads/${s.id}/agents`).then((r) => r.json()).then((agents: AgentWithSquad[]) =>
-            agents.map((a: AgentWithSquad) => ({ ...a, squadName: (s as Squad & { name: string }).name, squadIcon: (s as Squad & { icon: string | null }).icon }))
-          )
-        );
-        Promise.all(agentPromises).then((results) => {
-          setAgents(results.flat());
-          setLoading(false);
-        });
-      });
+    Promise.all([
+      fetch("/api/squads").then((r) => r.json()),
+      fetch("/api/agents").then((r) => r.json()),
+    ])
+      .then(([squadsData, agentsData]: [Squad[], AgentWithSquad[]]) => {
+        setSquads(squadsData);
+        setAgents(agentsData);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const filtered = agents.filter((agent) => {
