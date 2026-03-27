@@ -73,20 +73,18 @@ export function PipelineView({ squadId, pipeline, agents }: PipelineViewProps) {
         return;
       }
 
-      // Fetch individual executions for this run
+      // Fetch individual executions + pipeline run metadata for this run
       const execRes = await fetch(`/api/squads/${squadId}/runs/${latest.runId}`);
       if (execRes.ok) {
-        const steps = await execRes.json();
+        const data = await execRes.json();
+        // Response is { steps: [...], pipelineRun: {...} }
+        const steps = data.steps ?? data;
+        const prData = data.pipelineRun ?? null;
         setLatestRun(Array.isArray(steps) ? steps : null);
-        const isRunning = steps.some((s: RunStep) => s.status === "running");
-        setHasActiveRun(isRunning);
-      }
-
-      // Fetch pipeline run metadata (status, checkpoint info)
-      const pipelineRunRes = await fetch(`/api/squads/${squadId}/pipeline-run`);
-      if (pipelineRunRes.ok) {
-        const prData = await pipelineRunRes.json();
-        setPipelineRun(prData ?? null);
+        setPipelineRun(prData);
+        const isRunning = Array.isArray(steps) && steps.some((s: RunStep) => s.status === "running");
+        const isWaiting = prData?.status === "waiting_approval";
+        setHasActiveRun(isRunning || isWaiting);
       }
     } catch {
       // ignore
