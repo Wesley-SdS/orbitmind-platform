@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { getSessionUser } from "@/lib/auth/session";
 import { getSquadWithAgents } from "@/lib/db/queries/squads";
 import { getExecutionsBySquadId } from "@/lib/db/queries/executions";
+import { PipelineView } from "@/components/squads/pipeline-view";
 
 const STATUS_COLORS: Record<string, string> = {
   idle: "bg-muted-foreground",
@@ -36,6 +37,9 @@ export default async function SquadDetailPage({
   }
 
   const { agents, ...squad } = squadData;
+
+  const config = squad.config as Record<string, unknown> | null;
+  const pipelineSteps = (config?.pipeline as Array<{ step: number; name: string; type: string; agentId?: string }>) ?? [];
 
   const totalTokens = executions.reduce((sum, e) => sum + e.tokensUsed, 0);
   const totalCost = executions.reduce((sum, e) => sum + e.estimatedCost, 0);
@@ -125,58 +129,11 @@ export default async function SquadDetailPage({
         </TabsContent>
 
         <TabsContent value="pipeline" className="mt-6">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex flex-col items-center gap-4">
-                {[
-                  { step: 1, name: "Pesquisa de Mercado", agent: "Ana Insights", status: "done" },
-                  { step: 2, name: "Analise de Tendencias", agent: "Ana Insights", status: "done" },
-                  { step: 3, name: "Definicao de Estrategia", agent: "Sofia Strategy", status: "done" },
-                  { step: 4, name: "Checkpoint: Aprovacao", agent: "Humano", status: "done" },
-                  { step: 5, name: "Criacao de Copy", agent: "Carlos Copy", status: "current" },
-                  { step: 6, name: "Otimizacao SEO", agent: "Samuel SEO", status: "pending" },
-                  { step: 7, name: "Design Visual", agent: "Diana Design", status: "pending" },
-                  { step: 8, name: "Revisao de Qualidade", agent: "Vera Review", status: "pending" },
-                  { step: 9, name: "Checkpoint: Aprovacao Final", agent: "Humano", status: "pending" },
-                  { step: 10, name: "Publicacao", agent: "Paula Post", status: "pending" },
-                ].map((s, i, arr) => (
-                  <div key={s.step} className="flex w-full max-w-md flex-col items-center">
-                    <div
-                      className={`flex w-full items-center gap-3 rounded-lg border p-3 ${
-                        s.status === "current"
-                          ? "border-primary bg-primary/5"
-                          : s.status === "done"
-                            ? "border-green-500/30 bg-green-500/5"
-                            : "border-border"
-                      }`}
-                    >
-                      <div
-                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          s.status === "done"
-                            ? "bg-green-500 text-white"
-                            : s.status === "current"
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {s.step}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{s.name}</p>
-                        <p className="text-xs text-muted-foreground">{s.agent}</p>
-                      </div>
-                      {s.status === "current" && (
-                        <Badge className="bg-primary/10 text-primary">Em andamento</Badge>
-                      )}
-                    </div>
-                    {i < arr.length - 1 && (
-                      <div className="h-4 w-px bg-border" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <PipelineView
+            squadId={squad.id}
+            pipeline={pipelineSteps}
+            agents={agents.map((a) => ({ id: a.id, name: a.name, icon: a.icon }))}
+          />
         </TabsContent>
 
         <TabsContent value="metrics" className="mt-6">
