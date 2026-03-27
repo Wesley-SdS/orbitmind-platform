@@ -36,6 +36,9 @@ export const actorTypeEnum = pgEnum("actor_type", ["user", "agent", "system"]);
 export const integrationTierEnum = pgEnum("integration_tier", ["premium", "generic"]);
 export const integrationStatusEnum = pgEnum("integration_status", ["active", "inactive", "error", "disconnected"]);
 export const messageRoleEnum = pgEnum("message_role", ["user", "agent", "system"]);
+export const pipelineRunStatusEnum = pgEnum("pipeline_run_status", [
+  "running", "waiting_approval", "completed", "failed", "cancelled",
+]);
 
 // ──────────────────────────────────────────────
 // Organizations
@@ -506,6 +509,31 @@ export const pipelineLogs = pgTable("pipeline_logs", {
 ]);
 
 // ──────────────────────────────────────────────
+// Pipeline Runs (checkpoint support)
+// ──────────────────────────────────────────────
+
+export const pipelineRuns = pgTable("pipeline_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  squadId: uuid("squad_id").notNull().references(() => squads.id, { onDelete: "cascade" }),
+  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  runId: varchar("run_id", { length: 30 }).notNull(),
+  status: pipelineRunStatusEnum("status").notNull().default("running"),
+  currentStepIndex: integer("current_step_index").notNull().default(0),
+  totalSteps: integer("total_steps").notNull(),
+  checkpointStepId: varchar("checkpoint_step_id", { length: 100 }),
+  stepOutputs: jsonb("step_outputs").default({}),
+  pipelineConfig: jsonb("pipeline_config"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  pausedAt: timestamp("paused_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+}, (table) => [
+  index("pipeline_runs_squad_id_idx").on(table.squadId),
+  index("pipeline_runs_run_id_idx").on(table.runId),
+]);
+
+// ──────────────────────────────────────────────
 // Relations
 // ──────────────────────────────────────────────
 
@@ -516,6 +544,7 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   auditLogs: many(auditLogs),
   llmProviders: many(llmProviders),
   orgSkills: many(orgSkills),
+  pipelineRuns: many(pipelineRuns),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -534,6 +563,7 @@ export const squadsRelations = relations(squads, ({ one, many }) => ({
   executions: many(executions),
   messages: many(messages),
   auditLogs: many(auditLogs),
+  pipelineRuns: many(pipelineRuns),
 }));
 
 export const agentsRelations = relations(agents, ({ one, many }) => ({
@@ -573,4 +603,10 @@ export const orgSkillsRelations = relations(orgSkills, ({ one }) => ({
 
 export const squadMemoriesRelations = relations(squadMemories, ({ one }) => ({
   squad: one(squads, { fields: [squadMemories.squadId], references: [squads.id] }),
+}));
+
+export const pipelineRunsRelations = relations(pipelineRuns, ({ one }) => ({
+  squad: one(squads, { fields: [pipelineRuns.squadId], references: [squads.id] }),
+  organization: one(organizations, { fields: [pipelineRuns.orgId], references: [organizations.id] }),
+  approver: one(users, { fields: [pipelineRuns.approvedBy], references: [users.id] }),
 }));
