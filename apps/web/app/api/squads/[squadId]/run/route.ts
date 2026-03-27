@@ -119,9 +119,6 @@ export async function POST(
     const runId = runner.runId;
 
     // Run pipeline in background
-    console.log(`[Pipeline] Starting run ${runId} for squad ${squadId} with ${pipelineSteps.length} steps`);
-    console.log(`[Pipeline] Agents: ${agentsList.map(a => `${a.name}(${a.id})`).join(", ")}`);
-    console.log(`[Pipeline] YAML:\n${pipelineYaml}`);
     void (async () => {
       try {
         await runner.run();
@@ -133,9 +130,7 @@ export async function POST(
           actorId: session.user.id,
           metadata: { runId },
         });
-        console.log(`[Pipeline] Run ${runId} completed successfully`);
       } catch (error) {
-        console.error(`[Pipeline] Run ${runId} FAILED:`, error);
         await createAuditLog({
           orgId,
           squadId,
