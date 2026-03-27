@@ -718,8 +718,10 @@ async function startEditFlow(state: ArchitectConversationState, squadId: string,
   const editWords = ["adicionar", "remover", "mudar", "trocar", "alterar", "quem vai", "falta", "cadê", "cade", "agente que", "agente para", "agente de"];
   const hasEditRequest = editWords.some(w => lower.includes(w));
 
-  // Resolve which squad to edit
-  const target = matched ?? (squads.length === 1 ? squads[0]! : null);
+  // Resolve which squad to edit — prefer recent context (last edited or just created)
+  const recentSquadId = state.editSquadId ?? state.createdSquadId;
+  const recentContext = recentSquadId ? squads.find(s => s.id === recentSquadId) : null;
+  const target = matched ?? recentContext ?? (squads.length === 1 ? squads[0]! : null);
 
   if (target) {
     state.editSquadId = target.id;
