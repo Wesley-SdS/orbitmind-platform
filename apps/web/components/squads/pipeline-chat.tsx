@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Sparkles, Loader2, X } from "lucide-react";
+import { MessageSquare, Sparkles, Loader2, X, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { PostPreview } from "./post-preview";
 
@@ -34,6 +34,7 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
   const scrollRef = useRef<HTMLDivElement>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const sortedOutputs = pipeline
     .filter(step => step.type !== "checkpoint" && stepOutputs[`step-${step.step}`])
@@ -42,6 +43,9 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
       stepName: step.name,
       ...stepOutputs[`step-${step.step}`]!,
     }));
+
+  const socialOutputs = sortedOutputs.filter(e => isSocialStep(e.stepName, e.content));
+  const hasSocialContent = socialOutputs.length > 0;
 
   // Auto-scroll when new outputs arrive
   useEffect(() => {
@@ -114,16 +118,29 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
               <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30 ml-2">Pausado</Badge>
             )}
           </CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSummary}
-            disabled={loadingSummary || sortedOutputs.length === 0}
-            className="gap-1.5"
-          >
-            {loadingSummary ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            Resumo
-          </Button>
+          <div className="flex items-center gap-2">
+            {hasSocialContent && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPreview(true)}
+                className="gap-1.5"
+              >
+                <Eye className="h-3.5 w-3.5" />
+                Prévia
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSummary}
+              disabled={loadingSummary || sortedOutputs.length === 0}
+              className="gap-1.5"
+            >
+              {loadingSummary ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              Resumo
+            </Button>
+          </div>
         </div>
 
         {/* Agent badges - clickable index */}
@@ -140,6 +157,40 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
           ))}
         </div>
       </CardHeader>
+
+      {/* Post preview modal */}
+      {showPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="flex w-full max-w-5xl flex-col gap-4 rounded-xl border border-border bg-background p-6 shadow-2xl" style={{ height: "85vh" }}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Eye className="h-5 w-5 text-primary" />
+                <span className="text-base font-semibold">Prévia dos Posts</span>
+              </div>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowPreview(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="space-y-6 pr-4">
+                {socialOutputs.map((entry) => (
+                  <div key={entry.stepId}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-lg">{entry.agentIcon}</span>
+                      <span className="text-sm font-medium">{entry.agentName}</span>
+                      <span className="text-xs text-muted-foreground">— {entry.stepName}</span>
+                    </div>
+                    <PostPreview content={entry.content} agentName={entry.agentName} agentIcon={entry.agentIcon} />
+                  </div>
+                ))}
+                {socialOutputs.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Nenhum conteúdo de post encontrado nesta execução.</p>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        </div>
+      )}
 
       {/* Summary modal */}
       {summary && (
@@ -183,9 +234,6 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
                 <div className="rounded-lg border border-border/50 bg-muted/30 p-3 prose prose-sm prose-invert max-w-none">
                   <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(entry.content) }} />
                 </div>
-                {isSocialStep(entry.stepName, entry.content) && (
-                  <PostPreview content={entry.content} agentName={entry.agentName} agentIcon={entry.agentIcon} />
-                )}
               </div>
             </div>
           ))}

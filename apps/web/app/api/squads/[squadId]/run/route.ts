@@ -92,6 +92,7 @@ export async function POST(
     const events: PipelineEvents = {
       onStateChange: () => {},
       onCheckpoint: async (step) => {
+        console.log(`[Checkpoint] Step ${step.id} reached. RunId: ${runner.runId}. Waiting for approval...`);
         await updatePipelineRun(runner.runId, {
           status: "waiting_approval",
           checkpointStepId: step.id,
@@ -110,7 +111,9 @@ export async function POST(
           // WebSocket may not be available
         }
         // Block execution until human approves or rejects
-        return waitForCheckpoint(runner.runId, step.id);
+        const response = await waitForCheckpoint(runner.runId, step.id);
+        console.log(`[Checkpoint] Step ${step.id} resolved with: "${response}"`);
+        return response;
       },
       onStepStart: async (step) => {
         const agentId = step.agent ?? agentsList[0]?.id ?? "";

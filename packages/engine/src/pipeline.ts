@@ -305,8 +305,18 @@ ${context}`;
    * Max 5 tool call rounds to prevent infinite loops.
    */
   private async executeWithTools(stepId: string, prompt: string, agent?: { name: string; custom: string }): Promise<string> {
+    // Enrich prompt with available tools info
+    const toolNames = this.availableTools?.map(t => `- ${t.name}: ${t.description}`).join("\n") ?? "";
+    const enrichedPrompt = `${prompt}
+
+## Ferramentas disponiveis
+Voce tem acesso as seguintes ferramentas que pode usar para enriquecer seu trabalho:
+${toolNames}
+
+Use as ferramentas quando necessario — por exemplo, busque imagens para posts, pesquise dados atualizados, etc.`;
+
     const messages: Array<{ role: "user" | "assistant" | "tool"; content: string; toolCallId?: string }> = [
-      { role: "user", content: prompt },
+      { role: "user", content: enrichedPrompt },
     ];
     const systemPrompt = buildSystemPrompt(agent ? { name: agent.name, role: "", config: null } : { name: "Agente", role: "", config: null });
 
