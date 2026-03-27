@@ -119,16 +119,27 @@ export function PipelineView({ squadId, pipeline, agents }: PipelineViewProps) {
     return "pending";
   }
 
+  function resolveAgent(step: PipelineStep): Agent | null {
+    if (step.type === "checkpoint") return null;
+    if (!step.agentId) return null;
+    // Try direct UUID match
+    const direct = agentMap.get(step.agentId);
+    if (direct) return direct;
+    // Fallback: match kebab-case to agent name
+    const found = agents.find(a =>
+      a.name.toLowerCase().replace(/\s+/g, "-") === step.agentId
+    );
+    return found ?? null;
+  }
+
   function getAgentName(step: PipelineStep): string {
     if (step.type === "checkpoint") return "Humano";
-    const agent = step.agentId ? agentMap.get(step.agentId) : null;
-    return agent?.name ?? "Agente";
+    return resolveAgent(step)?.name ?? "Agente";
   }
 
   function getAgentIcon(step: PipelineStep): string {
     if (step.type === "checkpoint") return "👤";
-    const agent = step.agentId ? agentMap.get(step.agentId) : null;
-    return agent?.icon ?? "🤖";
+    return resolveAgent(step)?.icon ?? "🤖";
   }
 
   return (
