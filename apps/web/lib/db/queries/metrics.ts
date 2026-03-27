@@ -15,89 +15,103 @@ export async function _uncachedGetDashboardMetrics(orgId: string) {
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  // Active squads count
-  const [squadsResult] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(squads)
-    .where(and(eq(squads.orgId, orgId), eq(squads.status, "active")));
+  // Run all independent queries in parallel
+  const [
+    [squadsResult],
+    [tasksResult],
+    [execTodayResult],
+    [costResult],
+    executionsByDay,
+    budgetByAgent,
+    recentActivity,
+    activeSquads,
+  ] = await Promise.all([
+    // Active squads count
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(squads)
+      .where(and(eq(squads.orgId, orgId), eq(squads.status, "active"))),
 
-  // Tasks completed this month
-  const [tasksResult] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(tasks)
-    .innerJoin(squads, eq(tasks.squadId, squads.id))
-    .where(
-      and(
-        eq(squads.orgId, orgId),
-        eq(tasks.status, "done"),
-        gte(tasks.completedAt, startOfMonth),
+    // Tasks completed this month
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(tasks)
+      .innerJoin(squads, eq(tasks.squadId, squads.id))
+      .where(
+        and(
+          eq(squads.orgId, orgId),
+          eq(tasks.status, "done"),
+          gte(tasks.completedAt, startOfMonth),
+        ),
       ),
-    );
 
-  // Executions today
-  const [execTodayResult] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(executions)
-    .innerJoin(squads, eq(executions.squadId, squads.id))
-    .where(and(eq(squads.orgId, orgId), gte(executions.startedAt, startOfToday)));
+    // Executions today
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(executions)
+      .innerJoin(squads, eq(executions.squadId, squads.id))
+      .where(and(eq(squads.orgId, orgId), gte(executions.startedAt, startOfToday))),
 
-  // Estimated cost this month
-  const [costResult] = await db
-    .select({ total: sql<number>`coalesce(sum(${executions.estimatedCost}), 0)::int` })
-    .from(executions)
-    .innerJoin(squads, eq(executions.squadId, squads.id))
-    .where(and(eq(squads.orgId, orgId), gte(executions.startedAt, startOfMonth)));
+    // Estimated cost this month
+    db
+      .select({ total: sql<number>`coalesce(sum(${executions.estimatedCost}), 0)::int` })
+      .from(executions)
+      .innerJoin(squads, eq(executions.squadId, squads.id))
+      .where(and(eq(squads.orgId, orgId), gte(executions.startedAt, startOfMonth))),
 
-  // Executions by day (last 7 days)
-  const executionsByDay = await db
-    .select({
-      date: sql<string>`date(${executions.startedAt})`,
-      completed: sql<number>`count(*) filter (where ${executions.status} = 'completed')::int`,
-      failed: sql<number>`count(*) filter (where ${executions.status} = 'failed')::int`,
-      cancelled: sql<number>`count(*) filter (where ${executions.status} = 'cancelled')::int`,
-    })
-    .from(executions)
-    .innerJoin(squads, eq(executions.squadId, squads.id))
-    .where(and(eq(squads.orgId, orgId), gte(executions.startedAt, sevenDaysAgo)))
-    .groupBy(sql`date(${executions.startedAt})`)
-    .orderBy(sql`date(${executions.startedAt})`);
+    // Executions by day (last 7 days)
+    db
+      .select({
+        date: sql<string>`date(${executions.startedAt})`,
+        completed: sql<number>`count(*) filter (where ${executions.status} = 'completed')::int`,
+        failed: sql<number>`count(*) filter (where ${executions.status} = 'failed')::int`,
+        cancelled: sql<number>`count(*) filter (where ${executions.status} = 'cancelled')::int`,
+      })
+      .from(executions)
+      .innerJoin(squads, eq(executions.squadId, squads.id))
+      .where(and(eq(squads.orgId, orgId), gte(executions.startedAt, sevenDaysAgo)))
+      .groupBy(sql`date(${executions.startedAt})`)
+      .orderBy(sql`date(${executions.startedAt})`),
 
-  // Budget by agent (top agents with usage)
-  const budgetByAgent = await db
-    .select({
-      agentId: agents.id,
-      agentName: agents.name,
-      agentIcon: agents.icon,
-      squadName: squads.name,
-      budgetUsed: agents.budgetUsedTokens,
-      budgetLimit: agents.monthlyBudgetTokens,
-    })
-    .from(agents)
-    .innerJoin(squads, eq(agents.squadId, squads.id))
-    .where(eq(squads.orgId, orgId))
-    .orderBy(sql`${agents.budgetUsedTokens} desc`)
-    .limit(10);
+    // Budget by agent (top agents with usage)
+    db
+      .select({
+        agentId: agents.id,
+        agentName: agents.name,
+        agentIcon: agents.icon,
+        squadName: squads.name,
+        budgetUsed: agents.budgetUsedTokens,
+        budgetLimit: agents.monthlyBudgetTokens,
+      })
+      .from(agents)
+      .innerJoin(squads, eq(agents.squadId, squads.id))
+      .where(eq(squads.orgId, orgId))
+      .orderBy(sql`${agents.budgetUsedTokens} desc`)
+      .limit(10),
 
-  // Recent activity
-  const recentActivity = await db
-    .select()
-    .from(auditLogs)
-    .where(eq(auditLogs.orgId, orgId))
-    .orderBy(sql`${auditLogs.createdAt} desc`)
-    .limit(10);
+    // Recent activity
+    db
+      .select()
+      .from(auditLogs)
+      .where(eq(auditLogs.orgId, orgId))
+      .orderBy(sql`${auditLogs.createdAt} desc`)
+      .limit(10),
 
-  // Active squads list
-  const activeSquads = await db
-    .select({
-      id: squads.id,
-      name: squads.name,
-      icon: squads.icon,
-      status: squads.status,
-      agentCount: sql<number>`(SELECT count(*) FROM agents WHERE agents.squad_id = ${squads.id})::int`,
-      updatedAt: squads.updatedAt,
-    })
-    .from(squads)
-    .where(and(eq(squads.orgId, orgId), eq(squads.status, "active")));
+    // Active squads list (LEFT JOIN + GROUP BY instead of scalar subquery)
+    db
+      .select({
+        id: squads.id,
+        name: squads.name,
+        icon: squads.icon,
+        status: squads.status,
+        agentCount: sql<number>`count(${agents.id})::int`,
+        updatedAt: squads.updatedAt,
+      })
+      .from(squads)
+      .leftJoin(agents, eq(agents.squadId, squads.id))
+      .where(and(eq(squads.orgId, orgId), eq(squads.status, "active")))
+      .groupBy(squads.id, squads.name, squads.icon, squads.status, squads.updatedAt),
+  ]);
 
   return {
     squadsActive: squadsResult?.count ?? 0,

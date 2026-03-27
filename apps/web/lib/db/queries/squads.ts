@@ -10,24 +10,24 @@ import { CacheTags } from "@/lib/cache";
 // ---------------------------------------------------------------------------
 
 export async function _uncachedGetSquadsByOrgId(orgId: string) {
-  const squadRows = await db
-    .select()
-    .from(squads)
-    .where(and(
-      eq(squads.orgId, orgId),
-      ne(squads.status, "archived"),
-      ne(squads.code, "system-architect"),
-    ));
-
-  const agentCounts = await db
-    .select({ squadId: agents.squadId, count: count() })
-    .from(agents)
-    .groupBy(agents.squadId);
-
-  const taskCounts = await db
-    .select({ squadId: tasks.squadId, count: count() })
-    .from(tasks)
-    .groupBy(tasks.squadId);
+  const [squadRows, agentCounts, taskCounts] = await Promise.all([
+    db
+      .select()
+      .from(squads)
+      .where(and(
+        eq(squads.orgId, orgId),
+        ne(squads.status, "archived"),
+        ne(squads.code, "system-architect"),
+      )),
+    db
+      .select({ squadId: agents.squadId, count: count() })
+      .from(agents)
+      .groupBy(agents.squadId),
+    db
+      .select({ squadId: tasks.squadId, count: count() })
+      .from(tasks)
+      .groupBy(tasks.squadId),
+  ]);
 
   const agentMap = new Map(agentCounts.map((r) => [r.squadId, r.count]));
   const taskMap = new Map(taskCounts.map((r) => [r.squadId, r.count]));

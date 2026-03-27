@@ -23,16 +23,18 @@ export default async function SquadDetailPage({
 }: {
   params: Promise<{ squadId: string }>;
 }) {
-  const { orgId } = await getSessionUser();
-  const { squadId } = await params;
-  const squadData = await getSquadWithAgents(squadId);
+  const [{ orgId }, { squadId }] = await Promise.all([getSessionUser(), params]);
+
+  const [squadData, executions] = await Promise.all([
+    getSquadWithAgents(squadId),
+    getExecutionsBySquadId(squadId, 20),
+  ]);
 
   if (!squadData || squadData.orgId !== orgId) {
     notFound();
   }
 
   const { agents, ...squad } = squadData;
-  const executions = await getExecutionsBySquadId(squadId, 20);
 
   const totalTokens = executions.reduce((sum, e) => sum + e.tokensUsed, 0);
   const totalCost = executions.reduce((sum, e) => sum + e.estimatedCost, 0);
