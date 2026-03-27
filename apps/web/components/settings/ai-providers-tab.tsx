@@ -227,7 +227,7 @@ export function AiProvidersTab() {
               <DialogTitle>{step === 1 ? "Escolha o Provedor" : `Configurar ${PROVIDER_META[formProvider]?.name ?? ""}`}</DialogTitle>
               <DialogDescription>
                 {step === 1
-                  ? "Selecione qual provedor de IA voce quer configurar"
+                  ? "Selecione qual provedor de IA você quer configurar"
                   : "Configure a credencial e modelo padrao"}
               </DialogDescription>
             </DialogHeader>
@@ -331,7 +331,7 @@ export function AiProvidersTab() {
                     disabled={isFirstProvider}
                   />
                   <Label className={isFirstProvider ? "text-muted-foreground" : ""}>
-                    Definir como padrao {isFirstProvider && "(automatico — primeiro provedor)"}
+                    Definir como padrão {isFirstProvider && "(automático — primeiro provedor)"}
                   </Label>
                 </div>
 
@@ -417,7 +417,7 @@ export function AiProvidersTab() {
                     <div className="flex items-center gap-1">
                       <Switch checked={p.isActive} onCheckedChange={() => handleToggleActive(p.id, p.isActive)} />
                       {!p.isDefault && (
-                        <Button variant="ghost" size="sm" onClick={() => handleSetDefault(p.id)} title="Definir como padrao">
+                        <Button variant="ghost" size="sm" onClick={() => handleSetDefault(p.id)} title="Definir como padrão">
                           <Star className="h-4 w-4" />
                         </Button>
                       )}
@@ -428,7 +428,7 @@ export function AiProvidersTab() {
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Remover provedor?</AlertDialogTitle>
-                            <AlertDialogDescription>Esta acao nao pode ser desfeita.</AlertDialogDescription>
+                            <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>

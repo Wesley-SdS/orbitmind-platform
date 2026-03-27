@@ -90,7 +90,7 @@ export async function handleArchitectMessage(
   if (org && (!companyCtx || !companyCtx.name) && !state.wizardStep) {
     state.wizardStep = 1;
     await sendArchitectMessage(squadId,
-      "Bem-vindo ao OrbitMind! Antes de criarmos seu primeiro squad, preciso conhecer sua empresa. Sao 5 perguntas rapidas!\n\n**1/5 — Como se chama sua empresa ou projeto?**",
+      "Bem-vindo ao OrbitMind! Antes de criarmos seu primeiro squad, preciso conhecer sua empresa. São 5 perguntas rápidas!\n\n**1/5 — Como se chama sua empresa ou projeto?**",
     );
     architectStates.set(stateKey, state);
     return;
@@ -259,14 +259,14 @@ async function handleCompanyWizard(
 
   const sectorOptions: Record<string, string> = {
     "1": "Marketing Digital", "2": "SaaS / Tecnologia", "3": "E-commerce",
-    "4": "Educacao", "5": "Saude", "6": "Financeiro",
+    "4": "Educação", "5": "Saúde", "6": "Financeiro",
   };
   const audienceOptions: Record<string, string> = {
     "1": "Empresas B2B", "2": "Consumidores (B2C)",
     "3": "Empreendedores / startups", "4": "Ambos (B2B e B2C)",
   };
   const toneOptions: Record<string, string> = {
-    "1": "Profissional", "2": "Casual", "3": "Tecnico",
+    "1": "Profissional", "2": "Casual", "3": "Técnico",
     "4": "Divertido", "5": "Inspirador", "6": "Provocativo",
   };
 
@@ -274,7 +274,7 @@ async function handleCompanyWizard(
     case 1:
       state.wizardData.name = userMessage.trim();
       await sendArchitectMessage(squadId,
-        `Otimo, **${state.wizardData.name}**!\n\n**2/5 — Qual o setor de atuacao?**\n\n1. Marketing Digital\n2. SaaS / Tecnologia\n3. E-commerce\n4. Educacao\n5. Saude\n6. Financeiro\n7. Outro (descreva)`,
+        `Ótimo, **${state.wizardData.name}**!\n\n**2/5 — Qual o setor de atuação?**\n\n1. Marketing Digital\n2. SaaS / Tecnologia\n3. E-commerce\n4. Educação\n5. Saúde\n6. Financeiro\n7. Outro (descreva)`,
       );
       state.wizardStep = 2;
       break;
@@ -282,7 +282,7 @@ async function handleCompanyWizard(
     case 2:
       state.wizardData.sector = sectorOptions[userMessage.trim()] || userMessage.trim();
       await sendArchitectMessage(squadId,
-        `**3/5 — Quem e seu publico-alvo principal?**\n\n1. Empresas B2B\n2. Consumidores (B2C)\n3. Empreendedores / startups\n4. Ambos (B2B e B2C)\n5. Outro (descreva)`,
+        `**3/5 — Quem é seu público-alvo principal?**\n\n1. Empresas B2B\n2. Consumidores (B2C)\n3. Empreendedores / startups\n4. Ambos (B2B e B2C)\n5. Outro (descreva)`,
       );
       state.wizardStep = 3;
       break;
@@ -290,7 +290,7 @@ async function handleCompanyWizard(
     case 3:
       state.wizardData.audience = audienceOptions[userMessage.trim()] || userMessage.trim();
       await sendArchitectMessage(squadId,
-        `**4/5 — Qual tom de comunicacao voce prefere?**\n\n1. Profissional\n2. Casual\n3. Tecnico\n4. Divertido\n5. Inspirador\n6. Provocativo`,
+        `**4/5 — Qual tom de comunicação você prefere?**\n\n1. Profissional\n2. Casual\n3. Técnico\n4. Divertido\n5. Inspirador\n6. Provocativo`,
       );
       state.wizardStep = 4;
       break;
@@ -298,7 +298,7 @@ async function handleCompanyWizard(
     case 4:
       state.wizardData.tone = toneOptions[userMessage.trim()] || userMessage.trim();
       await sendArchitectMessage(squadId,
-        `**5/5 — Principais concorrentes ou referencias?** (opcional)\n\nDigite nomes de empresas ou perfis, ou "pular" se preferir.`,
+        `**5/5 — Principais concorrentes ou referências?** (opcional)\n\nDigite nomes de empresas ou perfis, ou "pular" se preferir.`,
       );
       state.wizardStep = 5;
       break;
@@ -316,13 +316,13 @@ async function handleCompanyWizard(
       const summary = [
         `**Empresa:** ${state.wizardData.name}`,
         `**Setor:** ${state.wizardData.sector}`,
-        `**Publico:** ${state.wizardData.audience}`,
+        `**Público:** ${state.wizardData.audience}`,
         `**Tom:** ${state.wizardData.tone}`,
-        state.wizardData.competitors ? `**Referencias:** ${state.wizardData.competitors}` : null,
+        state.wizardData.competitors ? `**Referências:** ${state.wizardData.competitors}` : null,
       ].filter(Boolean).join("\n");
 
       await sendArchitectMessage(squadId,
-        `Pronto! Agora conheco sua empresa.\n\n${summary}\n\nTodos os squads e agentes vao usar essas informacoes para personalizar o conteudo.\n\nQuer criar seu primeiro squad? E so me dizer o que precisa!`,
+        `Pronto! Agora conheço sua empresa.\n\n${summary}\n\nTodos os squads e agentes vão usar essas informações para personalizar o conteúdo.\n\nQuer criar seu primeiro squad? É só me dizer o que precisa!`,
       );
 
       // Limpar wizard state
@@ -339,33 +339,33 @@ async function handleCompanyWizard(
 function buildCompanyPrompt(companyCtx: Record<string, unknown> | null): string {
   if (!companyCtx?.name) return "";
   return `
-## Contexto da empresa do usuario
+## Contexto da empresa do usuário
 - Empresa: ${companyCtx.name}
 - Setor: ${companyCtx.sector}
-- Publico: ${companyCtx.audience}
+- Público: ${companyCtx.audience}
 - Tom: ${companyCtx.tone}
-${companyCtx.competitors ? `- Referencias: ${companyCtx.competitors}` : ""}
+${companyCtx.competitors ? `- Referências: ${companyCtx.competitors}` : ""}
 
-Use essas informacoes para personalizar todo conteudo e recomendacoes.`;
+Use essas informações para personalizar todo conteúdo e recomendações.`;
 }
 
 function buildIntegrationPrompt(integrations: Array<{ integrationId: string; status: string | null; enabledCapabilities: string[] | null }>): string {
   const connected = integrations.filter(i => i.status === "active");
   if (connected.length > 0) {
     return `
-## Integracoes conectadas na organizacao
+## Integrações conectadas na organização
 ${connected.map(i => `- **${i.integrationId}**: ${i.enabledCapabilities?.join(", ") || "conectado"}`).join("\n")}
 
-Voce pode sugerir acoes usando essas integracoes. Exemplos:
-- Se GitHub esta conectado: "Posso criar uma issue no GitHub para isso"
-- Se Slack esta conectado: "Vou notificar no Slack quando o pipeline terminar"
-- Se Jira esta conectado: "Posso sincronizar essas tasks com o Jira"`;
+Você pode sugerir ações usando essas integrações. Exemplos:
+- Se GitHub está conectado: "Posso criar uma issue no GitHub para isso"
+- Se Slack está conectado: "Vou notificar no Slack quando o pipeline terminar"
+- Se Jira está conectado: "Posso sincronizar essas tasks com o Jira"`;
   }
   return `
-## Integracoes
-Nenhuma integracao conectada. Quando relevante, sugira ao usuario conectar ferramentas em Settings > Integracoes para:
+## Integrações
+Nenhuma integração conectada. Quando relevante, sugira ao usuário conectar ferramentas em Settings > Integrações para:
 - GitHub/GitLab para esteira de desenvolvimento
-- Slack/Discord para notificacoes
+- Slack/Discord para notificações
 - Jira/Linear/Asana para sincronizar tasks`;
 }
 
@@ -405,21 +405,21 @@ async function handleDiscovery(
 ${companyPrompt}
 ${integrationPrompt}
 
-## Instrucoes — Fase Discovery
-Voce esta coletando informacoes para montar um squad novo.
-Perguntas ja feitas: ${state.discoveryStep}. Maximo: 5.
+## Instruções — Fase Discovery
+Você está coletando informações para montar um squad novo.
+Perguntas já feitas: ${state.discoveryStep}. Máximo: 5.
 
-Baseado no HISTORICO da conversa, faca UMA das acoes:
+Baseado no HISTÓRICO da conversa, faça UMA das ações:
 
-### Se falta informacao (max 5 perguntas):
-Faca a PROXIMA pergunta DIFERENTE das anteriores.
-Se o usuario respondeu com numero ("1","2"), interprete como selecao da opcao.
+### Se falta informação (max 5 perguntas):
+Faça a PRÓXIMA pergunta DIFERENTE das anteriores.
+Se o usuário respondeu com número ("1","2"), interprete como seleção da opção.
 
-### Se ja tem info SUFICIENTE (ou 4+ perguntas):
+### Se já tem info SUFICIENTE (ou 4+ perguntas):
 Monte o design com bloco JSON:
 
 \`\`\`json:squad-design
-{"ready":true,"name":"...","code":"...","description":"...","icon":"emoji","performanceMode":"high ou economic","agents":[{"id":"id-kebab","name":"Nome Aliterativo","role":"Funcao","icon":"emoji","modelTier":"powerful ou fast","execution":"inline ou subagent","description":"1 frase"}],"pipeline":[{"step":1,"name":"...","type":"agent","agentId":"id"},{"step":2,"name":"Aprovacao","type":"checkpoint"}],"skills":["web_search","web_fetch"]}
+{"ready":true,"name":"...","code":"...","description":"...","icon":"emoji","performanceMode":"high ou economic","agents":[{"id":"id-kebab","name":"Nome Aliterativo","role":"Função","icon":"emoji","modelTier":"powerful ou fast","execution":"inline ou subagent","description":"1 frase"}],"pipeline":[{"step":1,"name":"...","type":"agent","agentId":"id"},{"step":2,"name":"Aprovação","type":"checkpoint"}],"skills":["web_search","web_fetch"]}
 \`\`\`
 
 Depois apresente visualmente com emojis, equipe numerada e pipeline.
@@ -465,7 +465,7 @@ async function handleDesignApproval(
 
   if (isApprove && !isReject) {
     if (!state.proposedDesign) {
-      await sendArchitectMessage(squadId, "Nao tenho um design pronto. Me descreva o que voce precisa!");
+      await sendArchitectMessage(squadId, "Não tenho um design pronto. Me descreva o que você precisa!");
       state.phase = "idle";
       return;
     }
@@ -476,7 +476,7 @@ async function handleDesignApproval(
       state.phase = "idle";
       const d = state.proposedDesign!;
       await sendArchitectMessage(squadId,
-        `**Squad "${d.name}" criado com sucesso!**\n\n${d.agents.length} agentes configurados\n${d.pipeline.length} etapas no pipeline\n\nVoce ja pode encontra-lo na aba **Squads** ou selecionar aqui no chat.\n\nO que mais posso fazer? Posso **editar** esse squad, **criar outro**, ou **listar** seus squads.`
+        `**Squad "${d.name}" criado com sucesso!**\n\n${d.agents.length} agentes configurados\n${d.pipeline.length} etapas no pipeline\n\nVocê já pode encontrá-lo na aba **Squads** ou selecionar aqui no chat.\n\nO que mais posso fazer? Posso **editar** esse squad, **criar outro**, ou **listar** seus squads.`
       );
       try {
         const { wsManager } = await import("@/lib/realtime/ws-manager");
@@ -487,7 +487,7 @@ async function handleDesignApproval(
     }
   } else if (isReject) {
     state.phase = "idle";
-    await sendArchitectMessage(squadId, "Cancelei a criacao. O que mais posso fazer?");
+    await sendArchitectMessage(squadId, "Cancelei a criação. O que mais posso fazer?");
   } else {
     // Adjustment — use LLM
     const adapter = createAdapter({ name: ARCHITECT_AGENT.name, role: ARCHITECT_AGENT.role, config: {} }, providerConfig);
@@ -511,7 +511,7 @@ async function handleList(state: ArchitectConversationState, squadId: string, or
   const squads = await getSquadsByOrgId(orgId);
 
   if (squads.length === 0) {
-    await sendArchitectMessage(squadId, "Voce ainda nao tem squads. Quer **criar** um agora?");
+    await sendArchitectMessage(squadId, "Você ainda não tem squads. Quer **criar** um agora?");
     return;
   }
 
@@ -523,7 +523,7 @@ async function handleList(state: ArchitectConversationState, squadId: string, or
   state.phase = "list-action";
 
   await sendArchitectMessage(squadId,
-    `**Seus Squads:**\n\n${lines.join("\n\n")}\n\nResponda com o **numero** para selecionar, ou diga o que quer fazer: **editar**, **criar novo** ou **deletar**.`
+    `**Seus Squads:**\n\n${lines.join("\n\n")}\n\nResponda com o **número** para selecionar, ou diga o que quer fazer: **editar**, **criar novo** ou **deletar**.`
   );
 }
 
@@ -583,7 +583,7 @@ async function startEditFlow(state: ArchitectConversationState, squadId: string,
   const squads = await getSquadsByOrgId(orgId);
 
   if (squads.length === 0) {
-    await sendArchitectMessage(squadId, "Voce nao tem squads para editar. Quer **criar** um?");
+    await sendArchitectMessage(squadId, "Você não tem squads para editar. Quer **criar** um?");
     return;
   }
 
@@ -603,7 +603,7 @@ async function startEditFlow(state: ArchitectConversationState, squadId: string,
     state.phase = "edit-modify";
 
     if (hasEditRequest) {
-      // User already said what to change — skip "O que voce quer mudar?" and process directly
+      // User already said what to change — skip "O que você quer mudar?" and process directly
       await handleEditModify(state, squadId, userMessage, providerConfig);
     } else {
       // Just asked to edit, show current state
@@ -615,7 +615,7 @@ async function startEditFlow(state: ArchitectConversationState, squadId: string,
     // Save the original edit request so we can process it after squad selection
     state.discovery.customRequirements = hasEditRequest ? userMessage : undefined;
     const lines = squads.map((s, i) => `${i + 1}. ${s.icon} **${s.name}** — ${s.agentCount} agentes`);
-    await sendArchitectMessage(squadId, `Qual squad voce quer editar?\n\n${lines.join("\n")}\n\nResponda com o numero ou nome.`);
+    await sendArchitectMessage(squadId, `Qual squad você quer editar?\n\n${lines.join("\n")}\n\nResponda com o número ou nome.`);
   }
 }
 
@@ -624,7 +624,7 @@ async function showSquadForEdit(chatSquadId: string, squadId: string, squadName:
   const agentLines = agents.map((a, i) => `${i + 1}. ${a.icon} **${a.name}** — ${a.role} (${a.modelTier})`);
 
   await sendArchitectMessage(chatSquadId,
-    `**${squadName}** — Estado atual:\n\n**Agentes (${agents.length}):**\n${agentLines.join("\n")}\n\nO que voce quer mudar?`
+    `**${squadName}** — Estado atual:\n\n**Agentes (${agents.length}):**\n${agentLines.join("\n")}\n\nO que você quer mudar?`
   );
 }
 
@@ -637,7 +637,7 @@ async function handleEditSelect(state: ArchitectConversationState, squadId: stri
     : squads.find((s) => userMessage.toLowerCase().includes(s.name.toLowerCase()));
 
   if (!matched) {
-    await sendArchitectMessage(squadId, "Nao encontrei esse squad. Tente pelo numero ou nome.");
+    await sendArchitectMessage(squadId, "Não encontrei esse squad. Tente pelo número ou nome.");
     return;
   }
 
@@ -674,34 +674,34 @@ async function handleEditModify(state: ArchitectConversationState, squadId: stri
   const result = await adapter.chat(conversationMessages, `${ARCHITECT_AGENT.systemPrompt}
 ${companyPrompt}
 
-## MODO: EDICAO DE SQUAD EXISTENTE
-Voce esta EDITANDO o squad "${state.editSquadName}" (ID: ${state.editSquadId}).
-NAO crie um squad novo. APENAS modifique o existente.
+## MODO: EDIÇÃO DE SQUAD EXISTENTE
+Você está EDITANDO o squad "${state.editSquadName}" (ID: ${state.editSquadId}).
+NÃO crie um squad novo. APENAS modifique o existente.
 
 ### Agentes atuais
 ${agentList}
 
-## INSTRUCAO OBRIGATORIA
-Voce DEVE gerar um bloco JSON com as mudancas. SEMPRE inclua o JSON, mesmo que precise fazer uma pergunta.
-Se o pedido do usuario e claro, gere o JSON imediatamente.
-Se precisar perguntar algo, pergunte E inclua o JSON com sua melhor interpretacao.
+## INSTRUÇÃO OBRIGATÓRIA
+Você DEVE gerar um bloco JSON com as mudanças. SEMPRE inclua o JSON, mesmo que precise fazer uma pergunta.
+Se o pedido do usuário é claro, gere o JSON imediatamente.
+Se precisar perguntar algo, pergunte E inclua o JSON com sua melhor interpretação.
 
 \`\`\`json:squad-edit
 {
   "changes": [
-    {"type": "add-agent", "data": {"name": "Nome Aliterativo", "role": "Funcao", "icon": "emoji", "modelTier": "powerful ou fast", "description": "1 frase"}},
+    {"type": "add-agent", "data": {"name": "Nome Aliterativo", "role": "Função", "icon": "emoji", "modelTier": "powerful ou fast", "description": "1 frase"}},
     {"type": "remove-agent", "data": {"name": "Nome do agente a remover"}},
-    {"type": "update-agent", "data": {"name": "Nome atual", "updates": {"role": "nova funcao"}}}
+    {"type": "update-agent", "data": {"name": "Nome atual", "updates": {"role": "nova função"}}}
   ],
-  "summary": "Resumo das mudancas"
+  "summary": "Resumo das mudanças"
 }
 \`\`\`
 
 Depois do JSON, apresente visualmente:
-- ➕ para adicoes, ➖ para remocoes, ✏️ para alteracoes
-- Pergunte: "Aplicar essas mudancas ao squad ${state.editSquadName}?"
+- ➕ para adições, ➖ para remoções, ✏️ para alterações
+- Pergunte: "Aplicar essas mudanças ao squad ${state.editSquadName}?"
 
-Regras: Nomes aliterativos, nunca remova Reviewer sem substituto, NAO crie squad novo.`);
+Regras: Nomes aliterativos, nunca remova Reviewer sem substituto, NÃO crie squad novo.`);
 
   // Try to extract edit JSON
   const editMatch =
@@ -736,18 +736,18 @@ async function handleEditConfirm(state: ArchitectConversationState, squadId: str
   if (isApprove) {
     const changes = (state.pendingChanges as { changes: unknown[] } | undefined)?.changes;
     if (!changes || changes.length === 0) {
-      await sendArchitectMessage(squadId, "Nao tenho mudancas pendentes para aplicar. Descreva o que quer mudar no squad.");
+      await sendArchitectMessage(squadId, "Não tenho mudanças pendentes para aplicar. Descreva o que quer mudar no squad.");
       state.phase = "edit-modify";
       return;
     }
 
-    await sendArchitectMessage(squadId, "Aplicando mudancas...");
+    await sendArchitectMessage(squadId, "Aplicando mudanças...");
     try {
       await applySquadChanges(state);
       state.phase = "idle";
       state.pendingChanges = undefined;
       console.log(`[Architect] Changes applied to squad ${state.editSquadId}: ${changes.length} changes`);
-      await sendArchitectMessage(squadId, `**Mudancas aplicadas ao "${state.editSquadName}"!**\n\nO que mais posso fazer?`);
+      await sendArchitectMessage(squadId, `**Mudanças aplicadas ao "${state.editSquadName}"!**\n\nO que mais posso fazer?`);
       try {
         const { wsManager } = await import("@/lib/realtime/ws-manager");
         wsManager.broadcastToOrg(state.orgId, { type: "SQUAD_UPDATED", squadId: state.editSquadId });
@@ -759,7 +759,7 @@ async function handleEditConfirm(state: ArchitectConversationState, squadId: str
   } else if (isReject) {
     state.phase = "idle";
     state.pendingChanges = undefined;
-    await sendArchitectMessage(squadId, "Cancelei as mudancas. O que mais posso fazer?");
+    await sendArchitectMessage(squadId, "Cancelei as mudanças. O que mais posso fazer?");
   } else {
     // More changes requested
     state.phase = "edit-modify";
@@ -820,7 +820,7 @@ async function applySquadChanges(state: ArchitectConversationState) {
 async function startDeleteFlow(state: ArchitectConversationState, squadId: string, orgId: string, userMessage: string) {
   const squads = await getSquadsByOrgId(orgId);
   if (squads.length === 0) {
-    await sendArchitectMessage(squadId, "Voce nao tem squads para deletar.");
+    await sendArchitectMessage(squadId, "Você não tem squads para deletar.");
     return;
   }
 
@@ -856,7 +856,7 @@ async function handleDeleteConfirm(state: ArchitectConversationState, squadId: s
       state.deleteSquadId = matched.id;
       state.deleteSquadName = matched.name;
       await sendArchitectMessage(squadId,
-        `**Deletar "${matched.name}"?** ${matched.agentCount} agentes serao arquivados.\n\n1. **Sim**\n2. **Cancelar**`
+        `**Deletar "${matched.name}"?** ${matched.agentCount} agentes serão arquivados.\n\n1. **Sim**\n2. **Cancelar**`
       );
     } else {
       state.phase = "idle";
@@ -909,10 +909,10 @@ async function handleGeneral(state: ArchitectConversationState, squadId: string,
   try {
     const metrics = await getDashboardMetrics(orgId);
     metricsContext = `
-### Metricas do mes
+### Métricas do mês
 - Squads ativos: ${metrics.squadsActive}
 - Tasks completadas: ${metrics.tasksCompletedThisMonth}
-- Execucoes hoje: ${metrics.executionsToday}
+- Execuções hoje: ${metrics.executionsToday}
 - Custo estimado: R$ ${(metrics.estimatedCostCentsThisMonth / 100).toFixed(2)}`;
   } catch { /* metrics unavailable */ }
 
@@ -930,20 +930,20 @@ async function handleGeneral(state: ArchitectConversationState, squadId: string,
 ${companyPrompt}
 ${integrationPrompt}
 
-## Dados atuais da organizacao
+## Dados atuais da organização
 
 ### Squads (${squads.length})
 ${squads.map(s => `- ${s.icon} ${s.name} (${s.status}) — ${s.agentCount} agentes, ${s.taskCount} tasks`).join("\n") || "Nenhum squad criado"}
 ${metricsContext}
 
 ## Capacidades
-Voce pode:
+Você pode:
 - **Criar** squads novos
 - **Editar** squads existentes (adicionar/remover agentes, mudar config)
 - **Listar** squads
 - **Deletar** squads
 
-Responda de forma util e sugira acoes relevantes.`);
+Responda de forma útil e sugira ações relevantes.`);
 
   await sendArchitectMessage(squadId, result.output);
 }

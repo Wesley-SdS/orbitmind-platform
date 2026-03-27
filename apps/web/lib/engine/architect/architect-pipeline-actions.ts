@@ -46,7 +46,7 @@ async function getGitHub(orgId: string): Promise<{ github: GitHubIntegration; ow
 export async function handleListPipelineAgents(state: ArchitectConversationState) {
   const gh = await getGitHub(state.orgId);
   if (!gh) {
-    await sendMsg("Nenhum repositorio conectado. Va em **Integracoes → GitHub** e conecte um repo primeiro.");
+    await sendMsg("Nenhum repositório conectado. Vá em **Integrações → GitHub** e conecte um repo primeiro.");
     state.phase = "idle";
     return;
   }
@@ -67,7 +67,7 @@ export async function handleListPipelineAgents(state: ArchitectConversationState
     const statusIcon = agent.state === "active" ? "🟢" : "⚪";
     const icon = roleIcons[agent.role] ?? "⚙️";
     const runInfo = agent.lastRun
-      ? `Ultimo run: ${agent.lastRun.conclusion === "success" ? "✅" : agent.lastRun.conclusion === "failure" ? "❌" : "⏳"} ${agent.lastRun.duration ? `(${agent.lastRun.duration}s)` : ""}`
+      ? `Último run: ${agent.lastRun.conclusion === "success" ? "✅" : agent.lastRun.conclusion === "failure" ? "❌" : "⏳"} ${agent.lastRun.duration ? `(${agent.lastRun.duration}s)` : ""}`
       : "Nenhum run";
     response += `${statusIcon} ${icon} **${agent.displayName}** (${agent.role})\n`;
     response += `   Workflow: \`${agent.workflowPath}\`\n`;
@@ -84,7 +84,7 @@ export async function handleListPipelineAgents(state: ArchitectConversationState
 
 export async function handleShowAgentDetail(state: ArchitectConversationState, userMessage: string) {
   const gh = await getGitHub(state.orgId);
-  if (!gh) { await sendMsg("GitHub nao conectado."); state.phase = "idle"; return; }
+  if (!gh) { await sendMsg("GitHub não conectado."); state.phase = "idle"; return; }
 
   const agents = await gh.github.importPipeline(gh.owner, gh.repo);
   const agent = identifyAgent(userMessage, agents);
@@ -100,8 +100,8 @@ export async function handleShowAgentDetail(state: ArchitectConversationState, u
 
   if (agent.skillPath) {
     response += `- Skill: \`${agent.skillPath}\`\n\n`;
-    response += `**Conteudo do skill file:**\n\n\`\`\`markdown\n${agent.skillContent.slice(0, 2000)}\n\`\`\``;
-    if (agent.skillContent.length > 2000) response += "\n\n*(conteudo truncado)*";
+    response += `**Conteúdo do skill file:**\n\n\`\`\`markdown\n${agent.skillContent.slice(0, 2000)}\n\`\`\``;
+    if (agent.skillContent.length > 2000) response += "\n\n*(conteúdo truncado)*";
   } else {
     response += "\n*Sem skill file associado.*";
   }
@@ -114,7 +114,7 @@ export async function handleShowAgentDetail(state: ArchitectConversationState, u
 
 export async function handleEditAgent(state: ArchitectConversationState, userMessage: string, providerConfig: ProviderConfig) {
   const gh = await getGitHub(state.orgId);
-  if (!gh) { await sendMsg("GitHub nao conectado."); state.phase = "idle"; return; }
+  if (!gh) { await sendMsg("GitHub não conectado."); state.phase = "idle"; return; }
 
   const agents = await gh.github.importPipeline(gh.owner, gh.repo);
   const agent = identifyAgent(userMessage, agents);
@@ -125,7 +125,7 @@ export async function handleEditAgent(state: ArchitectConversationState, userMes
   }
 
   if (!agent.skillContent) {
-    await sendMsg(`O agente **${agent.displayName}** nao tem skill file. Quer que eu crie um?`);
+    await sendMsg(`O agente **${agent.displayName}** não tem skill file. Quer que eu crie um?`);
     state.phase = "idle";
     return;
   }
@@ -138,14 +138,14 @@ export async function handleEditAgent(state: ArchitectConversationState, userMes
 
   const result = await adapter.chat([{
     role: "user",
-    content: `O usuario pediu: "${userMessage}"
+    content: `O usuário pediu: "${userMessage}"
 
 Arquivo atual (${agent.skillPath}):
 \`\`\`markdown
 ${agent.skillContent}
 \`\`\`
 
-Edite o arquivo conforme o pedido do usuario. Retorne APENAS o conteudo novo do arquivo, sem explicacoes, sem code fences.`,
+Edite o arquivo conforme o pedido do usuário. Retorne APENAS o conteúdo novo do arquivo, sem explicações, sem code fences.`,
   }]);
 
   const newContent = result.output.replace(/^```\w*\n/, "").replace(/\n```$/, "").trim();
@@ -163,7 +163,7 @@ Edite o arquivo conforme o pedido do usuario. Retorne APENAS o conteudo novo do 
   // Show diff
   const diffLines = simpleDiff(agent.skillContent, newContent);
   await sendMsg(
-    `Alteracao proposta para **${agent.displayName}** (\`${agent.skillPath}\`):\n\n\`\`\`diff\n${diffLines}\n\`\`\`\n\nConfirma? Responda **sim** para fazer o commit ou **nao** para cancelar.`,
+    `Alteração proposta para **${agent.displayName}** (\`${agent.skillPath}\`):\n\n\`\`\`diff\n${diffLines}\n\`\`\`\n\nConfirma? Responda **sim** para fazer o commit ou **não** para cancelar.`,
   );
   state.phase = "edit-confirm";
 }
@@ -175,7 +175,7 @@ export async function handleConfirmPipelineEdit(state: ArchitectConversationStat
   const isYes = /\b(sim|yes|confirma|ok|pode|go|faz|faça)\b/.test(lower);
 
   if (!isYes) {
-    await sendMsg("Edicao cancelada.");
+    await sendMsg("Edição cancelada.");
     state.pendingChanges = undefined;
     state.phase = "idle";
     return;
@@ -183,13 +183,13 @@ export async function handleConfirmPipelineEdit(state: ArchitectConversationStat
 
   const changes = state.pendingChanges as Record<string, string> | undefined;
   if (!changes || changes.type !== "edit-agent") {
-    await sendMsg("Nenhuma edicao pendente.");
+    await sendMsg("Nenhuma edição pendente.");
     state.phase = "idle";
     return;
   }
 
   const gh = await getGitHub(state.orgId);
-  if (!gh) { await sendMsg("GitHub nao conectado."); state.phase = "idle"; return; }
+  if (!gh) { await sendMsg("GitHub não conectado."); state.phase = "idle"; return; }
 
   await gh.github.createOrUpdateFile(
     gh.owner, gh.repo,
@@ -200,7 +200,7 @@ export async function handleConfirmPipelineEdit(state: ArchitectConversationStat
   );
 
   state.pendingChanges = undefined;
-  await sendMsg(`✅ **${changes.agentName}** atualizado!\n\nCommit feito no repo \`${gh.owner}/${gh.repo}\`. A alteracao ja esta ativa para o proximo trigger.`);
+  await sendMsg(`✅ **${changes.agentName}** atualizado!\n\nCommit feito no repo \`${gh.owner}/${gh.repo}\`. A alteração já está ativa para o próximo trigger.`);
   state.phase = "idle";
 }
 
@@ -208,7 +208,7 @@ export async function handleConfirmPipelineEdit(state: ArchitectConversationStat
 
 export async function handleToggleAgent(state: ArchitectConversationState, userMessage: string) {
   const gh = await getGitHub(state.orgId);
-  if (!gh) { await sendMsg("GitHub nao conectado."); state.phase = "idle"; return; }
+  if (!gh) { await sendMsg("GitHub não conectado."); state.phase = "idle"; return; }
 
   const agents = await gh.github.importPipeline(gh.owner, gh.repo);
   const agent = identifyAgent(userMessage, agents);
@@ -230,7 +230,7 @@ export async function handleToggleAgent(state: ArchitectConversationState, userM
 
 export async function handleTriggerAgent(state: ArchitectConversationState, userMessage: string) {
   const gh = await getGitHub(state.orgId);
-  if (!gh) { await sendMsg("GitHub nao conectado."); state.phase = "idle"; return; }
+  if (!gh) { await sendMsg("GitHub não conectado."); state.phase = "idle"; return; }
 
   const agents = await gh.github.importPipeline(gh.owner, gh.repo);
   const agent = identifyAgent(userMessage, agents);
@@ -241,13 +241,13 @@ export async function handleTriggerAgent(state: ArchitectConversationState, user
   }
 
   if (agent.state !== "active") {
-    await sendMsg(`O agente **${agent.displayName}** esta desabilitado. Habilite primeiro.`);
+    await sendMsg(`O agente **${agent.displayName}** está desabilitado. Habilite primeiro.`);
     state.phase = "idle";
     return;
   }
 
   await gh.github.triggerWorkflow(gh.owner, gh.repo, agent.workflowId, gh.branch);
-  await sendMsg(`▶️ **${agent.displayName}** disparado!\n\nO workflow sera executado na branch \`${gh.branch}\`. Acompanhe em **/pipeline**.`);
+  await sendMsg(`▶️ **${agent.displayName}** disparado!\n\nO workflow será executado na branch \`${gh.branch}\`. Acompanhe em **/pipeline**.`);
   state.phase = "idle";
 }
 
@@ -255,7 +255,7 @@ export async function handleTriggerAgent(state: ArchitectConversationState, user
 
 export async function handleShowRuns(state: ArchitectConversationState, userMessage: string) {
   const gh = await getGitHub(state.orgId);
-  if (!gh) { await sendMsg("GitHub nao conectado."); state.phase = "idle"; return; }
+  if (!gh) { await sendMsg("GitHub não conectado."); state.phase = "idle"; return; }
 
   const agents = await gh.github.importPipeline(gh.owner, gh.repo);
   const agent = identifyAgent(userMessage, agents);
@@ -291,7 +291,7 @@ export async function handleShowRuns(state: ArchitectConversationState, userMess
 
 export async function handleCreateAgent(state: ArchitectConversationState, userMessage: string, providerConfig: ProviderConfig) {
   const gh = await getGitHub(state.orgId);
-  if (!gh) { await sendMsg("GitHub nao conectado."); state.phase = "idle"; return; }
+  if (!gh) { await sendMsg("GitHub não conectado."); state.phase = "idle"; return; }
 
   const adapter = createAdapter(
     { name: "Architect", role: "architect", config: {} },
@@ -300,15 +300,15 @@ export async function handleCreateAgent(state: ArchitectConversationState, userM
 
   const result = await adapter.chat([{
     role: "user",
-    content: `O usuario pediu: "${userMessage}"
+    content: `O usuário pediu: "${userMessage}"
 
 Crie um novo agente para a esteira de desenvolvimento GitHub Actions + Claude Code.
 O agente precisa de dois arquivos:
 1. Workflow YAML (.github/workflows/{nome}.yml)
 2. Skill file (.claude/commands/{nome}.md)
 
-Retorne APENAS um JSON valido (sem code fences):
-{"workflowName":"nome.yml","workflowContent":"conteudo YAML","skillName":"orbit-nome.md","skillContent":"conteudo MD","description":"descricao curta"}`,
+Retorne APENAS um JSON válido (sem code fences):
+{"workflowName":"nome.yml","workflowContent":"conteúdo YAML","skillName":"orbit-nome.md","skillContent":"conteúdo MD","description":"descrição curta"}`,
   }]);
 
   let agentFiles;
@@ -316,7 +316,7 @@ Retorne APENAS um JSON valido (sem code fences):
     const jsonStr = result.output.replace(/^```\w*\n/, "").replace(/\n```$/, "").trim();
     agentFiles = JSON.parse(jsonStr);
   } catch {
-    await sendMsg("Nao consegui gerar os arquivos do agente. Tente descrever com mais detalhes.");
+    await sendMsg("Não consegui gerar os arquivos do agente. Tente descrever com mais detalhes.");
     state.phase = "idle";
     return;
   }
@@ -340,13 +340,13 @@ Retorne APENAS um JSON valido (sem code fences):
 export async function handleConfirmPipelineCreate(state: ArchitectConversationState) {
   const changes = state.pendingChanges as Record<string, string> | undefined;
   if (!changes || changes.type !== "create-agent") {
-    await sendMsg("Nenhuma criacao pendente.");
+    await sendMsg("Nenhuma criação pendente.");
     state.phase = "idle";
     return;
   }
 
   const gh = await getGitHub(state.orgId);
-  if (!gh) { await sendMsg("GitHub nao conectado."); state.phase = "idle"; return; }
+  if (!gh) { await sendMsg("GitHub não conectado."); state.phase = "idle"; return; }
 
   await gh.github.createOrUpdateFile(
     gh.owner, gh.repo,
@@ -367,7 +367,7 @@ export async function handleConfirmPipelineCreate(state: ArchitectConversationSt
     `✅ Agente criado!\n\n` +
     `- Workflow: \`.github/workflows/${changes.workflowName}\`\n` +
     `- Skill: \`.claude/commands/${changes.skillName}\`\n\n` +
-    `Ambos ja estao no repo. O agente sera ativado no proximo trigger.`,
+    `Ambos já estão no repo. O agente será ativado no próximo trigger.`,
   );
   state.phase = "idle";
 }
@@ -381,14 +381,14 @@ function identifyAgent(message: string, agents: ImportedAgent[]): ImportedAgent 
   const roleMatches: Record<string, string[]> = {
     reviewer: ["reviewer", "revisor", "review", "code review"],
     developer: ["developer", "implementor", "claude", "dev", "implementador"],
-    autofix: ["autofix", "fix", "correcao"],
+    autofix: ["autofix", "fix", "correção"],
     architect: ["architect", "arquiteto", "prd"],
     designer: ["designer", "design", "ui", "ux"],
-    docs: ["docs", "documentacao", "documentation"],
+    docs: ["docs", "documentação", "documentation"],
     ideator: ["ideator", "ideias", "ideas", "market"],
-    taskmaster: ["taskmaster", "priorizacao", "prioridade"],
+    taskmaster: ["taskmaster", "priorização", "prioridade"],
     qa: ["qa", "teste", "test", "quality"],
-    release: ["release", "lancamento"],
+    release: ["release", "lançamento"],
     rebase: ["rebase"],
     "project-sync": ["project", "label", "board"],
   };

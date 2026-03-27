@@ -60,7 +60,7 @@ export async function handleCreateTasks(state: ArchitectConversationState, userM
   const squad = await resolveSquad(state, userMessage);
   if (!squad) {
     const squads = await getSquadsByOrgId(state.orgId);
-    if (squads.length === 0) { await sendMsg("Voce nao tem squads. Crie um primeiro!"); return; }
+    if (squads.length === 0) { await sendMsg("Você não tem squads. Crie um primeiro!"); return; }
     state.phase = "action-select-squad";
     state.pendingAction = "create-tasks";
     state.pendingActionMessage = userMessage;
@@ -70,7 +70,7 @@ export async function handleCreateTasks(state: ArchitectConversationState, userM
   }
 
   const agents = await getAgentsBySquadId(squad.id);
-  if (agents.length === 0) { await sendMsg(`Squad "${squad.name}" nao tem agentes. Adicione agentes primeiro.`); return; }
+  if (agents.length === 0) { await sendMsg(`Squad "${squad.name}" não tem agentes. Adicione agentes primeiro.`); return; }
 
   // Use LLM to generate tasks based on agents
   const adapter = createAdapter({ name: ARCHITECT_AGENT.name, role: ARCHITECT_AGENT.role, config: {} }, providerConfig);
@@ -85,7 +85,7 @@ ${agentList}
 Retorne APENAS um JSON:
 \`\`\`json:tasks
 [
-  {"title": "Titulo da task", "description": "Descricao", "priority": "p0|p1|p2|p3", "type": "feature|content|research|review", "agentName": "Nome do agente responsavel"}
+  {"title": "Título da task", "description": "Descrição", "priority": "p0|p1|p2|p3", "type": "feature|content|research|review", "agentName": "Nome do agente responsável"}
 ]
 \`\`\`
 
@@ -93,8 +93,8 @@ Regras:
 - 2-4 tasks por agente
 - Prioridades variadas (pelo menos 1 p0 e 1 p1)
 - Tipos variados
-- Descricoes com 1-2 frases explicando o que fazer
-- Tasks em portugues brasileiro
+- Descrições com 1-2 frases explicando o que fazer
+- Tasks em português brasileiro
 - Status: todas "ready"`,
   }]);
 
@@ -126,10 +126,10 @@ Regras:
   }
 
   if (tasksCreated > 0) {
-    await sendMsg(`**${tasksCreated} tasks criadas para "${squad.name}"!**\n\nAs tasks estao no board como "Ready". Acesse **/board** para visualizar.`);
+    await sendMsg(`**${tasksCreated} tasks criadas para "${squad.name}"!**\n\nAs tasks estão no board como "Ready". Acesse **/board** para visualizar.`);
     await createAuditLog({ orgId: state.orgId, squadId: squad.id, action: "tasks.batch-created", actorType: "system", actorId: "system-architect", metadata: { count: tasksCreated } });
   } else {
-    await sendMsg("Nao consegui gerar as tasks. Tente descrever mais especificamente o que cada agente deve fazer.");
+    await sendMsg("Não consegui gerar as tasks. Tente descrever mais especificamente o que cada agente deve fazer.");
   }
   state.phase = "idle";
 }
@@ -138,7 +138,7 @@ export async function handleViewTasks(state: ArchitectConversationState, userMes
   const squad = await resolveSquad(state, userMessage);
   if (!squad) {
     const squads = await getSquadsByOrgId(state.orgId);
-    if (squads.length === 0) { await sendMsg("Voce nao tem squads."); return; }
+    if (squads.length === 0) { await sendMsg("Você não tem squads."); return; }
     if (squads.length === 1) {
       const tasks = await getTasksBySquadId(squads[0]!.id);
       await formatAndSendTasks(squads[0]!.name, tasks);
@@ -157,12 +157,12 @@ export async function handleViewTasks(state: ArchitectConversationState, userMes
 }
 
 async function formatAndSendTasks(squadName: string, tasks: Array<{ title: string; status: string; priority: string; assignedAgentId: string | null }>) {
-  if (tasks.length === 0) { await sendMsg(`**${squadName}** nao tem tasks. Quer que eu crie?`); return; }
+  if (tasks.length === 0) { await sendMsg(`**${squadName}** não tem tasks. Quer que eu crie?`); return; }
 
   const byStatus: Record<string, typeof tasks> = {};
   for (const t of tasks) { (byStatus[t.status] ??= []).push(t); }
 
-  const statusLabels: Record<string, string> = { backlog: "Backlog", ready: "Ready", in_progress: "Em Progresso", in_review: "Em Revisao", done: "Concluido", blocked: "Bloqueado" };
+  const statusLabels: Record<string, string> = { backlog: "Backlog", ready: "Ready", in_progress: "Em Progresso", in_review: "Em Revisão", done: "Concluído", blocked: "Bloqueado" };
   const lines: string[] = [`**Board de ${squadName}** (${tasks.length} tasks)\n`];
 
   for (const [status, items] of Object.entries(byStatus)) {
@@ -180,7 +180,7 @@ export async function handleMoveTask(state: ArchitectConversationState, userMess
   // Parse: "mova task X para Done"
   const statusMap: Record<string, string> = {
     backlog: "backlog", ready: "ready", "em progresso": "in_progress", "in progress": "in_progress",
-    "em revisao": "in_review", "in review": "in_review", done: "done", concluido: "done", pronto: "done",
+    "em revisão": "in_review", "in review": "in_review", done: "done", concluido: "done", pronto: "done",
     bloqueado: "blocked", blocked: "blocked",
   };
 
@@ -190,7 +190,7 @@ export async function handleMoveTask(state: ArchitectConversationState, userMess
   }
 
   if (!targetStatus) {
-    await sendMsg("Para qual status? (backlog, ready, em progresso, em revisao, done, bloqueado)");
+    await sendMsg("Para qual status? (backlog, ready, em progresso, em revisão, done, bloqueado)");
     return;
   }
 
@@ -206,7 +206,7 @@ export async function handleMoveTask(state: ArchitectConversationState, userMess
     await updateTask(matched.id, { status: targetStatus as "backlog" | "ready" | "in_progress" | "in_review" | "done" | "blocked" });
     await sendMsg(`**Task movida!**\n"${matched.title}" → **${targetStatus}**`);
   } else {
-    await sendMsg(`Nao encontrei essa task. As tasks do squad "${squad.name}":\n${tasks.map((t) => `- ${t.title} (${t.status})`).join("\n")}`);
+    await sendMsg(`Não encontrei essa task. As tasks do squad "${squad.name}":\n${tasks.map((t) => `- ${t.title} (${t.status})`).join("\n")}`);
   }
   state.phase = "idle";
 }
@@ -223,7 +223,7 @@ export async function handleDeleteTask(state: ArchitectConversationState, userMe
     await deleteTask(matched.id);
     await sendMsg(`**Task deletada:** "${matched.title}"`);
   } else {
-    await sendMsg(`Nao encontrei. Tasks do squad:\n${tasks.map((t) => `- ${t.title}`).join("\n")}`);
+    await sendMsg(`Não encontrei. Tasks do squad:\n${tasks.map((t) => `- ${t.title}`).join("\n")}`);
   }
   state.phase = "idle";
 }
@@ -251,11 +251,11 @@ export async function handleDuplicateSquad(state: ArchitectConversationState, us
   if (!squad) { await sendMsg("Qual squad quer duplicar?"); return; }
 
   const original = await getSquadWithAgents(squad.id);
-  if (!original) { await sendMsg("Squad nao encontrado."); return; }
+  if (!original) { await sendMsg("Squad não encontrado."); return; }
 
   const newSquad = await createSquad({
     orgId: state.orgId,
-    name: `${original.name} (copia)`,
+    name: `${original.name} (cópia)`,
     code: `${original.code}-copy-${Date.now().toString(36)}`,
     description: original.description ?? undefined,
     icon: original.icon ?? undefined,
@@ -284,7 +284,7 @@ export async function handleExportSquad(state: ArchitectConversationState, userM
   if (!squad) { await sendMsg("Qual squad quer exportar?"); return; }
 
   const data = await getSquadWithAgents(squad.id);
-  if (!data) { await sendMsg("Squad nao encontrado."); return; }
+  if (!data) { await sendMsg("Squad não encontrado."); return; }
 
   const yaml = {
     name: data.name,
@@ -329,7 +329,7 @@ export async function handleChangeModel(state: ArchitectConversationState, userM
       : null;
 
   if (!newTier) {
-    await sendMsg(`Qual modelo? Opcoes:\n- **powerful** (Opus/Sonnet — mais inteligente)\n- **fast** (Haiku — mais rapido e economico)\n\n${agent.name} atualmente usa: **${agent.modelTier}**`);
+    await sendMsg(`Qual modelo? Opções:\n- **powerful** (Opus/Sonnet — mais inteligente)\n- **fast** (Haiku — mais rápido e econômico)\n\n${agent.name} atualmente usa: **${agent.modelTier}**`);
     return;
   }
 
@@ -364,7 +364,7 @@ export async function handleChangeBudget(state: ArchitectConversationState, user
   if (unit === "m" || unit === "milhao" || unit === "milhões") tokens *= 1_000_000;
 
   await updateAgent(agent.id, { monthlyBudgetTokens: Math.round(tokens) });
-  await sendMsg(`**Budget atualizado!**\n${agent.icon} ${agent.name}: **${(tokens / 1000).toFixed(0)}k tokens/mes**`);
+  await sendMsg(`**Budget atualizado!**\n${agent.icon} ${agent.name}: **${(tokens / 1000).toFixed(0)}k tokens/mês**`);
   state.phase = "idle";
 }
 
@@ -387,7 +387,7 @@ export async function handleViewAgents(state: ArchitectConversationState, userMe
 }
 
 async function formatAndSendAgents(squadName: string, agents: Array<{ icon: string | null; name: string; role: string; modelTier: string; status: string; monthlyBudgetTokens: number | null; budgetUsedTokens: number | null }>) {
-  if (agents.length === 0) { await sendMsg(`**${squadName}** nao tem agentes.`); return; }
+  if (agents.length === 0) { await sendMsg(`**${squadName}** não tem agentes.`); return; }
 
   const lines = [`**Agentes de ${squadName}** (${agents.length})\n`];
   for (const a of agents) {
@@ -399,14 +399,14 @@ async function formatAndSendAgents(squadName: string, agents: Array<{ icon: stri
 }
 
 export async function handleInstallSkill(state: ArchitectConversationState, userMessage: string) {
-  await sendMsg("Para configurar skills, acesse **Settings > Skills** no menu lateral.\n\nLa voce pode ativar:\n- 📸 Instagram Publisher\n- 💼 LinkedIn Publisher\n- 🌐 Blotato (multi-plataforma)\n- 🎨 Canva Designer\n- 🕷️ Apify Scraper\n- 🖼️ Image Fetcher");
+  await sendMsg("Para configurar skills, acesse **Settings > Skills** no menu lateral.\n\nLá você pode ativar:\n- 📸 Instagram Publisher\n- 💼 LinkedIn Publisher\n- 🌐 Blotato (multi-plataforma)\n- 🎨 Canva Designer\n- 🕷️ Apify Scraper\n- 🖼️ Image Fetcher");
   state.phase = "idle";
 }
 
 export async function handleRunPipeline(state: ArchitectConversationState, userMessage: string) {
   const squad = await resolveSquad(state, userMessage);
   if (!squad) { await sendMsg("Qual squad quer executar?"); return; }
-  await sendMsg(`**Execucao de pipeline ainda nao implementada.**\n\nO squad "${squad.name}" tem o pipeline configurado, mas a execucao automatica sera ativada em breve.\n\nPor enquanto, voce pode conversar diretamente com os agentes do squad no chat.`);
+  await sendMsg(`**Execução de pipeline ainda não implementada.**\n\nO squad "${squad.name}" tem o pipeline configurado, mas a execução automática será ativada em breve.\n\nPor enquanto, você pode conversar diretamente com os agentes do squad no chat.`);
   state.phase = "idle";
 }
 
@@ -421,7 +421,7 @@ export async function handleActionSelectSquad(state: ArchitectConversationState,
     : squads.find((s) => userMessage.toLowerCase().includes(s.name.toLowerCase()));
 
   if (!matched) {
-    await sendMsg("Nao encontrei esse squad. Tente pelo numero ou nome.");
+    await sendMsg("Não encontrei esse squad. Tente pelo número ou nome.");
     return;
   }
 
