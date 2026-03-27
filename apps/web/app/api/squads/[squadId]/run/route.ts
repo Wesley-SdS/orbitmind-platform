@@ -67,12 +67,24 @@ export async function POST(
     );
 
     const executionMap = new Map<string, string>();
+    // Resolve agentId: might be UUID or kebab-case from old designs
+    const resolveAgentId = (id?: string): string => {
+      if (!id) return agentsList[0]?.id ?? "";
+      // Already a valid UUID
+      if (/^[0-9a-f]{8}-/.test(id)) return id;
+      // Try matching by kebab-case → find agent by name similarity
+      const found = squad.agents.find(a =>
+        a.name.toLowerCase().replace(/\s+/g, "-") === id ||
+        a.id === id
+      );
+      return found?.id ?? agentsList[0]?.id ?? "";
+    };
 
     const events: PipelineEvents = {
       onStateChange: () => {},
       onCheckpoint: async () => "continuar",
       onStepStart: async (step) => {
-        const agentId = step.agent ?? agentsList[0]?.id ?? "";
+        const agentId = resolveAgentId(step.agent);
         const execution = await createExecution({
           squadId,
           agentId,

@@ -1158,6 +1158,8 @@ async function recoverStateFromHistory(orgId: string, squadId: string): Promise<
 
 async function buildSquadFromDesign(state: ArchitectConversationState) {
   const design = state.proposedDesign!;
+
+  // Create squad first (without pipeline agentIds resolved)
   const squad = await createSquad({
     orgId: state.orgId,
     name: design.name,
@@ -1167,8 +1169,10 @@ async function buildSquadFromDesign(state: ArchitectConversationState) {
     config: { performanceMode: design.performanceMode, pipeline: design.pipeline, skills: design.skills },
   });
 
+  // Create agents and build mapping: design id (kebab) → real UUID
+  const idMap = new Map<string, string>();
   for (const agentDef of design.agents) {
-    await createAgent({
+    const agent = await createAgent({
       squadId: squad.id,
       name: agentDef.name,
       role: agentDef.role,
@@ -1177,6 +1181,18 @@ async function buildSquadFromDesign(state: ArchitectConversationState) {
       runtimeType: "claude-code",
       config: { execution: agentDef.execution, description: agentDef.description },
       monthlyBudgetTokens: 500_000,
+    });
+    idMap.set(agentDef.id, agent.id);
+  }
+
+  // Update pipeline agentIds from kebab-case to real UUIDs
+  if (design.pipeline?.length) {
+    const resolvedPipeline = design.pipeline.map((step) => ({
+      ...step,
+      agentId: step.agentId ? (idMap.get(step.agentId) ?? step.agentId) : undefined,
+    }));
+    await updateSquad(squad.id, {
+      config: { ...squad.config as Record<string, unknown>, pipeline: resolvedPipeline },
     });
   }
 
