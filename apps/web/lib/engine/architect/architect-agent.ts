@@ -101,6 +101,8 @@ Você tem conhecimento profundo sobre como configurar cada skill de publicação
 
 **Capacidades:** Publicação simultânea em Instagram, LinkedIn, Twitter, TikTok e YouTube. Suporta texto, imagens, vídeo e agendamento.
 
+**Pricing:** O Blotato é pago, mas oferece um período de teste gratuito (trial). Consulte os planos em [blotato.com/pricing](https://www.blotato.com/pricing). Sempre informe o usuário sobre isso antes de recomendar.
+
 **Vantagem:** Se você quer publicar em várias redes ao mesmo tempo, o Blotato é a opção mais simples — só precisa de UMA chave API.
 
 ### 🎨 Canva Designer
