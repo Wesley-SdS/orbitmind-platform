@@ -20,6 +20,7 @@ export function SquadActions({ squadId, status }: SquadActionsProps) {
       const res = await fetch(`/api/squads/${squadId}/run`, { method: "POST" });
       if (res.ok) {
         toast.success("Pipeline iniciado!");
+        window.dispatchEvent(new Event("pipeline-started"));
       } else {
         const data = await res.json();
         toast.error(data.error || "Erro ao executar pipeline");

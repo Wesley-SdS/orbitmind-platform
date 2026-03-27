@@ -81,10 +81,22 @@ export function PipelineView({ squadId, pipeline, agents }: PipelineViewProps) {
     loadLatestRun();
   }, [loadLatestRun]);
 
+  // Listen for pipeline-started event from SquadActions
+  useEffect(() => {
+    const handler = () => {
+      setHasActiveRun(true);
+      // Start aggressive polling immediately
+      const polls = [1000, 3000, 5000, 8000, 12000, 16000, 20000, 25000, 30000, 40000, 50000, 60000];
+      polls.forEach(ms => setTimeout(loadLatestRun, ms));
+    };
+    window.addEventListener("pipeline-started", handler);
+    return () => window.removeEventListener("pipeline-started", handler);
+  }, [loadLatestRun]);
+
   // Poll while there's an active run
   useEffect(() => {
     if (!hasActiveRun) return;
-    const interval = setInterval(loadLatestRun, 5000);
+    const interval = setInterval(loadLatestRun, 3000);
     return () => clearInterval(interval);
   }, [hasActiveRun, loadLatestRun]);
 
