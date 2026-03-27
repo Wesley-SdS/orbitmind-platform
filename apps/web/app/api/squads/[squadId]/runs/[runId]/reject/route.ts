@@ -30,8 +30,9 @@ export async function POST(
 
     const resolved = rejectCheckpoint(runId);
     if (!resolved) {
+      await updatePipelineRun(runId, { status: "cancelled", completedAt: new Date() });
       return NextResponse.json(
-        { error: "Nenhum checkpoint pendente encontrado na memoria do processo." },
+        { error: "Checkpoint expirou (servidor reiniciou). Execute o pipeline novamente." },
         { status: 409 },
       );
     }

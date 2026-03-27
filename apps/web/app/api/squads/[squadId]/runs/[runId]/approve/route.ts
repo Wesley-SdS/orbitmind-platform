@@ -30,8 +30,10 @@ export async function POST(
 
     const resolved = approveCheckpoint(runId);
     if (!resolved) {
+      // Checkpoint was lost (server restarted). Mark as cancelled so user can re-run.
+      await updatePipelineRun(runId, { status: "cancelled", completedAt: new Date() });
       return NextResponse.json(
-        { error: "Nenhum checkpoint pendente encontrado na memoria do processo." },
+        { error: "Checkpoint expirou (servidor reiniciou). Execute o pipeline novamente." },
         { status: 409 },
       );
     }

@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { apiTokens } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createHash } from "node:crypto";
-import { PipelineRunner, createAdapter } from "@orbitmind/engine";
+import { PipelineRunner, createAdapter, skillsToTools } from "@orbitmind/engine";
 import type { PipelineEvents, ProviderConfig } from "@orbitmind/engine";
 import { getSquadWithAgents } from "@/lib/db/queries/squads";
 import { getDefaultLlmProvider } from "@/lib/db/queries/llm-providers";
@@ -160,7 +160,12 @@ export async function POST(
       },
     };
 
-    const runner = new PipelineRunner(pipelineYaml, agentsList, events, adapter);
+    // Resolve squad skills into tool definitions
+    const squadSkills = (config?.skills as string[]) ?? [];
+    const tools = skillsToTools(squadSkills);
+    const skillConfigs: Record<string, Record<string, string>> = {};
+
+    const runner = new PipelineRunner(pipelineYaml, agentsList, events, adapter, undefined, tools, skillConfigs);
     const runId = runner.runId;
 
     // Dispatch pipeline async (don't block the response)
