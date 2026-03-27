@@ -51,6 +51,7 @@ export default function ChatPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [waitingResponse, setWaitingResponse] = useState(false);
   const skipNextLoad = useRef(false);
 
   const isArchitectConversation = !!currentConversationId;
@@ -127,6 +128,7 @@ export default function ChatPage() {
       setCurrentConversationId(convId);
       setSelectedSquadId(null);
       setAgents([{ id: "system-architect", name: "Arquiteto", icon: "🧠", role: "Squad Architect" }]);
+      setWaitingResponse(true);
       skipNextLoad.current = true;
     }
 
@@ -151,7 +153,12 @@ export default function ChatPage() {
       const histRes = await fetch(`/api/chat/architect/history?conversationId=${convId}`);
       if (histRes.ok) {
         const data = await histRes.json();
-        if (Array.isArray(data)) setMessages(parseMessages(data));
+        if (Array.isArray(data)) {
+          setMessages(parseMessages(data));
+          if (data.some((m: ChatMessage) => m.role !== "user")) {
+            setWaitingResponse(false);
+          }
+        }
       }
       loadConversations();
     };
@@ -261,6 +268,7 @@ export default function ChatPage() {
             isArchitect
             conversationId={currentConversationId!}
             onSquadCreated={() => { loadSquads(); loadConversations(); }}
+            waitingResponse={waitingResponse}
           />
         ) : isSquadChat ? (
           <ChatPanel

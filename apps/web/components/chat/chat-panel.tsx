@@ -24,11 +24,14 @@ interface ChatPanelProps {
   isArchitect?: boolean;
   conversationId?: string;
   onSquadCreated?: () => void;
+  waitingResponse?: boolean;
 }
 
-export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchitect, conversationId, onSquadCreated }: ChatPanelProps) {
+export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchitect, conversationId, onSquadCreated, waitingResponse }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
-  const [typingAgent, setTypingAgent] = useState<Agent | null>(null);
+  const [typingAgent, setTypingAgent] = useState<Agent | null>(
+    waitingResponse && isArchitect ? { id: "system-architect", name: "Arquiteto", icon: "🧠", role: "Architect" } : null,
+  );
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Sync when initialMessages change (squad switch)
