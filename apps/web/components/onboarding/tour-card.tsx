@@ -12,6 +12,8 @@ export function TourCard({ step, currentStep, totalSteps, nextStep, prevStep, ar
   const progress = ((currentStep + 1) / totalSteps) * 100;
 
   async function handleFinish() {
+    sessionStorage.setItem("orbitmind-tour-done", "1");
+    closeOnborda();
     try {
       await fetch("/api/organizations", {
         method: "PATCH",
@@ -19,7 +21,6 @@ export function TourCard({ step, currentStep, totalSteps, nextStep, prevStep, ar
         body: JSON.stringify({ onboardingCompleted: true }),
       });
     } catch { /* */ }
-    closeOnborda();
   }
 
   return (

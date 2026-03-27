@@ -10,14 +10,17 @@ interface OnboardingProviderProps {
   showTour?: boolean;
 }
 
+let tourStarted = false;
+
 function TourTrigger({ showTour }: { showTour: boolean }) {
-  const { startOnborda, isOnbordaVisible } = useOnborda();
+  const { startOnborda } = useOnborda();
 
   useEffect(() => {
-    if (!showTour || isOnbordaVisible) return;
+    if (!showTour || tourStarted) return;
+    tourStarted = true;
     const timer = setTimeout(() => startOnborda("main-onboarding"), 1000);
     return () => clearTimeout(timer);
-  }, [showTour, startOnborda, isOnbordaVisible]);
+  }, [showTour, startOnborda]);
 
   return null;
 }

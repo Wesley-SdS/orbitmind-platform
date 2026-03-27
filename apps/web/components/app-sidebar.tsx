@@ -14,6 +14,7 @@ import {
   KanbanSquare,
   ShoppingBag,
   GitBranch,
+  HelpCircle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -50,6 +51,7 @@ const navItems = [
   { title: "Integrações", href: "/integrations", icon: Link2, id: "sidebar-integrations" },
   { title: "Configurações", href: "/settings", icon: Settings, id: "sidebar-settings" },
   { title: "Escritório", href: "/office", icon: Building2, id: "sidebar-office", badge: undefined as string | undefined },
+  { title: "Ajuda", href: "/help", icon: HelpCircle, id: "sidebar-help" },
 ];
 
 export function AppSidebar({ user }: AppSidebarProps) {
