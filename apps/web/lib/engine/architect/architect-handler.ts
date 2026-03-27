@@ -17,6 +17,7 @@ import {
   handlePauseSquad, handleActivateSquad, handleDuplicateSquad, handleExportSquad,
   handleChangeModel, handleChangeBudget, handleViewAgents,
   handleInstallSkill, handleRunPipeline, handleActionSelectSquad,
+  handleGuideIntegration, handleConfigSkill, handleSkillSelect, handleSkillConfig, handleSkillConfirm,
 } from "./architect-actions";
 import {
   setPipelineConversationId,
@@ -142,6 +143,12 @@ export async function handleArchitectMessage(
     await handleDeleteConfirm(state, squadId, userMessage);
   } else if (state.phase === "action-select-squad") {
     await handleActionSelectSquad(state, userMessage, providerConfig);
+  } else if (state.phase === "skill-select") {
+    await handleSkillSelect(state, userMessage);
+  } else if (state.phase === "skill-config") {
+    await handleSkillConfig(state, userMessage);
+  } else if (state.phase === "skill-confirm") {
+    await handleSkillConfirm(state, userMessage);
   } else {
     // Idle or complete — detect intent
     const intent = detectIntent(userMessage);
@@ -202,6 +209,12 @@ export async function handleArchitectMessage(
         break;
       case "install-skill":
         await handleInstallSkill(state, userMessage);
+        break;
+      case "guide-integration":
+        await handleGuideIntegration(state, userMessage);
+        break;
+      case "config-skill":
+        await handleConfigSkill(state, userMessage);
         break;
       case "run-pipeline":
         await handleRunPipeline(state, userMessage);
@@ -489,19 +502,34 @@ async function handleDesignApproval(
     state.phase = "idle";
     await sendArchitectMessage(squadId, "Cancelei a criação. O que mais posso fazer?");
   } else {
-    // Adjustment — use LLM
     const adapter = createAdapter({ name: ARCHITECT_AGENT.name, role: ARCHITECT_AGENT.role, config: {} }, providerConfig);
-    const result = await adapter.chat([{
-      role: "user",
-      content: `${ARCHITECT_AGENT.systemPrompt}\n\nDesign atual:\n${JSON.stringify(state.proposedDesign, null, 2)}\n\nPedido: "${userMessage}"\n\nAjuste o design e re-apresente com bloco \`\`\`json:squad-design\n{...}\n\`\`\` + apresentacao visual. Pergunte se quer criar ou ajustar mais.`,
-    }]);
-    const newDesign = extractDesignJson(result.output);
-    if (newDesign) state.proposedDesign = newDesign;
-    const display = stripJsonFromOutput(result.output);
-    await sendArchitectMessageWithMeta(squadId, display, {
-      agentName: "Arquiteto", agentIcon: "🧠", isArchitect: true,
-      proposedDesign: state.proposedDesign,
-    });
+    const isDetailRequest = /\b(detalh|explic|descrev|o que cada|responsabilidad|funcionalidad|papel de cada|quem faz o qu[eê]|como funciona)\b/i.test(lower);
+
+    if (isDetailRequest && state.proposedDesign) {
+      // Detail/explain — describe agents and pipeline without re-presenting JSON
+      const result = await adapter.chat([{
+        role: "user",
+        content: `${ARCHITECT_AGENT.systemPrompt}\n\nDesign atual:\n${JSON.stringify(state.proposedDesign, null, 2)}\n\nO usuário pediu: "${userMessage}"\n\nDetalhe as responsabilidades de cada agente do squad, explicando:\n- O que cada agente faz especificamente\n- Por que esse agente é necessário no pipeline\n- Que tipo de output ele produz\n- Como ele se conecta com o próximo agente\n\nExplique também o fluxo completo do pipeline passo a passo.\n\nNÃO re-apresente o JSON do design. Apenas explique de forma clara e didática.\nNo final, pergunte se o usuário quer criar o squad, fazer ajustes, ou tem mais dúvidas.`,
+      }]);
+      const display = stripJsonFromOutput(result.output);
+      await sendArchitectMessageWithMeta(squadId, display, {
+        agentName: "Arquiteto", agentIcon: "🧠", isArchitect: true,
+        proposedDesign: state.proposedDesign,
+      });
+    } else {
+      // Adjustment — use LLM to modify the design
+      const result = await adapter.chat([{
+        role: "user",
+        content: `${ARCHITECT_AGENT.systemPrompt}\n\nDesign atual:\n${JSON.stringify(state.proposedDesign, null, 2)}\n\nPedido: "${userMessage}"\n\nAjuste o design e re-apresente com bloco \`\`\`json:squad-design\n{...}\n\`\`\` + apresentacao visual. Pergunte se quer criar ou ajustar mais.`,
+      }]);
+      const newDesign = extractDesignJson(result.output);
+      if (newDesign) state.proposedDesign = newDesign;
+      const display = stripJsonFromOutput(result.output);
+      await sendArchitectMessageWithMeta(squadId, display, {
+        agentName: "Arquiteto", agentIcon: "🧠", isArchitect: true,
+        proposedDesign: state.proposedDesign,
+      });
+    }
   }
 }
 

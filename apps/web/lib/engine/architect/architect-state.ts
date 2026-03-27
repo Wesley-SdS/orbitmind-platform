@@ -8,6 +8,9 @@ export type ArchitectPhase =
   | "edit-confirm"
   | "delete-confirm"
   | "action-select-squad"
+  | "skill-select"
+  | "skill-config"
+  | "skill-confirm"
   | "complete";
 
 export interface ArchitectConversationState {
@@ -53,6 +56,10 @@ export interface ArchitectConversationState {
   // For action-select-squad: what to do after selecting
   pendingAction?: string;
   pendingActionMessage?: string;
+  // Skill configuration wizard
+  skillConfigId?: string;
+  skillConfigStep?: number;
+  skillConfigValues?: Record<string, string>;
   // Company wizard
   wizardStep?: number;
   wizardData?: {
@@ -70,7 +77,7 @@ export type UserIntent =
   | "pause-squad" | "activate-squad"
   | "change-model" | "change-budget"
   | "view-agents" | "duplicate-squad" | "export-squad"
-  | "install-skill"
+  | "install-skill" | "guide-integration" | "config-skill"
   | "run-pipeline"
   | "pipeline-list" | "pipeline-edit" | "pipeline-create"
   | "pipeline-toggle" | "pipeline-trigger"
@@ -108,8 +115,14 @@ export function detectIntent(message: string): UserIntent {
   if (/\b(mostre? os runs|ultimo run|status do run|historico de runs)\b/.test(lower)) return "pipeline-runs";
   if (/\b(mostre? o skill|mostre? o prompt|como esta configurado|o que o \w+ faz)\b/.test(lower)) return "pipeline-detail";
 
-  // Skills
-  if (/\b(instalar? skill|adicionar? skill|skill.*instagram|skill.*linkedin|configurar? skill)\b/.test(lower)) return "install-skill";
+  // Skills & Integrations
+  if (/\b(configurar?|configur[ae]|instalar?|conectar?|ativar?|habilitar?)\b.*\b(instagram|linkedin|blotato|canva|apify)\b/.test(lower)) return "config-skill";
+  if (/\b(instagram|linkedin|blotato|canva|apify)\b.*\b(configurar?|configur[ae]|instalar?|conectar?|ativar?|habilitar?)\b/.test(lower)) return "config-skill";
+  if (/\b(como\s+(integr|conect|configur|public))\b.*\b(instagram|linkedin|rede|social)\b/.test(lower)) return "guide-integration";
+  if (/\b(integra[çc][aã]o|integrar)\b.*\b(instagram|linkedin|rede|social|blotato)\b/.test(lower)) return "guide-integration";
+  if (/\b(passo a passo|tutorial|como fa[çc]o|me ensina|me ajuda)\b.*\b(instagram|linkedin|publica|post)\b/.test(lower)) return "guide-integration";
+  if (/\b(publicar|postar)\b.*\b(instagram|linkedin|rede)\b/.test(lower)) return "guide-integration";
+  if (/\b(instalar? skill|adicionar? skill|configurar? skill)\b/.test(lower)) return "install-skill";
 
   // Squad CRUD
   if (/\b(deletar|delete|remover squad|excluir|apagar)\b/.test(lower)) return "delete";
