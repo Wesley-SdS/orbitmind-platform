@@ -107,7 +107,7 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchi
       }
     }
 
-    // Poll for architect response
+    // Poll for response
     if (isArchitect && conversationId) {
       const pollHistory = async () => {
         const histRes = await fetch(`/api/chat/architect/history?conversationId=${conversationId}`);
@@ -119,7 +119,6 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchi
               createdAt: typeof m.createdAt === "string" ? m.createdAt : new Date(m.createdAt as unknown as string).toISOString(),
             }));
             setMessages(parsed);
-            // Detect squad creation to refresh sidebar
             if (parsed.some((m) => m.role === "agent" && m.content.includes("criado com sucesso"))) {
               onSquadCreated?.();
             }
@@ -130,6 +129,32 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchi
       setTimeout(pollHistory, 3000);
       setTimeout(pollHistory, 8000);
       setTimeout(pollHistory, 15000);
+    } else if (!isArchitect) {
+      // Squad chat — poll for agent response
+      const firstAgent = agents[0];
+      if (firstAgent) {
+        setTypingAgent(firstAgent);
+      }
+      const pollSquadMessages = async () => {
+        const res = await fetch(`/api/chat/${squadId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const parsed = (data as ChatMessage[]).map((m) => ({
+              ...m,
+              createdAt: typeof m.createdAt === "string" ? m.createdAt : new Date(m.createdAt as unknown as string).toISOString(),
+            }));
+            if (parsed.length > messages.length) {
+              setMessages(parsed);
+              setTypingAgent(null);
+            }
+          }
+        }
+      };
+      setTimeout(pollSquadMessages, 3000);
+      setTimeout(pollSquadMessages, 8000);
+      setTimeout(pollSquadMessages, 15000);
+      setTimeout(pollSquadMessages, 25000);
     }
   }
 

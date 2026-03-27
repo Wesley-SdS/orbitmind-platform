@@ -32,6 +32,26 @@ const AUDIT_ICONS: Record<string, string> = {
   "user.created": "👤",
 };
 
+const AUDIT_LABELS: Record<string, string> = {
+  "squad.created": "Squad criado",
+  "agent.started": "Agente iniciado",
+  "task.completed": "Task concluída",
+  "pipeline.checkpoint": "Checkpoint do pipeline",
+  "checkpoint.approved": "Checkpoint aprovado",
+  "budget.warning": "Alerta de budget",
+  "integration.connected": "Integração conectada",
+  "org.created": "Organização criada",
+  "user.created": "Usuário criado",
+  "squad.updated": "Squad atualizado",
+  "squad.deleted": "Squad removido",
+  "agent.stopped": "Agente parado",
+  "task.created": "Task criada",
+  "task.updated": "Task atualizada",
+  "execution.started": "Execução iniciada",
+  "execution.completed": "Execução concluída",
+  "execution.failed": "Execução falhou",
+};
+
 export default async function DashboardPage() {
   const { orgId } = await getSessionUser();
   const metrics = await getDashboardMetrics(orgId);
@@ -193,7 +213,7 @@ export default async function DashboardPage() {
                   <span className="text-base mt-0.5">{AUDIT_ICONS[event.action] ?? "📋"}</span>
                   <div className="flex-1">
                     <p className="text-sm">
-                      {event.action}
+                      {AUDIT_LABELS[event.action] ?? event.action}
                       {(event.metadata as Record<string, unknown>)?.taskTitle
                         ? ` — ${(event.metadata as Record<string, unknown>).taskTitle}`
                         : (event.metadata as Record<string, unknown>)?.squadName
