@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Onborda, OnbordaProvider as OnbordaCtx, useOnborda } from "onborda";
 import { TourCard } from "./tour-card";
 import { mainTourSteps } from "@/lib/onboarding/tour-steps";
 
 interface OnboardingProviderProps {
   children: React.ReactNode;
-  showTour?: boolean;
 }
 
 let tourStarted = false;
@@ -25,7 +24,18 @@ function TourTrigger({ showTour }: { showTour: boolean }) {
   return null;
 }
 
-export function OnboardingProvider({ children, showTour = false }: OnboardingProviderProps) {
+export function OnboardingProvider({ children }: OnboardingProviderProps) {
+  const [showTour, setShowTour] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/organizations")
+      .then((r) => r.ok ? r.json() : null)
+      .then((org) => {
+        if (org && !org.onboardingCompleted) setShowTour(true);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <OnbordaCtx>
       <TourTrigger showTour={showTour} />

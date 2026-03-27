@@ -1,6 +1,6 @@
 "use client";
 
-import { signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { Moon, Sun, LogOut, User, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,23 +14,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
-interface TopBarProps {
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  };
-}
-
-export function TopBar({ user }: TopBarProps) {
+export function TopBar() {
+  const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
 
-  const initials = user.name
+  const name = session?.user?.name ?? "";
+  const email = session?.user?.email ?? "";
+  const initials = name
     .split(" ")
     .map((n) => n[0])
     .join("")
     .toUpperCase()
-    .slice(0, 2);
+    .slice(0, 2) || "?";
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border/50 px-4">
@@ -53,15 +48,15 @@ export function TopBar({ user }: TopBarProps) {
                 <Avatar className="h-6 w-6">
                   <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
                 </Avatar>
-                <span className="hidden text-sm sm:inline-block">{user.name}</span>
+                <span className="hidden text-sm sm:inline-block">{name}</span>
                 <ChevronDown className="h-3 w-3 text-muted-foreground" />
               </button>
             }
           />
           <DropdownMenuContent align="end" className="w-48">
             <div className="px-2 py-1.5">
-              <p className="text-sm font-medium">{user.name}</p>
-              <p className="text-xs text-muted-foreground">{user.email}</p>
+              <p className="text-sm font-medium">{name}</p>
+              <p className="text-xs text-muted-foreground">{email}</p>
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem

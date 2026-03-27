@@ -31,15 +31,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
-interface AppSidebarProps {
-  user: {
-    id: string;
-    name: string;
-    orgId: string;
-    role: string;
-  };
-}
-
 const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard, id: "sidebar-dashboard" },
   { title: "Chat", href: "/chat", icon: MessageSquare, id: "sidebar-chat" },
@@ -54,7 +45,7 @@ const navItems = [
   { title: "Ajuda", href: "/help", icon: HelpCircle, id: "sidebar-help" },
 ];
 
-export function AppSidebar({ user }: AppSidebarProps) {
+export function AppSidebar() {
   const pathname = usePathname();
 
   return (
