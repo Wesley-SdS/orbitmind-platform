@@ -125,8 +125,8 @@ export function CheckpointReview({
                   )}
                 </summary>
                 <div className="border-t border-border px-4 py-3">
-                  <div className="whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed max-h-80 overflow-y-auto">
-                    {output.content || "Sem conteudo disponivel."}
+                  <div className="text-sm text-foreground/90 leading-relaxed max-h-80 overflow-y-auto prose prose-sm prose-invert max-w-none">
+                    <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(output.content || "Sem conteudo disponivel.") }} />
                   </div>
                 </div>
               </details>
@@ -167,4 +167,17 @@ export function CheckpointReview({
       </CardContent>
     </Card>
   );
+}
+
+function simpleMarkdown(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/^(\d+)\.\s+(.+)$/gm, "<li>$1. $2</li>")
+    .replace(/^[-–]\s+(.+)$/gm, "<li>$1</li>")
+    .replace(/\n/g, "<br />");
 }

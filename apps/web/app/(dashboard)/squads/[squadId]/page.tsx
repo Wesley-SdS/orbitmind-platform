@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { getSessionUser } from "@/lib/auth/session";
 import { getSquadWithAgents } from "@/lib/db/queries/squads";
 import { getExecutionsBySquadId } from "@/lib/db/queries/executions";
-import { PipelineView } from "@/components/squads/pipeline-view";
+import { PipelineSection } from "@/components/squads/pipeline-section";
 
 const STATUS_COLORS: Record<string, string> = {
   idle: "bg-muted-foreground",
@@ -129,7 +129,7 @@ export default async function SquadDetailPage({
         </TabsContent>
 
         <TabsContent value="pipeline" className="mt-6">
-          <PipelineView
+          <PipelineSection
             squadId={squad.id}
             pipeline={pipelineSteps}
             agents={agents.map((a) => ({ id: a.id, name: a.name, icon: a.icon }))}
