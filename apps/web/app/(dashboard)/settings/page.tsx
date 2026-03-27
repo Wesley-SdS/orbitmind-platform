@@ -121,7 +121,7 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="organization">Organização</TabsTrigger>
           <TabsTrigger value="members">Membros</TabsTrigger>
-          <TabsTrigger value="ai-providers">Provedores de IA</TabsTrigger>
+          <TabsTrigger id="tour-ai-providers" value="ai-providers">Provedores de IA</TabsTrigger>
           <TabsTrigger value="skills">Skills</TabsTrigger>
           <TabsTrigger value="plan">Plano</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>

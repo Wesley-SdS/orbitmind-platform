@@ -99,12 +99,14 @@ export default function BoardPage() {
           Nova Task
         </Button>
       </div>
-      <KanbanBoard
-        tasks={tasks}
-        agents={agents}
-        onTaskClick={handleTaskClick}
-        onTaskMove={handleTaskMove}
-      />
+      <div id="tour-kanban-board">
+        <KanbanBoard
+          tasks={tasks}
+          agents={agents}
+          onTaskClick={handleTaskClick}
+          onTaskMove={handleTaskMove}
+        />
+      </div>
       <TaskDetailDialog
         task={selectedTask}
         agents={agents}

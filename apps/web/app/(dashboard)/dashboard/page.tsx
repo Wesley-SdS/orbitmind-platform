@@ -51,7 +51,7 @@ export default async function DashboardPage() {
         <p className="text-muted-foreground">Visão geral dos seus squads e métricas</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div id="tour-dashboard-stats" className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <Card key={stat.label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">

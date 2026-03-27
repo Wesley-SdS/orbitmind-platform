@@ -244,7 +244,7 @@ export default function ChatPage() {
       </div>
 
       {/* Main Panel */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div id="tour-chat-panel" className="flex-1 flex flex-col overflow-hidden">
         {isArchitectConversation ? (
           <ChatPanel
             key={currentConversationId}

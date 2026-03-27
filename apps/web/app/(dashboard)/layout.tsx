@@ -27,7 +27,7 @@ export default async function DashboardLayout({
       <OnboardingProvider showTour={showTour}>
         <div className="flex min-h-screen w-full">
           <AppSidebar user={user} />
-          <div className="flex flex-1 flex-col">
+          <div className="flex flex-1 flex-col min-w-0">
             <TopBar user={user} />
             <main className="flex-1 overflow-auto p-6">{children}</main>
           </div>

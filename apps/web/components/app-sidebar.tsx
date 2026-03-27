@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  LayoutDashboard,
   MessageSquare,
   Bot,
   Users,
@@ -12,6 +13,7 @@ import {
   Orbit,
   KanbanSquare,
   ShoppingBag,
+  GitBranch,
 } from "lucide-react";
 import {
   Sidebar,
@@ -38,10 +40,12 @@ interface AppSidebarProps {
 }
 
 const navItems = [
+  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard, id: "sidebar-dashboard" },
   { title: "Chat", href: "/chat", icon: MessageSquare, id: "sidebar-chat" },
   { title: "Board", href: "/board", icon: KanbanSquare, id: "sidebar-board" },
   { title: "Squads", href: "/squads", icon: Bot, id: "sidebar-squads" },
   { title: "Agentes", href: "/agents", icon: Users, id: "sidebar-agents" },
+  { title: "Pipeline", href: "/pipeline", icon: GitBranch, id: "sidebar-pipeline" },
   { title: "Marketplace", href: "/marketplace", icon: ShoppingBag, id: "sidebar-marketplace" },
   { title: "Integrações", href: "/integrations", icon: Link2, id: "sidebar-integrations" },
   { title: "Configurações", href: "/settings", icon: Settings, id: "sidebar-settings" },
