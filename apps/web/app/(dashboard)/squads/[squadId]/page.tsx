@@ -2,7 +2,8 @@ export const revalidate = 30;
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Play, Pause, Settings, Zap, Clock, DollarSign, Hash } from "lucide-react";
+import { ArrowLeft, Settings, Zap, Clock, DollarSign, Hash } from "lucide-react";
+import { SquadActions } from "@/components/squads/squad-actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,16 +65,7 @@ export default async function SquadDetailPage({
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Pause className="mr-2 h-4 w-4" />
-            Pausar
-          </Button>
-          <Button size="sm">
-            <Play className="mr-2 h-4 w-4" />
-            Executar
-          </Button>
-        </div>
+        <SquadActions squadId={squad.id} status={squad.status} />
       </div>
 
       <Tabs defaultValue="agents">

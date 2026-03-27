@@ -24,7 +24,6 @@ const STATUS_LABEL: Record<string, string> = {
 export default async function SquadsPage() {
   const { orgId } = await getSessionUser();
   const squads = await getSquadsByOrgId(orgId);
-  console.log("[DEBUG /squads page]", orgId, squads.map(s => ({ name: s.name, agentCount: s.agentCount, taskCount: s.taskCount })));
 
   return (
     <div className="space-y-6">
