@@ -100,7 +100,7 @@ export function PipelineSection({ squadId, pipeline, agents }: PipelineSectionPr
   if (loading) return <SectionLoader text="Carregando pipeline..." />;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid gap-6 lg:grid-cols-[350px_1fr]">
       <PipelineStepsView
         pipeline={pipeline}
         agents={agents}

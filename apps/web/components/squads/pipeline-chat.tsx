@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MessageSquare, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { PostPreview } from "./post-preview";
 
 interface StepOutput {
   agentName: string;
@@ -147,7 +148,7 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
         </div>
       )}
 
-      <ScrollArea className="h-[500px]" ref={scrollRef}>
+      <ScrollArea className="h-[calc(100vh-20rem)]" ref={scrollRef}>
         <div className="space-y-4 px-6 pb-6">
           {sortedOutputs.map((entry) => (
             <div key={entry.stepId} id={`chat-${entry.stepId}`} className="flex gap-3">
@@ -167,6 +168,9 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
                 <div className="rounded-lg border border-border/50 bg-muted/30 p-3 prose prose-sm prose-invert max-w-none">
                   <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(entry.content) }} />
                 </div>
+                {isSocialStep(entry.stepName, entry.content) && (
+                  <PostPreview content={entry.content} agentName={entry.agentName} agentIcon={entry.agentIcon} />
+                )}
               </div>
             </div>
           ))}
@@ -174,6 +178,17 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
       </ScrollArea>
     </Card>
   );
+}
+
+/** Detect if a step is social/publishing related */
+function isSocialStep(stepName: string, content: string): boolean {
+  const nameKeywords = ["social", "publicação", "publicacao", "instagram", "linkedin", "post", "conteúdo", "conteudo", "copy", "redação", "redacao", "redes"];
+  const lower = stepName.toLowerCase();
+  if (nameKeywords.some(kw => lower.includes(kw))) return true;
+  // Also check content for post-like patterns
+  const contentLower = content.toLowerCase();
+  const contentKeywords = ["legenda", "caption", "hashtag", "#", "post para", "carrossel", "carousel", "stories", "feed"];
+  return contentKeywords.some(kw => contentLower.includes(kw));
 }
 
 /** Lightweight markdown: bold, italic, headers, lists, line breaks */
