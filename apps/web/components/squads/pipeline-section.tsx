@@ -82,7 +82,8 @@ export function PipelineSection({ squadId, pipeline, agents }: PipelineSectionPr
       setLatestRun(Array.isArray(steps) ? steps : null);
       setPipelineRun(prData);
       const isRunning = Array.isArray(steps) && steps.some((s: RunStep) => s.status === "running");
-      setHasActiveRun(isRunning);
+      const isWaiting = prData?.status === "waiting_approval";
+      setHasActiveRun(isRunning || isWaiting);
     } catch { /* ignore */ }
     finally { setLoading(false); }
   }, [squadId]);

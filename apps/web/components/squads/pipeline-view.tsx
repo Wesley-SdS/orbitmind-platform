@@ -111,9 +111,9 @@ export function PipelineStepsView({ pipeline, agents, latestRun, pipelineRun, sq
   function getCheckpointBadgeLabel(type: string): string {
     switch (type) {
       case "checkpoint-input": return "Briefing";
-      case "checkpoint-select": return "Selecao";
-      case "checkpoint-approve": return "Aprovacao";
-      default: return "Aprovacao";
+      case "checkpoint-select": return "Seleção";
+      case "checkpoint-approve": return "Aprovação";
+      default: return "Aprovação";
     }
   }
 
@@ -192,7 +192,7 @@ export function PipelineStepsView({ pipeline, agents, latestRun, pipelineRun, sq
                       </p>
                     </div>
                     {status === "waiting_approval" && (
-                      <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30">Aguardando aprovacao</Badge>
+                      <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30">Aguardando aprovação</Badge>
                     )}
                     {status === "pending" && isCheckpointType(step.type) && (
                       <Badge className={getCheckpointBadgeColor(step.type)}>{getCheckpointBadgeLabel(step.type)}</Badge>

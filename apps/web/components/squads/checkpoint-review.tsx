@@ -58,7 +58,7 @@ export function CheckpointReview({
 
   async function handleApprove() {
     if (checkpointType === "checkpoint-select" && selectedOption === null) {
-      toast.error("Selecione uma opcao antes de confirmar.");
+      toast.error("Selecione uma opção antes de confirmar.");
       return;
     }
 
@@ -84,7 +84,7 @@ export function CheckpointReview({
         toast.error(data.error || "Erro ao aprovar checkpoint");
       }
     } catch {
-      toast.error("Erro de conexao");
+      toast.error("Erro de conexão");
     } finally {
       setApproving(false);
     }
@@ -104,7 +104,7 @@ export function CheckpointReview({
         toast.error(data.error || "Erro ao rejeitar checkpoint");
       }
     } catch {
-      toast.error("Erro de conexao");
+      toast.error("Erro de conexão");
     } finally {
       setRejecting(false);
     }
@@ -127,7 +127,7 @@ export function CheckpointReview({
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              Preencha as informacoes abaixo para continuar o pipeline
+              Preencha as informações abaixo para continuar o pipeline
             </p>
           </div>
 
@@ -216,10 +216,10 @@ export function CheckpointReview({
             <div className="flex items-center gap-2 mb-1">
               <span className="text-lg">&#128203;</span>
               <h3 className="text-base font-semibold">
-                Selecao: {checkpointStepName}
+                Seleção: {checkpointStepName}
               </h3>
               <Badge className="bg-purple-500/15 text-purple-500 border-purple-500/30">
-                Aguardando selecao
+                Aguardando seleção
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -230,7 +230,7 @@ export function CheckpointReview({
           <div className="mb-6 space-y-2">
             {options.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                Nenhuma opcao detectada no output do step anterior.
+                Nenhuma opção detectada no output do step anterior.
               </p>
             )}
             {options.map((option, idx) => (
@@ -296,7 +296,7 @@ export function CheckpointReview({
               ) : (
                 <CheckCircle2 className="mr-2 h-4 w-4" />
               )}
-              Confirmar selecao
+              Confirmar seleção
             </Button>
           </div>
         </CardContent>
@@ -316,7 +316,7 @@ export function CheckpointReview({
               Checkpoint: {checkpointStepName}
             </h3>
             <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30">
-              Aguardando aprovacao
+              Aguardando aprovação
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -453,7 +453,7 @@ function parseSelectOptions(text: string): SelectOption[] {
   return blocks.map((block, i) => {
     const lines = block.trim().split("\n");
     return {
-      title: lines[0]?.replace(/^\d+[.)]\s*/, "").trim() || `Opcao ${i + 1}`,
+      title: lines[0]?.replace(/^\d+[.)]\s*/, "").trim() || `Opção ${i + 1}`,
       description: lines.slice(1).join(" ").trim(),
     };
   });

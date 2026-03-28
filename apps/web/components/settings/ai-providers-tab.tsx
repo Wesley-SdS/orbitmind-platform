@@ -339,11 +339,11 @@ export function AiProvidersTab() {
                 <div className="flex items-center gap-3">
                   <Button variant="outline" size="sm" onClick={handleTest} disabled={!formCredential || testing}>
                     {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                    Testar Conexao
+                    Testar Conexão
                   </Button>
                   {testResult && (
                     <span className={`text-xs ${testResult.valid ? "text-green-600" : "text-destructive"}`}>
-                      {testResult.valid ? "Conexao valida" : testResult.error || "Credencial invalida"}
+                      {testResult.valid ? "Conexão válida" : testResult.error || "Credencial inválida"}
                     </span>
                   )}
                 </div>

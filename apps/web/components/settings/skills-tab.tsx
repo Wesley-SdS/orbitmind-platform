@@ -183,7 +183,7 @@ export function SkillsTab() {
             <div className="flex items-center gap-3">
               <Button variant="outline" size="sm" onClick={handleTest} disabled={testing}>
                 {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                Testar Conexao
+                Testar Conexão
               </Button>
               {testResult && (
                 <span className={`text-xs ${testResult.ok ? "text-green-600" : "text-destructive"}`}>
