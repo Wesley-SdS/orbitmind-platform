@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Settings, Zap, GitBranch, Plug, Users, Shield, ChevronDown, ChevronUp, Copy, Check, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { ScheduleManager } from "./schedule-manager";
 
 interface Agent {
   id: string;
@@ -522,6 +523,9 @@ export function SquadConfig({ squad, config, agents, pipelineSteps }: SquadConfi
           )}
         </CardContent>
       </Card>
+
+      {/* Agendamentos */}
+      <ScheduleManager squadId={squad.id} />
 
       {/* Raw JSON */}
       <Card>
