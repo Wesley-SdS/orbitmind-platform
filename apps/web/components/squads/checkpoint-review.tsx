@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, XCircle, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { ImageUpload } from "./image-upload";
 
 interface StepOutput {
   agentName: string;
@@ -33,6 +34,7 @@ export function CheckpointReview({
 }: CheckpointReviewProps) {
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [stepImages, setStepImages] = useState<Record<string, string[]>>({});
 
   const entries = Object.entries(stepOutputs);
 
@@ -124,9 +126,17 @@ export function CheckpointReview({
                     </span>
                   )}
                 </summary>
-                <div className="border-t border-border px-4 py-3">
+                <div className="border-t border-border px-4 py-3 space-y-3">
                   <div className="text-sm text-foreground/90 leading-relaxed max-h-80 overflow-y-auto prose prose-sm prose-invert max-w-none">
                     <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(output.content || "Sem conteudo disponivel.") }} />
+                  </div>
+                  <div className="border-t border-border/50 pt-3">
+                    <p className="text-xs text-muted-foreground mb-2">Adicionar imagens manualmente:</p>
+                    <ImageUpload
+                      images={stepImages[stepName] ?? []}
+                      onImagesChange={(imgs) => setStepImages(prev => ({ ...prev, [stepName]: imgs }))}
+                      maxImages={5}
+                    />
                   </div>
                 </div>
               </details>

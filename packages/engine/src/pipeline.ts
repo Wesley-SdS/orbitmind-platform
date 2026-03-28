@@ -289,14 +289,29 @@ Execute o step "${step.name}". Use o contexto dos steps anteriores como base par
 
 ${context}`;
 
+    // Check if this step requires images (social/content/publishing steps)
+    const requiresImages = this.isImageRequiredStep(step);
+
     // If adapter supports tool calling and tools are available, use agentic loop
     if (this.adapter?.chatWithTools && this.availableTools?.length) {
-      return this.executeWithTools(step.id, basePrompt, agent);
+      let output = await this.executeWithTools(step.id, basePrompt, agent, requiresImages);
+
+      // If images were required but not included, force a search
+      if (requiresImages && !this.outputHasImages(output)) {
+        output = await this.forceImageSearch(step, output);
+      }
+
+      return output;
     }
 
-    // Fallback: simple text chat
+    // Fallback: simple text chat (force image search after if needed)
     const result = await this.adapter!.chat([{ role: "user", content: basePrompt }]);
     this.stepMetrics.set(step.id, { tokensUsed: result.tokensUsed, costCents: result.costCents, durationMs: result.durationMs });
+
+    if (requiresImages && !this.outputHasImages(result.output)) {
+      return this.forceImageSearch(step, result.output);
+    }
+
     return result.output;
   }
 
@@ -304,16 +319,24 @@ ${context}`;
    * Agentic tool use loop: LLM can call tools, get results, and continue.
    * Max 5 tool call rounds to prevent infinite loops.
    */
-  private async executeWithTools(stepId: string, prompt: string, agent?: { name: string; custom: string }): Promise<string> {
+  private async executeWithTools(stepId: string, prompt: string, agent?: { name: string; custom: string }, requiresImages = false): Promise<string> {
     // Enrich prompt with available tools info
     const toolNames = this.availableTools?.map(t => `- ${t.name}: ${t.description}`).join("\n") ?? "";
+    const imageInstruction = requiresImages
+      ? `\n\n## OBRIGATORIO: Imagens
+Este step EXIGE imagens. Voce DEVE usar a ferramenta image_search para buscar imagens relevantes ao conteudo.
+Inclua as URLs das imagens no seu output no formato:
+![descricao](url_da_imagem)
+Um post sem imagem NAO sera aceito.`
+      : "";
+
     const enrichedPrompt = `${prompt}
 
 ## Ferramentas disponiveis
 Voce tem acesso as seguintes ferramentas que pode usar para enriquecer seu trabalho:
 ${toolNames}
 
-Use as ferramentas quando necessario — por exemplo, busque imagens para posts, pesquise dados atualizados, etc.`;
+Use as ferramentas quando necessario — por exemplo, busque imagens para posts, pesquise dados atualizados, etc.${imageInstruction}`;
 
     const messages: Array<{ role: "user" | "assistant" | "tool"; content: string; toolCallId?: string }> = [
       { role: "user", content: enrichedPrompt },
@@ -371,6 +394,35 @@ Use as ferramentas quando necessario — por exemplo, busque imagens para posts,
   /**
    * Build context from previous step outputs so each agent sees what came before.
    */
+  /** Check if a step name indicates images are required */
+  private isImageRequiredStep(step: PipelineStep): boolean {
+    const lower = step.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const keywords = ["social", "publicacao", "publicação", "instagram", "linkedin", "post", "conteudo", "conteúdo", "copy", "visual", "design", "arte", "criacao", "criação", "carrossel", "redes"];
+    return keywords.some(kw => lower.includes(kw.normalize("NFD").replace(/[\u0300-\u036f]/g, "")));
+  }
+
+  /** Check if output already contains image URLs */
+  private outputHasImages(output: string): boolean {
+    return /!\[.*?\]\(https?:\/\//.test(output) || /https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif)/i.test(output);
+  }
+
+  /** Force image search and append results to output */
+  private async forceImageSearch(step: PipelineStep, output: string): Promise<string> {
+    try {
+      const { ImageFetcher } = await import("./skills/image-fetcher");
+      const fetcher = new ImageFetcher();
+      const searchQuery = `${step.name} ${this.pipeline.name} marketing`;
+      const result = await fetcher.searchImages(searchQuery, 3);
+      if (result.success && result.images && result.images.length > 0) {
+        const imageSection = result.images
+          .map((img, i) => `![${img.alt || step.name} ${i + 1}](${img.url})`)
+          .join("\n");
+        return `${output}\n\n## Imagens\n${imageSection}`;
+      }
+    } catch { /* ignore */ }
+    return output;
+  }
+
   private buildPreviousOutputsContext(currentStep: PipelineStep): string {
     const outputs: string[] = [];
     for (const step of this.pipeline.steps) {
