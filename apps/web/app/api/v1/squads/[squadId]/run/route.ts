@@ -86,6 +86,7 @@ export async function POST(
         name: s.name,
         type: s.type,
         agent: resolveAgent(s.agentId),
+        veto_conditions: (s as Record<string, unknown>).vetoConditions ?? undefined,
       })),
     });
 
@@ -94,6 +95,7 @@ export async function POST(
       id: a.id,
       name: a.name,
       icon: a.icon ?? "🤖",
+      config: a.config as Record<string, unknown> | null,
     }));
 
     const providerConfig: ProviderConfig = {

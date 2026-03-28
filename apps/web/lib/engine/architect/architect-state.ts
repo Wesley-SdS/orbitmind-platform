@@ -44,12 +44,21 @@ export interface ArchitectConversationState {
       modelTier: "powerful" | "fast";
       execution: "inline" | "subagent";
       description: string;
+      // Rich agent config
+      persona?: { role: string; identity: string; communicationStyle: string };
+      principles?: string[];
+      voiceGuidance?: { alwaysUse: string[]; neverUse: string[]; toneRules: string[] };
+      qualityCriteria?: string[];
+      antiPatterns?: string[];
+      outputFormat?: string;
     }>;
     pipeline: Array<{
       step: number;
       name: string;
       type: "agent" | "checkpoint" | "checkpoint-input" | "checkpoint-select" | "checkpoint-approve";
       agentId?: string;
+      vetoConditions?: string[];
+      outputFormat?: string;
     }>;
     skills: string[];
     contentBrief?: {
@@ -60,6 +69,13 @@ export interface ArchitectConversationState {
       audience: string;
       referenceProfiles: string[];
       language: string;
+    };
+    domainKnowledge?: {
+      researchBrief: string;
+      domainFramework: string;
+      qualityCriteria: string;
+      outputExamples: string;
+      antiPatterns: string;
     };
   };
   nameSuggestions?: string[];

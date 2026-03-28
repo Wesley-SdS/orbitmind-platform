@@ -48,6 +48,7 @@ export async function POST(
       id: a.id,
       name: a.name,
       icon: a.icon ?? "🤖",
+      config: a.config as Record<string, unknown> | null,
     }));
 
     // Resolve agentId: might be UUID or kebab-case from old designs
@@ -67,6 +68,7 @@ export async function POST(
         name: s.name,
         type: s.type,
         agent: resolveAgentId(s.agentId),
+        veto_conditions: (s as Record<string, unknown>).vetoConditions ?? undefined,
       })),
     });
 
@@ -176,6 +178,7 @@ export async function POST(
     const memories = await getTopMemories(squadId, 10);
     const memoryStrings = memories.map(m => `[${m.type}] ${m.content}`);
     const contentBrief = config?.contentBrief as ContentBrief | undefined;
+    const domainKnowledge = config?.domainKnowledge as { researchBrief: string; domainFramework: string; qualityCriteria: string; outputExamples: string; antiPatterns: string } | undefined;
 
     // Build company context string
     let companyContextStr = `Squad: ${squad.name}. ${squad.description ?? ""}`;
@@ -184,7 +187,7 @@ export async function POST(
       if (companyCtx.competitors) companyContextStr += `\nReferências: ${companyCtx.competitors}`;
     }
 
-    const runner = new PipelineRunner(pipelineYaml, agentsList, events, adapter, undefined, tools, skillConfigs, contentBrief, memoryStrings, companyContextStr);
+    const runner = new PipelineRunner(pipelineYaml, agentsList, events, adapter, undefined, tools, skillConfigs, contentBrief, memoryStrings, companyContextStr, domainKnowledge);
 
     // Set tone from content brief
     if (contentBrief?.tonePreferences?.[0]) {

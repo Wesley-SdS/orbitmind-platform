@@ -46,7 +46,7 @@ export class PipelineRunner {
   private stateMachine: StateMachine;
   private events: PipelineEvents;
   private adapter?: LlmAdapter;
-  private agents: Map<string, AgentDefinition & { id: string; name: string; icon: string }>;
+  private agents: Map<string, AgentDefinition & { id: string; name: string; icon: string; config?: Record<string, unknown> | null }>;
   private reviewCycles: Map<string, number> = new Map();
   private runContext: RunContext;
   private versionTracker: Map<string, number> = new Map();
@@ -57,7 +57,7 @@ export class PipelineRunner {
 
   constructor(
     yamlContent: string,
-    agents: Array<{ id: string; name: string; icon: string }>,
+    agents: Array<{ id: string; name: string; icon: string; config?: Record<string, unknown> | null }>,
     events: PipelineEvents,
     adapter?: LlmAdapter,
     agentDefinitions?: AgentDefinition[],
@@ -66,6 +66,7 @@ export class PipelineRunner {
     private contentBrief?: ContentBrief,
     private squadMemories?: string[],
     private companyContext?: string,
+    private domainKnowledge?: { researchBrief: string; domainFramework: string; qualityCriteria: string; outputExamples: string; antiPatterns: string },
   ) {
     const raw = parseYaml(yamlContent);
     this.pipeline = pipelineSchema.parse(raw);
@@ -81,7 +82,7 @@ export class PipelineRunner {
     this.agents = new Map();
     for (const a of agents) {
       const def = agentDefinitions?.find((d) => d.id === a.id);
-      this.agents.set(a.id, { ...a, custom: def?.custom ?? "", tasks: def?.tasks });
+      this.agents.set(a.id, { ...a, custom: def?.custom ?? "", tasks: def?.tasks, config: a.config });
     }
 
     // Initialize run context
@@ -320,8 +321,43 @@ Produza o output seguindo o processo e criterios acima.`;
     const briefContext = this.contentBrief
       ? `\nEste squad atua no nicho de "${this.contentBrief.nicho}" para o público "${this.contentBrief.audience}".`
       : "";
-    let basePrompt = `Voce e "${agent?.name ?? "Agente"}", ${agentRole ? agentRole : `responsavel pelo step "${step.name}"`}, trabalhando no squad "${this.pipeline.name}".${briefContext}
+    // Build rich agent context from config stored in DB
+    const fullAgent = step.agent ? this.agents.get(step.agent) : undefined;
+    const agentConfig = (fullAgent as Record<string, unknown> | undefined)?.config as Record<string, unknown> | null;
 
+    let agentContext = "";
+    if (agentConfig) {
+      const persona = agentConfig.persona as Record<string, string> | null;
+      const principles = agentConfig.principles as string[] | null;
+      const voice = agentConfig.voiceGuidance as Record<string, string[]> | null;
+      const criteria = agentConfig.qualityCriteria as string[] | null;
+      const antiPats = agentConfig.antiPatterns as string[] | null;
+      const outFormat = agentConfig.outputFormat as string | null;
+
+      if (persona) {
+        agentContext += `\n## Sua Persona\nPapel: ${persona.role}\nIdentidade: ${persona.identity}\nEstilo: ${persona.communicationStyle}\n`;
+      }
+      if (principles?.length) {
+        agentContext += `\n## Princípios Operacionais\n${principles.map((p, i) => `${i + 1}. ${p}`).join("\n")}\n`;
+      }
+      if (voice) {
+        if (voice.alwaysUse?.length) agentContext += `\n## Vocabulário — Sempre use: ${voice.alwaysUse.join(", ")}\n`;
+        if (voice.neverUse?.length) agentContext += `## Vocabulário — Nunca use: ${voice.neverUse.join(", ")}\n`;
+        if (voice.toneRules?.length) agentContext += `## Regras de tom: ${voice.toneRules.join("; ")}\n`;
+      }
+      if (criteria?.length) {
+        agentContext += `\n## Critérios de Qualidade (seu output DEVE atender)\n${criteria.map(c => `- ${c}`).join("\n")}\n`;
+      }
+      if (antiPats?.length) {
+        agentContext += `\n## Anti-Patterns (NUNCA faça)\n${antiPats.map(a => `- ${a}`).join("\n")}\n`;
+      }
+      if (outFormat) {
+        agentContext += `\n## Formato de Output Esperado\n${outFormat}\n`;
+      }
+    }
+
+    let basePrompt = `Voce e "${agent?.name ?? "Agente"}", ${agentRole ? agentRole : `responsavel pelo step "${step.name}"`}, trabalhando no squad "${this.pipeline.name}".${briefContext}
+${agentContext}
 ${previousOutputs}
 
 ## Sua tarefa: ${step.name}
@@ -562,6 +598,16 @@ Plataformas alvo: ${this.contentBrief.targetPlatforms.join(", ")}
 Público: ${this.contentBrief.audience}
 Pilares de conteúdo: ${this.contentBrief.contentPillars.join(", ")}
 Idioma: ${this.contentBrief.language ?? "pt-BR"}`);
+    }
+
+    // 0.6 Domain knowledge
+    if (this.domainKnowledge) {
+      const dk = this.domainKnowledge;
+      let dkContext = "--- CONHECIMENTO DO DOMÍNIO ---\n";
+      if (dk.domainFramework) dkContext += `Framework: ${dk.domainFramework.substring(0, 1000)}\n`;
+      if (dk.qualityCriteria) dkContext += `Critérios de qualidade: ${dk.qualityCriteria.substring(0, 500)}\n`;
+      if (dk.antiPatterns) dkContext += `Erros a evitar: ${dk.antiPatterns.substring(0, 500)}\n`;
+      parts.push(dkContext);
     }
 
     // 1. Agent definition

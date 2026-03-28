@@ -431,11 +431,38 @@ Faça a PRÓXIMA pergunta DIFERENTE das anteriores.
 Se o usuário respondeu com número ("1","2"), interprete como seleção da opção.
 
 ### Se já tem info SUFICIENTE (ou 4+ perguntas):
+
+## Fase de Pesquisa (OBRIGATÓRIO antes de desenhar)
+Antes de gerar o design do squad, você DEVE pesquisar o domínio usando a ferramenta web_search:
+
+1. Busque "{propósito do squad} melhores práticas" para frameworks operacionais
+2. Busque "{domínio} erros comuns" para anti-patterns
+3. Busque "{domínio} critérios de qualidade" para quality criteria
+
+Use os resultados para:
+- Definir principles realistas para cada agente
+- Identificar anti-patterns reais do domínio
+- Estabelecer critérios de qualidade específicos
+- Entender o vocabulário profissional do domínio
+
+Mostre ao usuário: "🔍 Pesquisando melhores práticas do domínio..." antes de pesquisar.
+Depois: "📊 Pesquisa concluída! Encontrei X fontes. Vou usar para desenhar seu squad."
+
+IMPORTANTE: Inclua os resultados da pesquisa no campo "domainKnowledge" do design JSON.
+
 Monte o design com bloco JSON:
 
 \`\`\`json:squad-design
-{"ready":true,"name":"...","code":"...","description":"...","icon":"emoji","performanceMode":"high ou economic","agents":[{"id":"id-kebab","name":"Nome Aliterativo","role":"Função","icon":"emoji","modelTier":"powerful ou fast","execution":"inline ou subagent","description":"1 frase"}],"pipeline":[{"step":1,"name":"...","type":"agent","agentId":"id"},{"step":2,"name":"Aprovação","type":"checkpoint"}],"skills":["web_search","web_fetch"],"contentBrief":null}
+{"ready":true,"name":"...","code":"...","description":"...","icon":"emoji","performanceMode":"high ou economic","agents":[{"id":"id-kebab","name":"Nome Aliterativo","role":"Função","icon":"emoji","modelTier":"powerful ou fast","execution":"inline ou subagent","description":"1 frase","persona":{"role":"descrição detalhada do papel","identity":"características de personalidade","communicationStyle":"como se comunica"},"principles":["princípio 1","princípio 2","princípio 3"],"voiceGuidance":{"alwaysUse":["termo 1","termo 2"],"neverUse":["termo 1","termo 2"],"toneRules":["regra 1"]},"qualityCriteria":["critério 1","critério 2"],"antiPatterns":["nunca fazer X","nunca fazer Y"],"outputFormat":"formato esperado do output"}],"pipeline":[{"step":1,"name":"...","type":"agent","agentId":"id","vetoConditions":["condição que rejeita o output"],"outputFormat":"formato esperado"},{"step":2,"name":"Aprovação","type":"checkpoint"}],"skills":["web_search","web_fetch"],"contentBrief":null,"domainKnowledge":{"researchBrief":"Resumo da pesquisa realizada sobre o domínio...","domainFramework":"Framework operacional identificado: 1. Step... 2. Step...","qualityCriteria":"Critérios de qualidade identificados: ...","outputExamples":"Exemplo de output esperado: ...","antiPatterns":"Erros comuns identificados: ..."}}
 \`\`\`
+
+Para CADA agente, gere configurações detalhadas:
+- persona: papel detalhado, identidade e estilo de comunicação
+- principles: 3-5 princípios operacionais específicos ao domínio
+- voiceGuidance: termos para usar, termos para evitar, regras de tom
+- qualityCriteria: critérios mensuráveis de qualidade do output
+- antiPatterns: erros comuns que o agente NUNCA deve cometer
+- outputFormat: formato estruturado esperado do output
 
 Para squads de conteúdo/marketing, inclua o campo "contentBrief" preenchido:
 \`\`\`json
@@ -561,6 +588,22 @@ Se o usuário mencionar publicação em Instagram, LinkedIn ou qualquer rede soc
   const design = extractDesignJson(result.output);
 
   if (design) {
+    // Quick domain research if the LLM didn't include domainKnowledge
+    if (!design.domainKnowledge) {
+      try {
+        const { webSearch } = await import("@orbitmind/engine");
+        const purpose = state.discovery.purpose || design.description || "";
+        const results = await webSearch(`${purpose} melhores práticas framework`, 5);
+        const brief = results.map(r => `- ${r.title}: ${r.snippet}`).join("\n");
+        design.domainKnowledge = {
+          researchBrief: brief || "Pesquisa automática não retornou resultados.",
+          domainFramework: "",
+          qualityCriteria: "",
+          outputExamples: "",
+          antiPatterns: "",
+        };
+      } catch { /* ignore search failures */ }
+    }
     state.proposedDesign = design;
     state.phase = "naming";
     const display = stripJsonFromOutput(result.output);
@@ -1273,7 +1316,7 @@ async function buildSquadFromDesign(state: ArchitectConversationState) {
     code: design.code,
     description: design.description,
     icon: design.icon,
-    config: { performanceMode: design.performanceMode, pipeline: design.pipeline, skills: design.skills, contentBrief: design.contentBrief ?? null },
+    config: { performanceMode: design.performanceMode, pipeline: design.pipeline, skills: design.skills, contentBrief: design.contentBrief ?? null, domainKnowledge: design.domainKnowledge ?? null },
   });
 
   // Create agents and build mapping: design id (kebab) → real UUID
@@ -1286,7 +1329,16 @@ async function buildSquadFromDesign(state: ArchitectConversationState) {
       icon: agentDef.icon,
       modelTier: agentDef.modelTier,
       runtimeType: "claude-code",
-      config: { execution: agentDef.execution, description: agentDef.description },
+      config: {
+        execution: agentDef.execution,
+        description: agentDef.description,
+        persona: agentDef.persona ?? null,
+        principles: agentDef.principles ?? [],
+        voiceGuidance: agentDef.voiceGuidance ?? null,
+        qualityCriteria: agentDef.qualityCriteria ?? [],
+        antiPatterns: agentDef.antiPatterns ?? [],
+        outputFormat: agentDef.outputFormat ?? null,
+      },
       monthlyBudgetTokens: 500_000,
     });
     idMap.set(agentDef.id, agent.id);
