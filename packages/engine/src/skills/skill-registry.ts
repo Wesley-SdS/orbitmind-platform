@@ -158,9 +158,11 @@ export const SKILL_REGISTRY: SkillDefinition[] = [
     icon: "🖼️",
     type: "api",
     category: "research",
-    requiredConfig: [],
-    execute: async (_config, params) => {
-      const fetcher = new ImageFetcher();
+    requiredConfig: [
+      { key: "PEXELS_API_KEY", label: "Pexels API Key (opcional)", type: "password", placeholder: "abc123...", helpText: "pexels.com/api — gratuito, 200 req/hora" },
+    ],
+    execute: async (config, params) => {
+      const fetcher = new ImageFetcher(undefined, config.PEXELS_API_KEY);
       return fetcher.execute(params as { mode: "search" | "screenshot" | "direct"; query?: string; url?: string });
     },
   },

@@ -2,9 +2,10 @@
  * Image Fetcher Skill
  *
  * Fetches images from multiple sources:
- * 1. Google Images scraping (primary, no key needed)
- * 2. Unsplash API (when user configures UNSPLASH_ACCESS_KEY)
- * 3. Direct URL validation
+ * 1. Pexels API (primary, free 200 req/hr)
+ * 2. Google Images scraping (no key needed)
+ * 3. Unsplash API (when user configures UNSPLASH_ACCESS_KEY)
+ * 4. Direct URL validation
  */
 
 interface FetchOptions {
@@ -31,28 +32,32 @@ interface FetchResult {
 
 export class ImageFetcher {
   private unsplashKey?: string;
+  private pexelsKey?: string;
 
-  constructor(unsplashKey?: string) {
+  constructor(unsplashKey?: string, pexelsKey?: string) {
     this.unsplashKey = unsplashKey;
+    this.pexelsKey = pexelsKey;
   }
 
-  /** Search images — tries Google scraping first, then Unsplash */
+  /** Search images — tries Pexels first, then Google, Unsplash, and Picsum */
   async searchImages(query: string, count = 5): Promise<FetchResult> {
-    // 1. Try Google Images scraping (no key needed)
-    const googleResult = await this.searchGoogle(query, count);
-    if (googleResult.success && googleResult.images && googleResult.images.length > 0) {
-      return googleResult;
+    // 1. Pexels API (most reliable, free 200 req/hr)
+    if (this.pexelsKey) {
+      const pexelsResult = await this.searchPexels(query, count);
+      if (pexelsResult.success && pexelsResult.images?.length) return pexelsResult;
     }
 
-    // 2. Fallback: Unsplash API (if key configured)
+    // 2. Google Images scraping (no key needed)
+    const googleResult = await this.searchGoogle(query, count);
+    if (googleResult.success && googleResult.images?.length) return googleResult;
+
+    // 3. Unsplash API (if key configured)
     if (this.unsplashKey) {
       const unsplashResult = await this.searchUnsplash(query, count);
-      if (unsplashResult.success && unsplashResult.images && unsplashResult.images.length > 0) {
-        return unsplashResult;
-      }
+      if (unsplashResult.success && unsplashResult.images?.length) return unsplashResult;
     }
 
-    // 3. Last fallback: curated stock-like URLs from Lorem Picsum
+    // 4. Picsum fallback (always works, deterministic)
     return {
       success: true,
       images: Array.from({ length: Math.min(count, 3) }, (_, i) => ({
@@ -61,6 +66,28 @@ export class ImageFetcher {
         source: "picsum",
       })),
     };
+  }
+
+  /** Search via Pexels API (requires API key) */
+  private async searchPexels(query: string, count: number): Promise<FetchResult> {
+    try {
+      const res = await fetch(
+        `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=${count}&locale=pt-BR`,
+        { headers: { Authorization: this.pexelsKey! } },
+      );
+      if (!res.ok) return { success: false, error: `Pexels returned ${res.status}` };
+      const data = (await res.json()) as { photos?: Array<{ src: { large: string }; alt: string }> };
+      return {
+        success: true,
+        images: (data.photos ?? []).map((p) => ({
+          url: p.src.large,
+          alt: p.alt || query,
+          source: "pexels",
+        })),
+      };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Erro no Pexels" };
+    }
   }
 
   /** Scrape Google Images — extracts image URLs from search results page */
