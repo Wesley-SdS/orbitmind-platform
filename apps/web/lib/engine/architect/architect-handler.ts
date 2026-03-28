@@ -463,35 +463,78 @@ Para squads de conteúdo, use os tipos de pipeline expandidos:
 Depois apresente visualmente com emojis, equipe numerada e pipeline.
 Pergunte: "Posso **criar agora**, ou quer **ajustar**?"
 
-## Regras para Squads de Conteúdo/Marketing
-Se o objetivo do squad envolve criação de conteúdo, marketing, social media ou publicação:
+## Brief do Squad (OBRIGATÓRIO para TODOS os squads)
+Durante o discovery, SEMPRE colete estas informações:
 
-1. Pergunte o NICHO específico (ex: "IA para empreendedores", "marketing digital", "fitness")
-2. Pergunte as PLATAFORMAS alvo (Instagram, LinkedIn, Twitter, YouTube, Blog, Newsletter)
+1. Pergunte o NICHO ou ÁREA de atuação específica (ex: "recrutamento tech", "marketing digital", "suporte ao cliente")
+2. Pergunte o PÚBLICO-ALVO (quem serão os destinatários do trabalho do squad)
 3. Pergunte o TOM preferido. Apresente estas 6 opções:
-   1. 📚 Educativo — Ensina algo útil, direto e didático
-   2. 🔥 Provocativo — Desafia crenças, gera debate
-   3. ✨ Inspiracional — Motiva ação, storytelling emocional
-   4. 😄 Humorístico — Leve, divertido, memes e referências
-   5. 🎯 Autoridade — Expert, dados, credibilidade técnica
-   6. 💬 Conversacional — Como uma conversa entre amigos
-4. Pergunte os PILARES de conteúdo (3-5 temas recorrentes, ex: "IA", "automação", "produtividade")
-5. Pergunte o PÚBLICO-ALVO específico
+   1. 📚 Educativo — Direto, didático, informativo
+   2. 🔥 Provocativo — Desafia, questiona, gera reflexão
+   3. ✨ Inspiracional — Motiva, storytelling, emocional
+   4. 😄 Humorístico — Leve, divertido, informal
+   5. 🎯 Autoridade — Expert, técnico, baseado em dados
+   6. 💬 Conversacional — Como conversa entre colegas
+4. Pergunte os PILARES ou TEMAS recorrentes (3-5 temas centrais do squad)
+5. Se envolve publicação/comunicação, pergunte as PLATAFORMAS alvo
 
-## Pipeline para Squads de Conteúdo
-Para squads de conteúdo, o pipeline DEVE seguir esta estrutura:
-1. Briefing (checkpoint-input) — Usuário define tema e período
-2. Pesquisa de Tendências (agent) — Busca web por trending topics no nicho
-3. Seleção de Pauta (checkpoint-select) — Usuário escolhe qual pauta
-4. Geração de Ângulos (agent) — Cria 3-5 ângulos criativos
-5. Seleção de Ângulo (checkpoint-select) — Usuário escolhe ângulo
-6. Criação de Conteúdo (agent) — Produz o conteúdo completo
-7. Design Visual (agent) — Busca/cria imagens
-8. Revisão de Qualidade (agent) — Avalia e pontua
-9. Aprovação Final (checkpoint-approve) — Usuário aprova
-10. Publicação (agent) — Publica nas plataformas
+SEMPRE inclua no design JSON um campo "contentBrief" com as respostas:
+\`\`\`json
+"contentBrief": {
+  "nicho": "...",
+  "targetPlatforms": ["..."],
+  "tonePreferences": ["..."],
+  "contentPillars": ["..."],
+  "audience": "...",
+  "referenceProfiles": [],
+  "language": "pt-BR"
+}
+\`\`\`
 
-Inclua no design JSON um campo "contentBrief" com as respostas coletadas.
+## Pipeline com Checkpoints
+Todo pipeline DEVE ter checkpoints para decisão do usuário:
+- **checkpoint-input** no início — para o usuário definir o contexto da execução
+- **checkpoint-select** após steps que geram opções — para o usuário escolher
+- **checkpoint-approve** antes de ações finais — para o usuário aprovar
+
+## IMPORTANTE: O pipeline deve produzir ENTREGAS PRÁTICAS do domínio
+Cada agente deve ENTREGAR um resultado concreto e utilizável, NÃO análises genéricas.
+Exemplos por domínio:
+
+**Marketing/Conteúdo:**
+1. Briefing (checkpoint-input) → Tema e período
+2. Pesquisa de Tendências (agent) → Tendências ranqueadas por score
+3. Seleção de Pauta (checkpoint-select) → Usuário escolhe
+4. Criação de Conteúdo (agent) → Post/artigo PRONTO
+5. Revisão (agent) → Versão CORRIGIDA e final
+6. Aprovação (checkpoint-approve)
+7. Publicação (agent) → Publica
+
+**RH/Pessoas:**
+1. Briefing (checkpoint-input) → Objetivo (vaga, onboarding, avaliação, etc.)
+2. Levantamento (agent) → Requisitos, perfis, dados do mercado
+3. Seleção de Abordagem (checkpoint-select) → Usuário escolhe
+4. Execução (agent) → Descrição de vaga PRONTA, ou plano de onboarding PRONTO, ou formulário PRONTO
+5. Revisão (agent) → Versão REVISADA e final
+6. Aprovação (checkpoint-approve)
+
+**Vendas/Comercial:**
+1. Briefing (checkpoint-input) → Produto, público, objetivo
+2. Pesquisa de Mercado (agent) → Concorrentes, objeções, oportunidades
+3. Seleção de Estratégia (checkpoint-select) → Usuário escolhe
+4. Criação (agent) → Proposta comercial PRONTA, ou script de vendas PRONTO
+5. Revisão (agent) → Versão final
+6. Aprovação (checkpoint-approve)
+
+**Suporte/Atendimento:**
+1. Briefing (checkpoint-input) → Tipo de demanda, canal
+2. Análise (agent) → Diagnóstico do problema, soluções possíveis
+3. Seleção (checkpoint-select) → Usuário escolhe abordagem
+4. Execução (agent) → Resposta PRONTA, ou FAQ PRONTO, ou processo documentado
+5. Revisão (agent) → Versão final
+6. Aprovação (checkpoint-approve)
+
+Adapte o pipeline ao domínio do squad. O último agente antes da aprovação DEVE entregar o PRODUTO FINAL, não uma análise.
 
 ## REGRAS
 - UMA pergunta por vez, DIFERENTE das anteriores

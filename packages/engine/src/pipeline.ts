@@ -316,14 +316,67 @@ Produza o output seguindo o processo e criterios acima.`;
   private async executeMonolithic(step: PipelineStep, agent?: { name: string; custom: string }): Promise<string> {
     const context = this.buildStepContext(step, agent);
     const previousOutputs = this.buildPreviousOutputsContext(step);
-    const basePrompt = `Voce e o agente "${agent?.name ?? step.agent ?? "Agente"}" executando o step "${step.name}" do pipeline "${this.pipeline.name}".
+    const agentRole = agent?.custom || "";
+    const briefContext = this.contentBrief
+      ? `\nEste squad atua no nicho de "${this.contentBrief.nicho}" para o público "${this.contentBrief.audience}".`
+      : "";
+    let basePrompt = `Voce e "${agent?.name ?? "Agente"}", ${agentRole ? agentRole : `responsavel pelo step "${step.name}"`}, trabalhando no squad "${this.pipeline.name}".${briefContext}
 
 ${previousOutputs}
 
-## Sua tarefa
-Execute o step "${step.name}". Use o contexto dos steps anteriores como base para seu trabalho. Produza um resultado concreto e detalhado — NAO peca mais informacoes, trabalhe com o que tem.
+## Sua tarefa: ${step.name}
+Produza uma ENTREGA PRÁTICA e CONCRETA para "${step.name}".
+
+IMPORTANTE:
+- NÃO produza análises genéricas ou meta-comentários sobre o que fazer
+- PRODUZA o resultado em si — o deliverable real que o próximo step ou o cliente vai usar
+- Se o step é "Criação de Conteúdo", ESCREVA o conteúdo (não descreva o que seria)
+- Se o step é "Revisão", CORRIJA o conteúdo e entregue a versão revisada
+- Se o step é "Pesquisa", TRAGA dados reais e ranqueie opções com scores
+- Trabalhe com o que tem dos steps anteriores, NÃO peça mais informações
 
 ${context}`;
+
+    // If this looks like a research/analysis step, instruct structured output
+    const researchKeywords = ["pesquisa", "mapeamento", "análise", "analise", "levantamento", "tendência", "tendencia", "investigação", "investigacao"];
+    const isResearchStep = researchKeywords.some(kw => step.name.toLowerCase().includes(kw));
+    if (isResearchStep) {
+      basePrompt += `\n\n## FORMATO DE OUTPUT OBRIGATÓRIO
+Ao final da sua pesquisa/análise, apresente as descobertas como opções numeradas ranqueadas:
+
+1. **[Título da opção]** (Score: X/10)
+   Descrição breve de por que é relevante.
+
+2. **[Título da opção]** (Score: X/10)
+   Descrição breve.
+
+(mínimo 3, máximo 7 opções)
+
+Isso é obrigatório para que o próximo step funcione corretamente.`;
+    }
+
+    // If this is a review step, instruct to deliver corrected content
+    const isReviewStep = step.name.toLowerCase().includes("revis");
+    if (isReviewStep) {
+      basePrompt += `\n\n## INSTRUÇÃO DE REVISÃO
+Você é o revisor. Sua tarefa é:
+1. ANALISAR o trabalho dos steps anteriores
+2. IDENTIFICAR problemas e melhorias
+3. ENTREGAR a versão CORRIGIDA e FINAL do trabalho — não apenas uma análise
+4. O output deve ser o CONTEÚDO REVISADO E PRONTO, não um relatório sobre o conteúdo`;
+    }
+
+    // If this is the last agent step before approval or end, instruct final delivery
+    const stepsAfter = this.pipeline.steps.slice(this.pipeline.steps.indexOf(step) + 1);
+    const nextIsApproveOrEnd = stepsAfter.length === 0 ||
+      stepsAfter[0]?.type === "checkpoint-approve" ||
+      stepsAfter[0]?.type === "checkpoint";
+    if (nextIsApproveOrEnd && !isReviewStep) {
+      basePrompt += `\n\n## INSTRUÇÃO DE ENTREGA FINAL
+Este é o último step de execução antes da aprovação.
+Sua entrega deve ser o PRODUTO FINAL e COMPLETO — pronto para ser usado/publicado.
+Não entregue rascunhos, análises ou sugestões. Entregue o resultado pronto.`;
+    }
 
     // Check if this step requires images (social/content/publishing steps)
     const requiresImages = this.isImageRequiredStep(step);

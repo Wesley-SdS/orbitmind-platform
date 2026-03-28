@@ -228,7 +228,7 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
               </Button>
             </div>
             <ScrollArea className="flex-1 min-h-0">
-              <div className="prose prose-sm prose-invert max-w-none pr-4 pb-4">
+              <div className="prose prose-sm dark:prose-invert max-w-none pr-4 pb-4">
                 <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(summary) }} />
               </div>
             </ScrollArea>
@@ -270,7 +270,7 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
                 </div>
               )}
               <ScrollArea className="flex-1 min-h-0">
-                <div className="prose prose-sm prose-invert max-w-none pr-4 pb-4">
+                <div className="prose prose-sm dark:prose-invert max-w-none pr-4 pb-4">
                   <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(entry.content) }} />
                 </div>
               </ScrollArea>
@@ -316,7 +316,7 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
                       })}
                     </div>
                   )}
-                  <div className="rounded-lg border border-border/50 bg-muted/30 p-3 prose prose-sm prose-invert max-w-none max-h-96 overflow-hidden relative">
+                  <div className="rounded-lg border border-border/50 bg-muted/30 p-3 prose prose-sm dark:prose-invert max-w-none max-h-96 overflow-hidden relative">
                     <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(entry.content) }} />
                     <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-muted/80 to-transparent pointer-events-none" />
                   </div>
@@ -405,9 +405,9 @@ function simpleMarkdown(text: string): string {
     .replace(/^### (.+)$/gm, "<h4 class='font-semibold mt-3 mb-1'>$1</h4>")
     .replace(/^## (.+)$/gm, "<h3 class='font-semibold text-base mt-4 mb-1'>$1</h3>")
     .replace(/^# (.+)$/gm, "<h2 class='font-bold text-lg mt-4 mb-2'>$1</h2>")
-    .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
     .replace(/^(\d+)\.\s+(.+)$/gm, "<li>$1. $2</li>")
     .replace(/^[-–]\s+(.+)$/gm, "<li>$1</li>")
     .replace(/\n/g, "<br />");

@@ -132,32 +132,35 @@ export function PipelineSection({ squadId, pipeline, agents }: PipelineSectionPr
     <div className="space-y-6">
       {isWaitingApproval && pipelineRun && (() => {
         const checkpointStep = pipeline.find(s => `step-${s.step}` === pipelineRun.checkpointStepId);
-        const checkpointType = checkpointStep?.type ?? "checkpoint-approve";
-        // Resolve source output: from sourceStepId, or fallback to previous step's output
+        let checkpointType = checkpointStep?.type ?? "checkpoint-approve";
+
+        // Resolve source output from previous step
         let sourceOutput: string | undefined;
-        console.log("[CheckpointReview] checkpointStep:", checkpointStep?.step, checkpointStep?.type, "sourceStepId:", checkpointStep?.sourceStepId);
-        console.log("[CheckpointReview] stepOutputs keys:", Object.keys(pipelineRun.stepOutputs));
         if (checkpointStep?.sourceStepId) {
           sourceOutput = pipelineRun.stepOutputs[checkpointStep.sourceStepId]?.content;
-          console.log("[CheckpointReview] sourceStepId match:", !!sourceOutput, "key:", checkpointStep.sourceStepId);
         }
         if (!sourceOutput && checkpointStep) {
-          // Fallback: find the output from the step immediately before this checkpoint
           const stepIndex = pipeline.findIndex(s => s.step === checkpointStep.step);
-          console.log("[CheckpointReview] fallback: looking from index", stepIndex - 1, "pipeline steps:", pipeline.map(s => `step-${s.step}`));
           for (let i = stepIndex - 1; i >= 0; i--) {
             const prevStep = pipeline[i];
             if (!prevStep) continue;
-            const key = `step-${prevStep.step}`;
-            const prevOutput = pipelineRun.stepOutputs[key]?.content;
-            console.log("[CheckpointReview] checking", key, "has output:", !!prevOutput, "length:", prevOutput?.length ?? 0);
+            const prevOutput = pipelineRun.stepOutputs[`step-${prevStep.step}`]?.content;
             if (prevOutput) {
               sourceOutput = prevOutput;
               break;
             }
           }
         }
-        console.log("[CheckpointReview] final sourceOutput length:", sourceOutput?.length ?? 0);
+
+        // Smart type detection: if generic "checkpoint" has previous agent output,
+        // and it's not the final checkpoint, treat as selection checkpoint
+        if (checkpointType === "checkpoint" && sourceOutput) {
+          const stepIndex = pipeline.findIndex(s => s.step === checkpointStep!.step);
+          const hasAgentAfter = pipeline.slice(stepIndex + 1).some(s => s.type === "agent");
+          if (hasAgentAfter) {
+            checkpointType = "checkpoint-select";
+          }
+        }
         return (
           <CheckpointReview
             squadId={squadId}

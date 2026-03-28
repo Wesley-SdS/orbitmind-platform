@@ -115,9 +115,9 @@ export function CheckpointReview({
   // --- checkpoint-input variant ---
   if (checkpointType === "checkpoint-input") {
     const fields = checkpointFields?.length ? checkpointFields : [
-      { name: "topic", label: "Tema ou assunto", type: "textarea" },
-      { name: "timePeriod", label: "Período de pesquisa", type: "select", options: ["últimas 24 horas", "última semana", "último mês", "últimos 3 meses"] },
-      { name: "objective", label: "Objetivo do conteúdo (opcional)", type: "text" },
+      { name: "topic", label: "O que você precisa? Descreva o objetivo desta execução", type: "textarea" },
+      { name: "context", label: "Contexto adicional (detalhes, restrições, referências)", type: "textarea" },
+      { name: "priority", label: "Prioridade", type: "select", options: ["alta — preciso disso urgente", "média — prazo normal", "baixa — quando possível"] },
     ];
     return (
       <Card className="border-blue-500/30 bg-blue-500/5">
@@ -245,7 +245,7 @@ export function CheckpointReview({
           <div className="mb-6 space-y-2">
             {options.length === 0 && rawSource && (
               <div className="space-y-3">
-                <div className="rounded-lg border border-border/50 bg-muted/30 p-3 prose prose-sm prose-invert max-w-none max-h-64 overflow-y-auto">
+                <div className="rounded-lg border border-border/50 bg-muted/30 p-3 prose prose-sm dark:prose-invert max-w-none max-h-64 overflow-y-auto">
                   <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(rawSource.substring(0, 3000)) }} />
                 </div>
                 <div className="space-y-1.5">
@@ -382,7 +382,7 @@ export function CheckpointReview({
                   )}
                 </summary>
                 <div className="border-t border-border px-4 py-3 space-y-3">
-                  <div className="text-sm text-foreground/90 leading-relaxed max-h-80 overflow-y-auto prose prose-sm prose-invert max-w-none">
+                  <div className="text-sm text-foreground/90 leading-relaxed max-h-80 overflow-y-auto prose prose-sm dark:prose-invert max-w-none">
                     <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(output.content || "Sem conteudo disponivel.") }} />
                   </div>
                   <div className="border-t border-border/50 pt-3">
@@ -441,9 +441,9 @@ function simpleMarkdown(text: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
     .replace(/^(\d+)\.\s+(.+)$/gm, "<li>$1. $2</li>")
     .replace(/^[-–]\s+(.+)$/gm, "<li>$1</li>")
     .replace(/\n/g, "<br />");
