@@ -133,9 +133,24 @@ export function PipelineSection({ squadId, pipeline, agents }: PipelineSectionPr
       {isWaitingApproval && pipelineRun && (() => {
         const checkpointStep = pipeline.find(s => `step-${s.step}` === pipelineRun.checkpointStepId);
         const checkpointType = checkpointStep?.type ?? "checkpoint-approve";
-        const sourceOutput = checkpointStep?.sourceStepId
-          ? pipelineRun.stepOutputs[checkpointStep.sourceStepId]?.content
-          : undefined;
+        // Resolve source output: from sourceStepId, or fallback to previous step's output
+        let sourceOutput: string | undefined;
+        if (checkpointStep?.sourceStepId) {
+          sourceOutput = pipelineRun.stepOutputs[checkpointStep.sourceStepId]?.content;
+        }
+        if (!sourceOutput && checkpointStep) {
+          // Fallback: find the output from the step immediately before this checkpoint
+          const stepIndex = pipeline.findIndex(s => s.step === checkpointStep.step);
+          for (let i = stepIndex - 1; i >= 0; i--) {
+            const prevStep = pipeline[i];
+            if (!prevStep) continue;
+            const prevOutput = pipelineRun.stepOutputs[`step-${prevStep.step}`]?.content;
+            if (prevOutput) {
+              sourceOutput = prevOutput;
+              break;
+            }
+          }
+        }
         return (
           <CheckpointReview
             squadId={squadId}
