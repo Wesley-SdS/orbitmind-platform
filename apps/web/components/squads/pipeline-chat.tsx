@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Sparkles, Loader2, X, Eye, ExternalLink, Maximize2 } from "lucide-react";
+import { MessageSquare, Sparkles, Loader2, X, Eye, ExternalLink, Maximize2, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { PostPreview } from "./post-preview";
 
@@ -36,6 +36,7 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [expandedEntry, setExpandedEntry] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const sortedOutputs = pipeline
     .filter(step => step.type !== "checkpoint" && stepOutputs[`step-${step.step}`])
@@ -82,6 +83,16 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
       setLoadingSummary(false);
     }
   }, [squadId, stepOutputs]);
+
+  const handleCopyAll = useCallback(async () => {
+    const allContent = sortedOutputs
+      .map(e => `## ${e.agentName} — ${e.stepName}\n\n${e.content}`)
+      .join("\n\n---\n\n");
+    await navigator.clipboard.writeText(allContent);
+    setCopied(true);
+    toast.success("Comunicação copiada!");
+    setTimeout(() => setCopied(false), 2000);
+  }, [sortedOutputs]);
 
   if (sortedOutputs.length === 0) {
     return (
@@ -140,6 +151,16 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
             >
               {loadingSummary ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
               Resumo
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyAll}
+              disabled={sortedOutputs.length === 0}
+              className="gap-1.5"
+            >
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? "Copiado" : "Copiar"}
             </Button>
           </div>
         </div>
@@ -235,14 +256,17 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
               </div>
               {sources.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {sources.map((src, i) => (
-                    <a key={i} href={src.url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-3 py-1 text-xs hover:bg-accent transition-colors">
-                      <img src={`https://www.google.com/s2/favicons?domain=${new URL(src.url).hostname}&sz=16`} alt="" className="h-4 w-4 rounded" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                      <span className="truncate max-w-[200px]">{src.title || new URL(src.url).hostname}</span>
-                      <ExternalLink className="h-3 w-3 shrink-0 opacity-50" />
-                    </a>
-                  ))}
+                  {sources.map((src, i) => {
+                    const host = new URL(src.url).hostname;
+                    return (
+                      <a key={i} href={src.url} target="_blank" rel="noopener noreferrer" title={src.url}
+                        className="flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-3 py-1.5 text-xs hover:bg-accent transition-colors">
+                        <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=16`} alt="" className="h-4 w-4 rounded" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        <span>{formatDomainName(host)}</span>
+                        <ExternalLink className="h-3 w-3 shrink-0 opacity-50" />
+                      </a>
+                    );
+                  })}
                 </div>
               )}
               <ScrollArea className="flex-1 min-h-0">
@@ -280,13 +304,16 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
                   {/* Source links */}
                   {sources.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-2">
-                      {sources.slice(0, 5).map((src, i) => (
-                        <a key={i} href={src.url} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1 rounded-full border border-border/50 bg-muted/50 px-2 py-0.5 text-[10px] hover:bg-accent transition-colors">
-                          <img src={`https://www.google.com/s2/favicons?domain=${new URL(src.url).hostname}&sz=16`} alt="" className="h-3 w-3 rounded" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                          <span className="truncate max-w-[150px]">{new URL(src.url).hostname}</span>
-                        </a>
-                      ))}
+                      {sources.slice(0, 5).map((src, i) => {
+                        const host = new URL(src.url).hostname;
+                        return (
+                          <a key={i} href={src.url} target="_blank" rel="noopener noreferrer" title={src.url}
+                            className="flex items-center gap-1 rounded-full border border-border/50 bg-muted/50 px-2 py-0.5 text-[10px] hover:bg-accent transition-colors">
+                            <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=16`} alt="" className="h-3 w-3 rounded" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                            <span>{formatDomainName(host)}</span>
+                          </a>
+                        );
+                      })}
                     </div>
                   )}
                   <div className="rounded-lg border border-border/50 bg-muted/30 p-3 prose prose-sm prose-invert max-w-none max-h-96 overflow-hidden relative">
@@ -304,6 +331,12 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
       </ScrollArea>
     </Card>
   );
+}
+
+/** Format domain name to readable brand name */
+function formatDomainName(hostname: string): string {
+  const name = hostname.replace(/^www\./, "").split(".")[0] ?? hostname;
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 /** Extract source URLs from agent output */
