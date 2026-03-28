@@ -10,9 +10,11 @@ import { getDefaultLlmProvider } from "@/lib/db/queries/llm-providers";
 import { createExecution, updateExecution } from "@/lib/db/queries/executions";
 import { createAuditLog } from "@/lib/db/queries/audit-logs";
 import { getOrganizationById } from "@/lib/db/queries/organizations";
-import { createPipelineRun, updatePipelineRun, saveStepOutput } from "@/lib/db/queries/pipeline-runs";
+import { createPipelineRun, updatePipelineRun, saveStepOutput, getPipelineRunByRunIdAndSquad } from "@/lib/db/queries/pipeline-runs";
 import { getTopMemories } from "@/lib/db/queries/squad-memories";
 import { waitForCheckpoint } from "@/lib/engine/checkpoint-manager";
+import { autoSelectBestOption } from "@/lib/engine/cron-helpers";
+import { extractAndSaveMemories } from "@/lib/engine/memory-extractor";
 import { stringify as yamlStringify } from "yaml";
 import type { ContentBrief } from "@orbitmind/shared";
 
@@ -121,17 +123,31 @@ export async function POST(req: Request): Promise<Response> {
 
         const events: PipelineEvents = {
           onStateChange: () => {},
-          onCheckpoint: async (step) => {
-            // Autonomous schedules skip checkpoints automatically
-            if (isAutonomous) return "continuar";
+          onCheckpoint: async (step, context) => {
+            // Autonomous schedules: auto-resolve all checkpoints
+            if (isAutonomous) {
+              if (step.type === "checkpoint-input") {
+                // Auto-fill from content brief
+                const topic = contentBrief?.nicho ?? squad.name;
+                const timePeriod = "última semana";
+                return JSON.stringify({ topic, timePeriod, objective: `Conteúdo sobre ${topic}` });
+              }
+              if (step.type === "checkpoint-select") {
+                // Auto-select highest scored option from previous step
+                const sourceOutput = context?.sourceOutput ?? "";
+                return String(autoSelectBestOption(sourceOutput));
+              }
+              // checkpoint-approve or generic checkpoint
+              return "continuar";
+            }
 
+            // Non-autonomous: wait for human
             await updatePipelineRun(runner.runId, {
               status: "waiting_approval",
               checkpointStepId: step.id,
               currentStepIndex: pipelineSteps.findIndex((s) => `step-${s.step}` === step.id),
               pausedAt: new Date(),
             });
-            // Notify connected clients via WebSocket
             try {
               const { wsManager } = await import("@/lib/realtime/ws-manager");
               wsManager.broadcastToSquad(schedule.squadId, {
@@ -139,9 +155,7 @@ export async function POST(req: Request): Promise<Response> {
                 runId: runner.runId,
                 stepId: step.id,
               });
-            } catch {
-              // WebSocket may not be available
-            }
+            } catch {}
             return waitForCheckpoint(runner.runId, step.id);
           },
           onStepStart: async (step) => {
@@ -233,6 +247,17 @@ export async function POST(req: Request): Promise<Response> {
           try {
             await runner.run();
             await updatePipelineRun(runId, { status: "completed", completedAt: new Date() });
+
+            // Extract and save memories from completed run
+            const completedRun = await getPipelineRunByRunIdAndSquad(runId, schedule.squadId);
+            if (completedRun?.stepOutputs) {
+              await extractAndSaveMemories(
+                schedule.squadId,
+                completedRun.stepOutputs as Record<string, { agentName: string; agentIcon: string; content: string; completedAt: string }>,
+                runId,
+              );
+            }
+
             await createAuditLog({
               orgId: schedule.orgId,
               squadId: schedule.squadId,

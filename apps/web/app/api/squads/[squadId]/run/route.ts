@@ -7,7 +7,8 @@ import { getDefaultLlmProvider } from "@/lib/db/queries/llm-providers";
 import { createExecution, updateExecution } from "@/lib/db/queries/executions";
 import { createAuditLog } from "@/lib/db/queries/audit-logs";
 import { getOrganizationById } from "@/lib/db/queries/organizations";
-import { createPipelineRun, updatePipelineRun, saveStepOutput } from "@/lib/db/queries/pipeline-runs";
+import { createPipelineRun, updatePipelineRun, saveStepOutput, getPipelineRunByRunIdAndSquad } from "@/lib/db/queries/pipeline-runs";
+import { extractAndSaveMemories } from "@/lib/engine/memory-extractor";
 import { getTopMemories } from "@/lib/db/queries/squad-memories";
 import { waitForCheckpoint } from "@/lib/engine/checkpoint-manager";
 import { stringify as yamlStringify } from "yaml";
@@ -205,6 +206,17 @@ export async function POST(
       try {
         await runner.run();
         await updatePipelineRun(runId, { status: "completed", completedAt: new Date() });
+
+        // Extract and save memories from completed run
+        const completedRun = await getPipelineRunByRunIdAndSquad(runId, squadId);
+        if (completedRun?.stepOutputs) {
+          await extractAndSaveMemories(
+            squadId,
+            completedRun.stepOutputs as Record<string, { agentName: string; agentIcon: string; content: string; completedAt: string }>,
+            runId,
+          );
+        }
+
         await createAuditLog({
           orgId,
           squadId,
