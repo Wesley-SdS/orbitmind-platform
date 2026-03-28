@@ -1,4 +1,4 @@
-import type { PipelineDefinition, PipelineStep, SquadState, AgentDefinition, AgentTask, RunContext, RunStepOutput } from "@orbitmind/shared";
+import type { PipelineDefinition, PipelineStep, SquadState, AgentDefinition, AgentTask, RunContext, RunStepOutput, ContentBrief } from "@orbitmind/shared";
 import { pipelineSchema } from "@orbitmind/shared";
 import { parse as parseYaml } from "yaml";
 import { StateMachine } from "./state";
@@ -10,7 +10,7 @@ import { buildToneInstructions } from "./best-practices/tone-of-voice";
 
 export interface PipelineEvents {
   onStateChange: (state: SquadState) => void;
-  onCheckpoint: (step: PipelineStep) => Promise<string>;
+  onCheckpoint: (step: PipelineStep, context?: Record<string, string>) => Promise<string>;
   onStepStart: (step: PipelineStep) => void;
   onStepComplete: (step: PipelineStep, output: string) => void;
   onError: (step: PipelineStep, error: Error) => void;
@@ -63,6 +63,9 @@ export class PipelineRunner {
     agentDefinitions?: AgentDefinition[],
     private availableTools?: ToolDefinition[],
     private skillConfigs?: Record<string, Record<string, string>>,
+    private contentBrief?: ContentBrief,
+    private squadMemories?: string[],
+    private companyContext?: string,
   ) {
     const raw = parseYaml(yamlContent);
     this.pipeline = pipelineSchema.parse(raw);
@@ -102,12 +105,39 @@ export class PipelineRunner {
       const step = this.pipeline.steps[i]!;
 
       // ── Checkpoint ──
-      if (step.type === "checkpoint") {
+      if (step.type === "checkpoint" || step.type === "checkpoint-input" || step.type === "checkpoint-select" || step.type === "checkpoint-approve") {
         this.events.onStateChange(this.stateMachine.checkpoint());
-        const response = await this.events.onCheckpoint(step);
+
+        // For checkpoint-select, include previous step outputs as context
+        let checkpointContext: Record<string, string> | undefined;
+        if (step.type === "checkpoint-select" && step.sourceStepId) {
+          const sourceOutput = [...this.runContext.outputs.entries()]
+            .filter(([key]) => key.startsWith(step.sourceStepId + "-v"))
+            .sort(([a], [b]) => b.localeCompare(a))[0]?.[1];
+          if (sourceOutput) {
+            checkpointContext = { sourceOutput: sourceOutput.content };
+          }
+        }
+
+        const response = await this.events.onCheckpoint(step, checkpointContext);
+
         if (response.toLowerCase().includes("cancelar")) {
           return this.stateMachine.fail();
         }
+
+        // Save checkpoint response as step output (important for downstream steps)
+        if (step.type === "checkpoint-input" || step.type === "checkpoint-select") {
+          const version = this.getNextVersion(step.id);
+          this.runContext.outputs.set(`${step.id}-v${version}`, {
+            stepId: step.id,
+            agentId: "_user",
+            version,
+            content: response,
+            timestamp: new Date().toISOString(),
+            vetoed: false,
+          });
+        }
+
         this.events.onStateChange(this.stateMachine.resumeFromCheckpoint());
         i++;
         continue;
@@ -425,7 +455,7 @@ Agora use esses resultados para completar sua tarefa. Inclua as URLs de imagens 
     const outputs: string[] = [];
     for (const step of this.pipeline.steps) {
       if (step.id === currentStep.id) break;
-      if (step.type === "checkpoint") continue;
+      if (step.type === "checkpoint" || step.type === "checkpoint-approve") continue;
 
       // Find the latest version of this step's output
       const versions = [...this.runContext.outputs.entries()]
@@ -458,6 +488,21 @@ Agora use esses resultados para completar sua tarefa. Inclua as URLs de imagens 
   private buildStepContext(step: PipelineStep, agent?: { name: string; custom: string }): string {
     const parts: string[] = [];
 
+    // 0. Company context
+    if (this.companyContext) {
+      parts.push(`--- CONTEXTO DA EMPRESA ---\n${this.companyContext}`);
+    }
+
+    // 0.5 Content brief
+    if (this.contentBrief) {
+      parts.push(`--- BRIEF DE CONTEÚDO ---
+Nicho: ${this.contentBrief.nicho}
+Plataformas alvo: ${this.contentBrief.targetPlatforms.join(", ")}
+Público: ${this.contentBrief.audience}
+Pilares de conteúdo: ${this.contentBrief.contentPillars.join(", ")}
+Idioma: ${this.contentBrief.language ?? "pt-BR"}`);
+    }
+
     // 1. Agent definition
     if (agent?.custom) parts.push(agent.custom);
 
@@ -482,6 +527,11 @@ Agora use esses resultados para completar sua tarefa. Inclua as URLs de imagens 
     // 5. Previous research context
     if (this.lastResearchOutput) {
       parts.push(`\n--- CONTEXTO DA PESQUISA ---\n${this.lastResearchOutput.substring(0, 2000)}`);
+    }
+
+    // 8. Squad memories
+    if (this.squadMemories?.length) {
+      parts.push(`--- MEMÓRIAS DO SQUAD ---\nAprendizados de execuções anteriores:\n${this.squadMemories.map(m => `- ${m}`).join("\n")}`);
     }
 
     return parts.join("\n\n");

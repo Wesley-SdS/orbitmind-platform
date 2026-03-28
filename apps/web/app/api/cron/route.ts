@@ -9,9 +9,12 @@ import { getSquadWithAgents } from "@/lib/db/queries/squads";
 import { getDefaultLlmProvider } from "@/lib/db/queries/llm-providers";
 import { createExecution, updateExecution } from "@/lib/db/queries/executions";
 import { createAuditLog } from "@/lib/db/queries/audit-logs";
+import { getOrganizationById } from "@/lib/db/queries/organizations";
 import { createPipelineRun, updatePipelineRun, saveStepOutput } from "@/lib/db/queries/pipeline-runs";
+import { getTopMemories } from "@/lib/db/queries/squad-memories";
 import { waitForCheckpoint } from "@/lib/engine/checkpoint-manager";
 import { stringify as yamlStringify } from "yaml";
+import type { ContentBrief } from "@orbitmind/shared";
 
 function getNextRunAt(cronExpression: string, timezone: string): Date {
   const expr = CronExpressionParser.parse(cronExpression, {
@@ -194,7 +197,26 @@ export async function POST(req: Request): Promise<Response> {
         const tools = skillsToTools(squadSkills);
         const skillConfigs: Record<string, Record<string, string>> = {};
 
-        const runner = new PipelineRunner(pipelineYaml, agentsList, events, adapter, undefined, tools, skillConfigs);
+        // Load memories and build enriched context
+        const memories = await getTopMemories(schedule.squadId, 10);
+        const memoryStrings = memories.map(m => `[${m.type}] ${m.content}`);
+        const contentBrief = config?.contentBrief as ContentBrief | undefined;
+
+        // Build company context string
+        const org = await getOrganizationById(schedule.orgId);
+        const companyCtx = org?.companyContext as Record<string, unknown> | null;
+        let companyContextStr = `Squad: ${squad.name}. ${squad.description ?? ""}`;
+        if (companyCtx?.name) {
+          companyContextStr += `\nEmpresa: ${companyCtx.name}. Setor: ${companyCtx.sector}. Público: ${companyCtx.audience}. Tom: ${companyCtx.tone}.`;
+          if (companyCtx.competitors) companyContextStr += `\nReferências: ${companyCtx.competitors}`;
+        }
+
+        const runner = new PipelineRunner(pipelineYaml, agentsList, events, adapter, undefined, tools, skillConfigs, contentBrief, memoryStrings, companyContextStr);
+
+        // Set tone from content brief
+        if (contentBrief?.tonePreferences?.[0]) {
+          runner.setSelectedTone(contentBrief.tonePreferences[0]);
+        }
         const runId = runner.runId;
 
         // Persist pipeline run record
