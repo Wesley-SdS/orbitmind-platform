@@ -152,6 +152,7 @@ export async function POST(
         });
       },
       onError: async (step, error) => {
+        console.error(`[Pipeline] Step ${step.id} (${step.name}) FAILED:`, error.message);
         const execId = executionMap.get(step.id);
         if (execId) {
           await updateExecution(execId, {
@@ -194,6 +195,7 @@ export async function POST(
           metadata: { runId },
         });
       } catch (error) {
+        console.error(`[Pipeline] Run ${runId} FAILED:`, error);
         await updatePipelineRun(runId, { status: "failed", completedAt: new Date() });
         await createAuditLog({
           orgId,

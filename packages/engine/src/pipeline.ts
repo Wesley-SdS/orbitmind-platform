@@ -320,7 +320,6 @@ ${context}`;
    * Max 5 tool call rounds to prevent infinite loops.
    */
   private async executeWithTools(stepId: string, prompt: string, agent?: { name: string; custom: string }, requiresImages = false): Promise<string> {
-    // Enrich prompt with available tools info
     const toolNames = this.availableTools?.map(t => `- ${t.name}: ${t.description}`).join("\n") ?? "";
     const imageInstruction = requiresImages
       ? `\n\n## OBRIGATORIO: Imagens
@@ -338,18 +337,21 @@ ${toolNames}
 
 Use as ferramentas quando necessario — por exemplo, busque imagens para posts, pesquise dados atualizados, etc.${imageInstruction}`;
 
-    const messages: Array<{ role: "user" | "assistant" | "tool"; content: string; toolCallId?: string }> = [
-      { role: "user", content: enrichedPrompt },
-    ];
     const systemPrompt = buildSystemPrompt(agent ? { name: agent.name, role: "", config: null } : { name: "Agente", role: "", config: null });
 
+    let currentPrompt = enrichedPrompt;
     let finalOutput = "";
     let totalTokens = 0;
     let totalCost = 0;
     const startTime = Date.now();
     const maxRounds = 5;
+    const toolResultsAccumulated: string[] = [];
 
     for (let round = 0; round < maxRounds; round++) {
+      const messages: Array<{ role: "user" | "assistant" | "tool"; content: string; toolCallId?: string }> = [
+        { role: "user", content: currentPrompt },
+      ];
+
       const result = await this.adapter!.chatWithTools!(messages, this.availableTools!, systemPrompt);
       totalTokens += result.tokensUsed;
       totalCost += result.costCents;
@@ -359,32 +361,28 @@ Use as ferramentas quando necessario — por exemplo, busque imagens para posts,
         break;
       }
 
-      // LLM wants to use tools - add assistant message with tool calls indicator
-      if (result.output) {
-        messages.push({ role: "assistant", content: result.output });
-      }
-
-      // Execute each tool call and add results
+      // Execute each tool call
       for (const toolCall of result.toolCalls) {
         const toolResult = await executeToolCall(toolCall, this.skillConfigs ?? {});
-        messages.push({
-          role: "tool",
-          content: toolResult.content,
-          toolCallId: toolResult.toolCallId,
-        });
+        toolResultsAccumulated.push(`### Resultado de ${toolCall.name}\n${toolResult.content}`);
       }
 
-      // If this is the last round, force a text response
-      if (round === maxRounds - 1) {
-        messages.push({ role: "user", content: "Agora gere sua resposta final com base nos resultados das ferramentas." });
-        const finalResult = await this.adapter!.chat(
-          messages.filter(m => m.role !== "tool").map(m => ({ role: m.role === "tool" ? "user" : m.role, content: m.content })),
-          systemPrompt,
-        );
-        finalOutput = finalResult.output;
-        totalTokens += finalResult.tokensUsed;
-        totalCost += finalResult.costCents;
-      }
+      // Build new prompt with tool results for next round
+      currentPrompt = `${enrichedPrompt}
+
+## Resultados das ferramentas que voce usou
+${toolResultsAccumulated.join("\n\n---\n\n")}
+
+Agora use esses resultados para completar sua tarefa. Inclua as URLs de imagens encontradas no formato ![descricao](url).`;
+    }
+
+    // If we exhausted rounds without final output, do a simple chat
+    if (!finalOutput) {
+      const fallbackPrompt = `${enrichedPrompt}\n\n## Dados coletados\n${toolResultsAccumulated.join("\n\n")}\n\nGere sua resposta final.`;
+      const fallbackResult = await this.adapter!.chat([{ role: "user", content: fallbackPrompt }], systemPrompt);
+      finalOutput = fallbackResult.output;
+      totalTokens += fallbackResult.tokensUsed;
+      totalCost += fallbackResult.costCents;
     }
 
     this.stepMetrics.set(stepId, { tokensUsed: totalTokens, costCents: totalCost, durationMs: Date.now() - startTime });
