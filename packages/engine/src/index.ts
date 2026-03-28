@@ -26,7 +26,8 @@ export {
 } from "./best-practices";
 export type { BestPractice } from "./best-practices";
 export { TONE_OF_VOICE_OPTIONS, getToneById, buildToneInstructions } from "./best-practices/tone-of-voice";
-export { skillsToTools, executeToolCall } from "./tools";
+export { skillsToTools, executeToolCall, webSearch } from "./tools";
+export type { SearchResult } from "./tools";
 export type { ToneDefinition } from "./best-practices/tone-of-voice";
 export { IntegrationHookManager } from "./integration-hooks";
 export type { IntegrationHookConfig, IntegrationHookContext, HookEvent, HookNotifier } from "./integration-hooks";

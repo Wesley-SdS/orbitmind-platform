@@ -172,7 +172,15 @@ async function routeToolCall(
 
   switch (call.name) {
     case "web_search": {
-      return { results: `[Resultados de busca para: "${args.query}"]`, note: "Web search não implementado neste ambiente. Use o conteúdo disponível." };
+      const { webSearch } = await import("../tools/web-search");
+      const results = await webSearch(args.query as string, 10);
+      if (results.length === 0) {
+        return { results: [], note: "Nenhum resultado encontrado para a busca." };
+      }
+      return {
+        results: results.map((r, i) => `${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.snippet}`).join("\n\n"),
+        count: results.length,
+      };
     }
 
     case "web_fetch": {
@@ -187,7 +195,9 @@ async function routeToolCall(
 
     case "image_search": {
       const { ImageFetcher } = await import("../skills/image-fetcher");
-      const fetcher = new ImageFetcher();
+      const pexelsKey = skillConfigs["image-fetcher"]?.PEXELS_API_KEY;
+      const unsplashKey = skillConfigs["image-fetcher"]?.UNSPLASH_ACCESS_KEY;
+      const fetcher = new ImageFetcher(unsplashKey, pexelsKey);
       return fetcher.execute({ mode: "search", query: args.query as string });
     }
 
