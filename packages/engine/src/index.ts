@@ -37,3 +37,4 @@ export type {
   InvestigationConfig, ProfileConfig, RawContent,
   PatternAnalysis, ConsolidatedAnalysis, InvestigationResult,
 } from "./sherlock/types";
+export { CONTENT_PIPELINE_TEMPLATE, isContentSquad, mapTemplateToAgents, type ContentPipelineStep } from "./templates";
