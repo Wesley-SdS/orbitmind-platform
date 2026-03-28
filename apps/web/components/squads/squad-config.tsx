@@ -463,24 +463,34 @@ export function SquadConfig({ squad, config, agents, pipelineSteps }: SquadConfi
             <p className="text-sm text-muted-foreground">Nenhum pipeline configurado.</p>
           ) : (
             <div className="space-y-2">
-              {pipelineSteps.map((step) => (
-                <div key={step.step} className="flex items-center gap-3 rounded-lg border border-border/50 p-2.5">
-                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                    step.type === "checkpoint" ? "bg-amber-500/15 text-amber-500" : "bg-primary/10 text-primary"
-                  }`}>
-                    {step.step}
+              {pipelineSteps.map((step) => {
+                const isCheckpoint = step.type.startsWith("checkpoint");
+                const checkpointColor = step.type === "checkpoint-input" ? "bg-blue-500/15 text-blue-500"
+                  : step.type === "checkpoint-select" ? "bg-purple-500/15 text-purple-500"
+                  : "bg-amber-500/15 text-amber-500";
+                const checkpointLabel = step.type === "checkpoint-input" ? "Briefing"
+                  : step.type === "checkpoint-select" ? "Seleção"
+                  : step.type === "checkpoint-approve" ? "Aprovação"
+                  : step.type === "checkpoint" ? "Checkpoint" : "Agente";
+                return (
+                  <div key={step.step} className="flex items-center gap-3 rounded-lg border border-border/50 p-2.5">
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      isCheckpoint ? checkpointColor : "bg-primary/10 text-primary"
+                    }`}>
+                      {step.step}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{step.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {isCheckpoint ? "👤 Humano" : `${resolveAgentIcon(step.agentId)} ${resolveAgentName(step.agentId)}`}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="text-[10px]">
+                      {checkpointLabel}
+                    </Badge>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{step.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {step.type === "checkpoint" ? "👤 Checkpoint humano" : `${resolveAgentIcon(step.agentId)} ${resolveAgentName(step.agentId)}`}
-                    </p>
-                  </div>
-                  <Badge variant="outline" className="text-[10px]">
-                    {step.type === "checkpoint" ? "Checkpoint" : "Agente"}
-                  </Badge>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

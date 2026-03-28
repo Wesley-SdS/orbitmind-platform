@@ -94,7 +94,7 @@ export async function POST(
 
     const events: PipelineEvents = {
       onStateChange: () => {},
-      onCheckpoint: async (step) => {
+      onCheckpoint: async (step, _context) => {
         console.log(`[Checkpoint] Step ${step.id} reached. RunId: ${runner.runId}. Waiting for approval...`);
         await updatePipelineRun(runner.runId, {
           status: "waiting_approval",

@@ -254,6 +254,9 @@ export class PipelineRunner {
   ): Promise<string> {
     let previousOutput = "";
     const sortedTasks = [...tasks].sort((a, b) => a.order - b.order);
+    let totalTokens = 0;
+    let totalCost = 0;
+    const startTime = Date.now();
 
     for (let t = 0; t < sortedTasks.length; t++) {
       const task = sortedTasks[t]!;
@@ -267,6 +270,8 @@ export class PipelineRunner {
 
       const prompt = this.buildTaskPrompt(agent, task, previousOutput);
       const result = await this.adapter!.chat([{ role: "user", content: prompt }]);
+      totalTokens += result.tokensUsed;
+      totalCost += result.costCents;
       let output = result.output;
 
       // Check task-level veto conditions
@@ -283,6 +288,7 @@ export class PipelineRunner {
       previousOutput = output;
     }
 
+    this.stepMetrics.set(step.id, { tokensUsed: totalTokens, costCents: totalCost, durationMs: Date.now() - startTime });
     return previousOutput;
   }
 
@@ -438,7 +444,9 @@ Agora use esses resultados para completar sua tarefa. Inclua as URLs de imagens 
   private async forceImageSearch(step: PipelineStep, output: string): Promise<string> {
     try {
       const { ImageFetcher } = await import("./skills/image-fetcher");
-      const fetcher = new ImageFetcher();
+      const pexelsKey = this.skillConfigs?.["image-fetcher"]?.PEXELS_API_KEY;
+      const unsplashKey = this.skillConfigs?.["image-fetcher"]?.UNSPLASH_ACCESS_KEY;
+      const fetcher = new ImageFetcher(unsplashKey, pexelsKey);
       const searchQuery = `${step.name} ${this.pipeline.name} marketing`;
       const result = await fetcher.searchImages(searchQuery, 3);
       if (result.success && result.images && result.images.length > 0) {

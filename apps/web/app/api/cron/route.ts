@@ -79,6 +79,13 @@ export async function POST(req: Request): Promise<Response> {
           continue;
         }
 
+        // Prepare agents list (must be before resolveAgent closure)
+        const agentsList = squad.agents.map((a) => ({
+          id: a.id,
+          name: a.name,
+          icon: a.icon ?? "🤖",
+        }));
+
         // Resolve agentId kebab → UUID
         const resolveAgent = (id?: string): string | undefined => {
           if (!id) return undefined;
@@ -97,13 +104,6 @@ export async function POST(req: Request): Promise<Response> {
             agent: resolveAgent(s.agentId),
           })),
         });
-
-        // Prepare agents and adapter
-        const agentsList = squad.agents.map((a) => ({
-          id: a.id,
-          name: a.name,
-          icon: a.icon ?? "🤖",
-        }));
 
         const providerConfig: ProviderConfig = {
           provider: llmProvider.provider,
