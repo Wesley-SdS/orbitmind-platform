@@ -2,7 +2,7 @@ import { createAdapter } from "@orbitmind/engine";
 import type { ProviderConfig } from "@orbitmind/engine";
 import { getDefaultLlmProvider } from "@/lib/db/queries/llm-providers";
 import { createMessage, getMessagesByConversationId, getMessagesBySquadId } from "@/lib/db/queries/messages";
-import { getSquadsByOrgId, getSquadWithAgents, createSquad, updateSquad } from "@/lib/db/queries/squads";
+import { getSquadsByOrgId, getSquadWithAgents, getSquadById, createSquad, updateSquad } from "@/lib/db/queries/squads";
 import { createAgent, getAgentsBySquadId } from "@/lib/db/queries/agents";
 import { createAuditLog } from "@/lib/db/queries/audit-logs";
 import { getOrganizationById, updateOrganization } from "@/lib/db/queries/organizations";
@@ -434,11 +434,64 @@ Se o usuário respondeu com número ("1","2"), interprete como seleção da opç
 Monte o design com bloco JSON:
 
 \`\`\`json:squad-design
-{"ready":true,"name":"...","code":"...","description":"...","icon":"emoji","performanceMode":"high ou economic","agents":[{"id":"id-kebab","name":"Nome Aliterativo","role":"Função","icon":"emoji","modelTier":"powerful ou fast","execution":"inline ou subagent","description":"1 frase"}],"pipeline":[{"step":1,"name":"...","type":"agent","agentId":"id"},{"step":2,"name":"Aprovação","type":"checkpoint"}],"skills":["web_search","web_fetch"]}
+{"ready":true,"name":"...","code":"...","description":"...","icon":"emoji","performanceMode":"high ou economic","agents":[{"id":"id-kebab","name":"Nome Aliterativo","role":"Função","icon":"emoji","modelTier":"powerful ou fast","execution":"inline ou subagent","description":"1 frase"}],"pipeline":[{"step":1,"name":"...","type":"agent","agentId":"id"},{"step":2,"name":"Aprovação","type":"checkpoint"}],"skills":["web_search","web_fetch"],"contentBrief":null}
+\`\`\`
+
+Para squads de conteúdo/marketing, inclua o campo "contentBrief" preenchido:
+\`\`\`json
+"contentBrief": {
+  "nicho": "...",
+  "targetPlatforms": ["instagram-feed", "linkedin-post"],
+  "tonePreferences": ["educativo"],
+  "contentPillars": ["IA", "automação"],
+  "audience": "Empreendedores 25-45 anos",
+  "referenceProfiles": [],
+  "language": "pt-BR"
+}
+\`\`\`
+
+Para squads de conteúdo, use os tipos de pipeline expandidos:
+\`\`\`json
+"pipeline": [
+  {"step": 1, "name": "Briefing", "type": "checkpoint-input"},
+  {"step": 2, "name": "Pesquisa", "type": "agent", "agentId": "agent-id"},
+  {"step": 3, "name": "Seleção de Pauta", "type": "checkpoint-select"},
+  ...
+]
 \`\`\`
 
 Depois apresente visualmente com emojis, equipe numerada e pipeline.
 Pergunte: "Posso **criar agora**, ou quer **ajustar**?"
+
+## Regras para Squads de Conteúdo/Marketing
+Se o objetivo do squad envolve criação de conteúdo, marketing, social media ou publicação:
+
+1. Pergunte o NICHO específico (ex: "IA para empreendedores", "marketing digital", "fitness")
+2. Pergunte as PLATAFORMAS alvo (Instagram, LinkedIn, Twitter, YouTube, Blog, Newsletter)
+3. Pergunte o TOM preferido. Apresente estas 6 opções:
+   1. 📚 Educativo — Ensina algo útil, direto e didático
+   2. 🔥 Provocativo — Desafia crenças, gera debate
+   3. ✨ Inspiracional — Motiva ação, storytelling emocional
+   4. 😄 Humorístico — Leve, divertido, memes e referências
+   5. 🎯 Autoridade — Expert, dados, credibilidade técnica
+   6. 💬 Conversacional — Como uma conversa entre amigos
+4. Pergunte os PILARES de conteúdo (3-5 temas recorrentes, ex: "IA", "automação", "produtividade")
+5. Pergunte o PÚBLICO-ALVO específico
+
+## Pipeline para Squads de Conteúdo
+Para squads de conteúdo, o pipeline DEVE seguir esta estrutura:
+1. Briefing (checkpoint-input) — Usuário define tema e período
+2. Pesquisa de Tendências (agent) — Busca web por trending topics no nicho
+3. Seleção de Pauta (checkpoint-select) — Usuário escolhe qual pauta
+4. Geração de Ângulos (agent) — Cria 3-5 ângulos criativos
+5. Seleção de Ângulo (checkpoint-select) — Usuário escolhe ângulo
+6. Criação de Conteúdo (agent) — Produz o conteúdo completo
+7. Design Visual (agent) — Busca/cria imagens
+8. Revisão de Qualidade (agent) — Avalia e pontua
+9. Aprovação Final (checkpoint-approve) — Usuário aprova
+10. Publicação (agent) — Publica nas plataformas
+
+Inclua no design JSON um campo "contentBrief" com as respostas coletadas.
 
 ## REGRAS
 - UMA pergunta por vez, DIFERENTE das anteriores
@@ -787,6 +840,12 @@ async function handleEditModify(state: ArchitectConversationState, squadId: stri
 
   const agentList = agents.map((a) => `- ${a.icon} ${a.name}: ${a.role} (${a.modelTier})`).join("\n");
 
+  const squadConfig = await getSquadById(state.editSquadId!);
+  const currentBrief = (squadConfig?.config as Record<string, unknown>)?.contentBrief;
+  const briefContext = currentBrief
+    ? `\n### Content Brief Atual\n${JSON.stringify(currentBrief, null, 2)}`
+    : "";
+
   // Include conversation history for context
   const history = await getHistory(squadId, 15);
   const conversationMessages = history.map((m) => ({
@@ -806,6 +865,11 @@ NÃO crie um squad novo. APENAS modifique o existente.
 
 ### Agentes atuais
 ${agentList}
+${briefContext}
+
+## Edição de Content Brief
+Se o usuário quiser mudar nicho, tom, plataformas ou público, atualize o contentBrief.
+Inclua o campo "contentBrief" no JSON de edição se houver mudanças.
 
 ## INSTRUÇÃO OBRIGATÓRIA
 Você DEVE gerar um bloco JSON com as mudanças. SEMPRE inclua o JSON, mesmo que precise fazer uma pergunta.
@@ -1166,7 +1230,7 @@ async function buildSquadFromDesign(state: ArchitectConversationState) {
     code: design.code,
     description: design.description,
     icon: design.icon,
-    config: { performanceMode: design.performanceMode, pipeline: design.pipeline, skills: design.skills },
+    config: { performanceMode: design.performanceMode, pipeline: design.pipeline, skills: design.skills, contentBrief: design.contentBrief ?? null },
   });
 
   // Create agents and build mapping: design id (kebab) → real UUID

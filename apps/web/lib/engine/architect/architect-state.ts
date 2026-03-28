@@ -24,6 +24,11 @@ export interface ArchitectConversationState {
     performanceMode?: "high" | "economic";
     targetFormats?: string[];
     customRequirements?: string;
+    // Content-specific
+    nicho?: string;
+    targetPlatforms?: string[];
+    tonePreference?: string;
+    contentPillars?: string[];
   };
   proposedDesign?: {
     name: string;
@@ -43,10 +48,19 @@ export interface ArchitectConversationState {
     pipeline: Array<{
       step: number;
       name: string;
-      type: "agent" | "checkpoint";
+      type: "agent" | "checkpoint" | "checkpoint-input" | "checkpoint-select" | "checkpoint-approve";
       agentId?: string;
     }>;
     skills: string[];
+    contentBrief?: {
+      nicho: string;
+      targetPlatforms: string[];
+      tonePreferences: string[];
+      contentPillars: string[];
+      audience: string;
+      referenceProfiles: string[];
+      language: string;
+    };
   };
   nameSuggestions?: string[];
   createdSquadId?: string;
