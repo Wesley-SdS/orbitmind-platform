@@ -57,7 +57,7 @@ export function CheckpointReview({
   const busy = approving || rejecting;
 
   async function handleApprove() {
-    if (checkpointType === "checkpoint-select" && selectedOption === null) {
+    if (checkpointType === "checkpoint-select" && selectedOption === null && !formData["selection"]) {
       toast.error("Selecione uma opção antes de confirmar.");
       return;
     }
@@ -69,6 +69,8 @@ export function CheckpointReview({
         body = { data: formData };
       } else if (checkpointType === "checkpoint-select" && selectedOption !== null) {
         body = { selectedIndex: selectedOption };
+      } else if (checkpointType === "checkpoint-select" && formData["selection"]) {
+        body = { data: { selection: formData["selection"] } };
       }
 
       const res = await fetch(`/api/squads/${squadId}/runs/${runId}/approve`, {
@@ -212,7 +214,16 @@ export function CheckpointReview({
 
   // --- checkpoint-select variant ---
   if (checkpointType === "checkpoint-select") {
-    const options = parseSelectOptions(sourceStepOutput ?? "");
+    // Try to get source output from props or from the last available step output
+    const rawSource = sourceStepOutput || (() => {
+      const outputEntries = Object.entries(stepOutputs);
+      if (outputEntries.length > 0) {
+        const lastEntry = outputEntries[outputEntries.length - 1];
+        return lastEntry?.[1]?.content ?? "";
+      }
+      return "";
+    })();
+    const options = parseSelectOptions(rawSource);
     return (
       <Card className="border-purple-500/30 bg-purple-500/5">
         <CardContent className="p-6">
@@ -227,12 +238,27 @@ export function CheckpointReview({
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              Escolha uma das opcoes geradas pelo agente
+              Escolha uma das opções geradas pelo agente
             </p>
           </div>
 
           <div className="mb-6 space-y-2">
-            {options.length === 0 && (
+            {options.length === 0 && rawSource && (
+              <div className="space-y-3">
+                <div className="rounded-lg border border-border/50 bg-muted/30 p-3 prose prose-sm prose-invert max-w-none max-h-64 overflow-y-auto">
+                  <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(rawSource.substring(0, 3000)) }} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Digite sua escolha (número ou descrição)</label>
+                  <Input
+                    value={formData["selection"] ?? ""}
+                    onChange={(e) => setFormData(prev => ({ ...prev, selection: e.target.value }))}
+                    placeholder="Ex: 1, ou 'IA agentica como prioridade'"
+                  />
+                </div>
+              </div>
+            )}
+            {options.length === 0 && !rawSource && (
               <p className="text-sm text-muted-foreground">
                 Nenhuma opção detectada no output do step anterior.
               </p>
