@@ -46,7 +46,7 @@ export const pipelineStepSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   agent: z.string().optional(),
-  type: z.enum(["agent", "checkpoint", "ci"]).optional(),
+  type: z.enum(["agent", "checkpoint", "checkpoint-input", "checkpoint-select", "checkpoint-approve", "ci"]).optional(),
   execution: z.enum(["inline", "subagent"]).optional(),
   model_tier: z.enum(["powerful", "fast"]).default("powerful"),
   file: z.string().optional(),
@@ -65,6 +65,15 @@ export const pipelineStepSchema = z.object({
   max_review_cycles: z.number().int().min(1).max(10).default(3),
   // Format injection
   format: z.string().optional(),
+  // Checkpoint fields (for checkpoint-input)
+  checkpoint_fields: z.array(z.object({
+    name: z.string().min(1),
+    label: z.string().min(1),
+    type: z.enum(["text", "textarea", "select"]),
+    options: z.array(z.string()).optional(),
+  })).optional(),
+  // Source step reference (for checkpoint-select)
+  source_step_id: z.string().optional(),
 });
 
 export const pipelineSchema = z.object({

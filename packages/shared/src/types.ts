@@ -163,10 +163,24 @@ export interface MetricsSnapshot {
 }
 
 // ──────────────────────────────────────────────
+// Content Brief
+// ──────────────────────────────────────────────
+
+export interface ContentBrief {
+  nicho: string;
+  targetPlatforms: string[];
+  tonePreferences: string[];
+  contentPillars: string[];
+  audience: string;
+  referenceProfiles: string[];
+  language: string;
+}
+
+// ──────────────────────────────────────────────
 // Pipeline
 // ──────────────────────────────────────────────
 
-export type StepType = "agent" | "checkpoint" | "ci";
+export type StepType = "agent" | "checkpoint" | "checkpoint-input" | "checkpoint-select" | "checkpoint-approve" | "ci";
 export type ExecutionMode = "inline" | "subagent";
 
 export interface PipelineStep {
@@ -192,6 +206,10 @@ export interface PipelineStep {
   maxReviewCycles?: number;
   // Format injection (platform best practices)
   format?: string;
+  // Checkpoint fields (for checkpoint-input)
+  checkpointFields?: Array<{ name: string; label: string; type: "text" | "textarea" | "select"; options?: string[] }>;
+  // Source step reference (for checkpoint-select)
+  sourceStepId?: string;
 }
 
 export interface RunContext {
