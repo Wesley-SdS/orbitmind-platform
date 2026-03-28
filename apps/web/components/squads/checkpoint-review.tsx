@@ -112,7 +112,11 @@ export function CheckpointReview({
 
   // --- checkpoint-input variant ---
   if (checkpointType === "checkpoint-input") {
-    const fields = checkpointFields ?? [];
+    const fields = checkpointFields?.length ? checkpointFields : [
+      { name: "topic", label: "Tema ou assunto", type: "textarea" },
+      { name: "timePeriod", label: "Período de pesquisa", type: "select", options: ["últimas 24 horas", "última semana", "último mês", "últimos 3 meses"] },
+      { name: "objective", label: "Objetivo do conteúdo (opcional)", type: "text" },
+    ];
     return (
       <Card className="border-blue-500/30 bg-blue-500/5">
         <CardContent className="p-6">

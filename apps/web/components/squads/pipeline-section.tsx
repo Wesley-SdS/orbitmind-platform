@@ -60,29 +60,45 @@ export function PipelineSection({ squadId, pipeline, agents }: PipelineSectionPr
 
   const loadData = useCallback(async () => {
     try {
-      const res = await fetch(`/api/squads/${squadId}/runs`);
-      if (!res.ok) return;
-      const runs = await res.json();
-      if (!Array.isArray(runs) || runs.length === 0) {
-        setLatestRun(null);
-        setPipelineRun(null);
-        setHasActiveRun(false);
-        return;
+      // Always fetch the latest pipeline run (includes waiting_approval checkpoints)
+      const prRes = await fetch(`/api/squads/${squadId}/pipeline-run`);
+      let prData: PipelineRun | null = null;
+      if (prRes.ok) {
+        const prJson = await prRes.json();
+        if (prJson?.runId) prData = prJson;
       }
 
-      const latest = runs[0];
-      if (!latest.runId) return;
+      // Fetch execution steps if we have a runId
+      let steps: RunStep[] | null = null;
+      if (prData?.runId) {
+        const execRes = await fetch(`/api/squads/${squadId}/runs/${prData.runId}`);
+        if (execRes.ok) {
+          const data = await execRes.json();
+          const execSteps = data.steps ?? data;
+          steps = Array.isArray(execSteps) ? execSteps : null;
+          // Merge pipelineRun from detail endpoint if available
+          if (data.pipelineRun) prData = { ...prData, ...data.pipelineRun };
+        }
+      } else {
+        // Fallback: try executions list for older runs without pipeline_runs record
+        const res = await fetch(`/api/squads/${squadId}/runs`);
+        if (res.ok) {
+          const runs = await res.json();
+          if (Array.isArray(runs) && runs.length > 0 && runs[0].runId) {
+            const execRes = await fetch(`/api/squads/${squadId}/runs/${runs[0].runId}`);
+            if (execRes.ok) {
+              const data = await execRes.json();
+              steps = Array.isArray(data.steps) ? data.steps : Array.isArray(data) ? data : null;
+              if (data.pipelineRun) prData = data.pipelineRun;
+            }
+          }
+        }
+      }
 
-      const execRes = await fetch(`/api/squads/${squadId}/runs/${latest.runId}`);
-      if (!execRes.ok) return;
-      const data = await execRes.json();
-      const steps = data.steps ?? data;
-      const prData = data.pipelineRun ?? null;
-
-      setLatestRun(Array.isArray(steps) ? steps : null);
+      setLatestRun(steps);
       setPipelineRun(prData);
-      const isRunning = Array.isArray(steps) && steps.some((s: RunStep) => s.status === "running");
-      const isWaiting = prData?.status === "waiting_approval";
+      const isRunning = steps?.some((s: RunStep) => s.status === "running") ?? false;
+      const isWaiting = prData?.status === "waiting_approval" || prData?.status === "running";
       setHasActiveRun(isRunning || isWaiting);
     } catch { /* ignore */ }
     finally { setLoading(false); }
