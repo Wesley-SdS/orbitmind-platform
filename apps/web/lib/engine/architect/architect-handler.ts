@@ -432,23 +432,9 @@ Se o usuário respondeu com número ("1","2"), interprete como seleção da opç
 
 ### Se já tem info SUFICIENTE (ou 4+ perguntas):
 
-## Fase de Pesquisa (OBRIGATÓRIO antes de desenhar)
-Antes de gerar o design do squad, você DEVE pesquisar o domínio usando a ferramenta web_search:
-
-1. Busque "{propósito do squad} melhores práticas" para frameworks operacionais
-2. Busque "{domínio} erros comuns" para anti-patterns
-3. Busque "{domínio} critérios de qualidade" para quality criteria
-
-Use os resultados para:
-- Definir principles realistas para cada agente
-- Identificar anti-patterns reais do domínio
-- Estabelecer critérios de qualidade específicos
-- Entender o vocabulário profissional do domínio
-
-Mostre ao usuário: "🔍 Pesquisando melhores práticas do domínio..." antes de pesquisar.
-Depois: "📊 Pesquisa concluída! Encontrei X fontes. Vou usar para desenhar seu squad."
-
-IMPORTANTE: Inclua os resultados da pesquisa no campo "domainKnowledge" do design JSON.
+## Pesquisa de Domínio
+A pesquisa web será feita automaticamente após você gerar o design. NÃO use web_search durante o discovery.
+Foque em gerar o design JSON com base nas informações coletadas nas perguntas ao usuário.
 
 Monte o design com bloco JSON:
 
@@ -588,22 +574,42 @@ Se o usuário mencionar publicação em Instagram, LinkedIn ou qualquer rede soc
   const design = extractDesignJson(result.output);
 
   if (design) {
-    // Quick domain research if the LLM didn't include domainKnowledge
-    if (!design.domainKnowledge) {
-      try {
-        const { webSearch } = await import("@orbitmind/engine");
-        const purpose = state.discovery.purpose || design.description || "";
-        const results = await webSearch(`${purpose} melhores práticas framework`, 5);
-        const brief = results.map(r => `- ${r.title}: ${r.snippet}`).join("\n");
+    // Send progress message BEFORE research
+    await sendArchitectMessage(squadId, "🔍 Pesquisando melhores práticas do domínio para enriquecer o squad...");
+
+    // Do web search directly (not via LLM)
+    try {
+      const { webSearch } = await import("@orbitmind/engine");
+      const nicho = state.discovery.nicho || state.discovery.purpose || design.description || "";
+      const [practices, errors, criteria] = await Promise.all([
+        webSearch(`${nicho} melhores práticas framework`, 5).catch(() => []),
+        webSearch(`${nicho} erros comuns evitar`, 5).catch(() => []),
+        webSearch(`${nicho} critérios qualidade`, 5).catch(() => []),
+      ]);
+
+      const allResults = [...practices, ...errors, ...criteria];
+      const researchBrief = allResults.map(r => `- **${r.title}**: ${r.snippet}`).join("\n");
+
+      // Enrich design with domain knowledge
+      if (!design.domainKnowledge) {
         design.domainKnowledge = {
-          researchBrief: brief || "Pesquisa automática não retornou resultados.",
+          researchBrief: researchBrief || "Pesquisa não retornou resultados.",
           domainFramework: "",
           qualityCriteria: "",
           outputExamples: "",
           antiPatterns: "",
         };
-      } catch { /* ignore search failures */ }
+      }
+
+      // Send research results message
+      if (allResults.length > 0) {
+        await sendArchitectMessage(squadId, `📊 Pesquisa concluída! Encontrei **${allResults.length} fontes** sobre "${nicho}".\n\n🧠 Finalizando o design do squad...`);
+      }
+    } catch {
+      // Research failure is not blocking
+      await sendArchitectMessage(squadId, "📊 Pesquisa de domínio concluída. Montando o design...");
     }
+
     state.proposedDesign = design;
     state.phase = "naming";
     const display = stripJsonFromOutput(result.output);

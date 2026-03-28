@@ -441,11 +441,18 @@ function simpleMarkdown(text: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
+    .replace(/!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g, '<img src="$2" alt="$1" class="rounded-lg max-w-full h-auto my-2 max-h-64 object-cover" loading="lazy" />')
+    .replace(/^(https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?)$/gm, '<img src="$1" alt="image" class="rounded-lg max-w-full h-auto my-2 max-h-64 object-cover" loading="lazy" />')
+    .replace(/^### (.+)$/gm, "<h4 class='font-semibold mt-3 mb-1'>$1</h4>")
+    .replace(/^## (.+)$/gm, "<h3 class='font-semibold text-base mt-4 mb-1'>$1</h3>")
+    .replace(/^# (.+)$/gm, "<h2 class='font-bold text-lg mt-4 mb-2'>$1</h2>")
     .replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>")
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, "<em>$1</em>")
     .replace(/^(\d+)\.\s+(.+)$/gm, "<li>$1. $2</li>")
     .replace(/^[-–]\s+(.+)$/gm, "<li>$1</li>")
+    .replace(/^---$/gm, "<hr class='my-3 border-border/50' />")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary underline hover:no-underline">$1</a>')
     .replace(/\n/g, "<br />");
 }
 

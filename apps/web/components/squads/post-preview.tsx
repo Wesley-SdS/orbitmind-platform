@@ -64,13 +64,33 @@ export function PostPreview({ content, agentName, agentIcon }: PostPreviewProps)
   );
 }
 
+function extractImageUrl(text: string): string | null {
+  // Try markdown image
+  const mdMatch = text.match(/!\[[^\]]*\]\((https?:\/\/[^)]+)\)/);
+  if (mdMatch) return mdMatch[1]!;
+  // Try bare image URL
+  const urlMatch = text.match(/(https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif))/i);
+  if (urlMatch) return urlMatch[1]!;
+  return null;
+}
+
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/^#+\s+/gm, "")
+    .replace(/^[-–]\s+/gm, "• ")
+    .trim();
+}
+
 function InstagramPreview({ text, agentName, agentIcon }: { text: string; agentName: string; agentIcon: string }) {
-  const lines = text.split("\n").filter(l => l.trim());
-  const caption = lines.join("\n");
+  const imageUrl = extractImageUrl(text);
+  const caption = stripMarkdown(text);
   const hashtags = caption.match(/#\w+/g) ?? [];
 
   return (
-    <div className="max-w-sm rounded-lg border border-border bg-black/40 overflow-hidden">
+    <div className="max-w-sm rounded-lg border border-border bg-card overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2">
         <div className="h-7 w-7 rounded-full bg-gradient-to-br from-pink-500 via-red-500 to-yellow-500 flex items-center justify-center text-sm">
@@ -78,10 +98,16 @@ function InstagramPreview({ text, agentName, agentIcon }: { text: string; agentN
         </div>
         <span className="text-xs font-semibold">orbitmind360</span>
       </div>
-      {/* Image placeholder */}
-      <div className="aspect-square bg-gradient-to-br from-purple-900/50 via-indigo-900/30 to-blue-900/50 flex items-center justify-center">
-        <span className="text-4xl opacity-30">📸</span>
-      </div>
+      {/* Image */}
+      {imageUrl ? (
+        <div className="aspect-square relative bg-muted">
+          <img src={imageUrl} alt="Post" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+        </div>
+      ) : (
+        <div className="aspect-square bg-gradient-to-br from-purple-900/50 via-indigo-900/30 to-blue-900/50 flex items-center justify-center">
+          <span className="text-4xl opacity-30">📸</span>
+        </div>
+      )}
       {/* Actions */}
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-3">
@@ -107,11 +133,12 @@ function InstagramPreview({ text, agentName, agentIcon }: { text: string; agentN
 }
 
 function LinkedInPreview({ text, agentName, agentIcon }: { text: string; agentName: string; agentIcon: string }) {
+  const cleanText = stripMarkdown(text);
   return (
-    <div className="max-w-md rounded-lg border border-border bg-[#1b1f23] overflow-hidden">
+    <div className="max-w-md rounded-lg border border-border bg-card overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3">
-        <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-lg">
+        <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-lg text-white">
           {agentIcon}
         </div>
         <div>
@@ -122,8 +149,8 @@ function LinkedInPreview({ text, agentName, agentIcon }: { text: string; agentNa
       {/* Content */}
       <div className="px-4 pb-3">
         <p className="text-sm leading-relaxed whitespace-pre-wrap">
-          {text.substring(0, 500)}
-          {text.length > 500 && <span className="text-blue-400 cursor-pointer">...ver mais</span>}
+          {cleanText.substring(0, 500)}
+          {cleanText.length > 500 && <span className="text-blue-500 cursor-pointer">...ver mais</span>}
         </p>
       </div>
       {/* Engagement bar */}

@@ -129,9 +129,8 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchi
         }
         setTypingAgent(null);
       };
-      setTimeout(pollHistory, 3000);
-      setTimeout(pollHistory, 8000);
-      setTimeout(pollHistory, 15000);
+      const polls = [2000, 4000, 6000, 8000, 10000, 13000, 16000, 20000, 25000, 30000, 40000, 50000, 60000];
+      polls.forEach(ms => setTimeout(pollHistory, ms));
     } else if (!isArchitect) {
       // Squad chat — poll for agent response
       const firstAgent = agents[0];

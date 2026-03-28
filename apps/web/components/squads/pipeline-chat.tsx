@@ -261,7 +261,7 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
                     return (
                       <a key={i} href={src.url} target="_blank" rel="noopener noreferrer" title={src.url}
                         className="flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-3 py-1.5 text-xs hover:bg-accent transition-colors">
-                        <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=16`} alt="" className="h-4 w-4 rounded" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=32`} alt="" className="h-4 w-4 rounded" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                         <span>{formatDomainName(host)}</span>
                         <ExternalLink className="h-3 w-3 shrink-0 opacity-50" />
                       </a>
@@ -309,7 +309,7 @@ export function PipelineChat({ squadId, pipeline, stepOutputs, runStatus }: Pipe
                         return (
                           <a key={i} href={src.url} target="_blank" rel="noopener noreferrer" title={src.url}
                             className="flex items-center gap-1 rounded-full border border-border/50 bg-muted/50 px-2 py-0.5 text-[10px] hover:bg-accent transition-colors">
-                            <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=16`} alt="" className="h-3 w-3 rounded" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                            <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=32`} alt="" className="h-3 w-3 rounded" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                             <span>{formatDomainName(host)}</span>
                           </a>
                         );
@@ -396,19 +396,31 @@ function isSocialStep(stepName: string, content: string): boolean {
   return contentKeywords.some(kw => contentLower.includes(kw));
 }
 
-/** Lightweight markdown: bold, italic, headers, lists, line breaks */
+/** Lightweight markdown: images, bold, italic, headers, lists, line breaks */
 function simpleMarkdown(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
+    // Images: ![alt](url) → <img>
+    .replace(/!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g, '<img src="$2" alt="$1" class="rounded-lg max-w-full h-auto my-2 max-h-64 object-cover" loading="lazy" />')
+    // Bare image URLs on their own line
+    .replace(/^(https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?)$/gm, '<img src="$1" alt="image" class="rounded-lg max-w-full h-auto my-2 max-h-64 object-cover" loading="lazy" />')
+    // Headers
     .replace(/^### (.+)$/gm, "<h4 class='font-semibold mt-3 mb-1'>$1</h4>")
     .replace(/^## (.+)$/gm, "<h3 class='font-semibold text-base mt-4 mb-1'>$1</h3>")
     .replace(/^# (.+)$/gm, "<h2 class='font-bold text-lg mt-4 mb-2'>$1</h2>")
+    // Bold + italic
     .replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>")
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, "<em>$1</em>")
+    // Lists
     .replace(/^(\d+)\.\s+(.+)$/gm, "<li>$1. $2</li>")
     .replace(/^[-–]\s+(.+)$/gm, "<li>$1</li>")
+    // Horizontal rules
+    .replace(/^---$/gm, "<hr class='my-3 border-border/50' />")
+    // Links: [text](url) → <a>
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary underline hover:no-underline">$1</a>')
+    // Line breaks
     .replace(/\n/g, "<br />");
 }

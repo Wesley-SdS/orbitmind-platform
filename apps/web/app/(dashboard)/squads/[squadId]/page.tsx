@@ -13,6 +13,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getSquadWithAgents } from "@/lib/db/queries/squads";
 import { getExecutionsBySquadId } from "@/lib/db/queries/executions";
 import { PipelineSection } from "@/components/squads/pipeline-section";
+import { RefreshButton } from "@/components/squads/refresh-button";
 import { SquadConfig } from "@/components/squads/squad-config";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -138,6 +139,9 @@ export default async function SquadDetailPage({
         </TabsContent>
 
         <TabsContent value="metrics" className="mt-6">
+          <div className="flex justify-end mb-4">
+            <RefreshButton />
+          </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
