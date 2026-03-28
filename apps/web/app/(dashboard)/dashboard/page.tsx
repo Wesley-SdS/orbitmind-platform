@@ -30,6 +30,9 @@ const AUDIT_ICONS: Record<string, string> = {
   "integration.connected": "🔗",
   "org.created": "🏢",
   "user.created": "👤",
+  "pipeline.completed": "✅",
+  "pipeline.failed": "❌",
+  "agent.responded": "💬",
 };
 
 const AUDIT_LABELS: Record<string, string> = {
@@ -50,6 +53,9 @@ const AUDIT_LABELS: Record<string, string> = {
   "execution.started": "Execução iniciada",
   "execution.completed": "Execução concluída",
   "execution.failed": "Execução falhou",
+  "pipeline.completed": "Pipeline concluído",
+  "pipeline.failed": "Pipeline falhou",
+  "agent.responded": "Agente respondeu",
 };
 
 export default async function DashboardPage() {
