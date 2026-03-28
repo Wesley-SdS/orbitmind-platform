@@ -2,13 +2,15 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Circle, Loader2, XCircle, User, Pause } from "lucide-react";
+import { CheckCircle2, Circle, Loader2, XCircle, User, Pause, ClipboardEdit, ListChecks } from "lucide-react";
 
 interface PipelineStep {
   step: number;
   name: string;
   type: string;
   agentId?: string;
+  sourceStepId?: string;
+  checkpointFields?: Array<{ name: string; label: string; type: string; options?: string[] }>;
 }
 
 interface Agent {
@@ -69,8 +71,14 @@ export function PipelineStepsView({ pipeline, agents, latestRun, pipelineRun, sq
   const isWaitingApproval = pipelineRun?.status === "waiting_approval";
   const checkpointStepId = pipelineRun?.checkpointStepId;
 
+  const checkpointTypes = ["checkpoint", "checkpoint-approve", "checkpoint-input", "checkpoint-select"];
+
+  function isCheckpointType(type: string): boolean {
+    return checkpointTypes.includes(type);
+  }
+
   function getStepStatus(step: PipelineStep): StepStatus {
-    if (isWaitingApproval && step.type === "checkpoint" && checkpointStepId === `step-${step.step}`) {
+    if (isWaitingApproval && isCheckpointType(step.type) && checkpointStepId === `step-${step.step}`) {
       return "waiting_approval";
     }
     const exec = runMap.get(`step-${step.step}`);
@@ -86,18 +94,35 @@ export function PipelineStepsView({ pipeline, agents, latestRun, pipelineRun, sq
   }
 
   function resolveAgent(step: PipelineStep): Agent | null {
-    if (step.type === "checkpoint" || !step.agentId) return null;
+    if (isCheckpointType(step.type) || !step.agentId) return null;
     return agentMap.get(step.agentId) ?? agents.find(a => toKebab(a.name) === step.agentId) ?? null;
   }
 
   function getAgentName(step: PipelineStep): string {
-    if (step.type === "checkpoint") return "Humano";
+    if (isCheckpointType(step.type)) return "Humano";
     return resolveAgent(step)?.name ?? "Agente";
   }
 
   function getAgentIcon(step: PipelineStep): string {
-    if (step.type === "checkpoint") return "👤";
+    if (isCheckpointType(step.type)) return "👤";
     return resolveAgent(step)?.icon ?? "🤖";
+  }
+
+  function getCheckpointBadgeLabel(type: string): string {
+    switch (type) {
+      case "checkpoint-input": return "Briefing";
+      case "checkpoint-select": return "Selecao";
+      case "checkpoint-approve": return "Aprovacao";
+      default: return "Aprovacao";
+    }
+  }
+
+  function getCheckpointBadgeColor(type: string): string {
+    switch (type) {
+      case "checkpoint-input": return "bg-blue-500/15 text-blue-500 border-blue-500/30";
+      case "checkpoint-select": return "bg-purple-500/15 text-purple-500 border-purple-500/30";
+      default: return "bg-amber-500/15 text-amber-500 border-amber-500/30";
+    }
   }
 
   return (
@@ -145,8 +170,14 @@ export function PipelineStepsView({ pipeline, agents, latestRun, pipelineRun, sq
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : status === "failed" ? (
                         <XCircle className="h-4 w-4" />
-                      ) : step.type === "checkpoint" ? (
-                        <User className="h-3.5 w-3.5" />
+                      ) : isCheckpointType(step.type) ? (
+                        step.type === "checkpoint-input" ? (
+                          <ClipboardEdit className="h-3.5 w-3.5" />
+                        ) : step.type === "checkpoint-select" ? (
+                          <ListChecks className="h-3.5 w-3.5" />
+                        ) : (
+                          <User className="h-3.5 w-3.5" />
+                        )
                       ) : (
                         <Circle className="h-4 w-4" />
                       )}
@@ -161,7 +192,10 @@ export function PipelineStepsView({ pipeline, agents, latestRun, pipelineRun, sq
                       </p>
                     </div>
                     {status === "waiting_approval" && (
-                      <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30">Aguardando aprovação</Badge>
+                      <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30">Aguardando aprovacao</Badge>
+                    )}
+                    {status === "pending" && isCheckpointType(step.type) && (
+                      <Badge className={getCheckpointBadgeColor(step.type)}>{getCheckpointBadgeLabel(step.type)}</Badge>
                     )}
                     {status === "running" && (
                       <Badge className="bg-primary/10 text-primary">Em andamento</Badge>

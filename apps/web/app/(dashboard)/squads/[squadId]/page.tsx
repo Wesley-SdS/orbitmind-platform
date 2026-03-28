@@ -40,7 +40,7 @@ export default async function SquadDetailPage({
   const { agents, ...squad } = squadData;
 
   const config = squad.config as Record<string, unknown> | null;
-  const pipelineSteps = (config?.pipeline as Array<{ step: number; name: string; type: string; agentId?: string }>) ?? [];
+  const pipelineSteps = (config?.pipeline as Array<{ step: number; name: string; type: string; agentId?: string; sourceStepId?: string; checkpointFields?: Array<{ name: string; label: string; type: string; options?: string[] }> }>) ?? [];
 
   const totalTokens = executions.reduce((sum, e) => sum + e.tokensUsed, 0);
   const totalCost = executions.reduce((sum, e) => sum + e.estimatedCost, 0);

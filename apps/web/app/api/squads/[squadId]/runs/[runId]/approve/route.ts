@@ -4,7 +4,7 @@ import { getPipelineRunByRunIdAndSquad, updatePipelineRun } from "@/lib/db/queri
 import { approveCheckpoint } from "@/lib/engine/checkpoint-manager";
 
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ squadId: string; runId: string }> },
 ): Promise<Response> {
   try {
@@ -28,7 +28,17 @@ export async function POST(
       );
     }
 
-    const resolved = approveCheckpoint(runId);
+    const body = await req.json().catch(() => ({}));
+    const payload = body as { data?: Record<string, string>; selectedIndex?: number };
+
+    let response = "continuar";
+    if (payload.data) {
+      response = JSON.stringify(payload.data);
+    } else if (payload.selectedIndex !== undefined) {
+      response = String(payload.selectedIndex);
+    }
+
+    const resolved = approveCheckpoint(runId, response);
     if (!resolved) {
       // Checkpoint was lost (server restarted). Mark as cancelled so user can re-run.
       await updatePipelineRun(runId, { status: "cancelled", completedAt: new Date() });

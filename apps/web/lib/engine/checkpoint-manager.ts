@@ -30,14 +30,14 @@ export function waitForCheckpoint(runId: string, stepId: string): Promise<string
   });
 }
 
-export function approveCheckpoint(runId: string): boolean {
+export function approveCheckpoint(runId: string, response = "continuar"): boolean {
   const map = getMap();
   console.log(`[CheckpointManager] approveCheckpoint called for run ${runId}. Pending keys: [${[...map.keys()].join(", ")}]`);
   const pending = map.get(runId);
   if (pending) {
-    pending.resolve("continuar");
+    pending.resolve(response);
     map.delete(runId);
-    console.log(`[CheckpointManager] Checkpoint approved for run ${runId}`);
+    console.log(`[CheckpointManager] Checkpoint approved for run ${runId} with response: ${response}`);
     return true;
   }
   console.log(`[CheckpointManager] No pending checkpoint found for run ${runId}`);

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Loader2, CheckCircle2, XCircle, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { ImageUpload } from "./image-upload";
@@ -15,11 +17,21 @@ interface StepOutput {
   completedAt: string;
 }
 
+interface CheckpointField {
+  name: string;
+  label: string;
+  type: string;
+  options?: string[];
+}
+
 interface CheckpointReviewProps {
   squadId: string;
   runId: string;
   checkpointStepName: string;
+  checkpointType: string;
   stepOutputs: Record<string, StepOutput>;
+  sourceStepOutput?: string;
+  checkpointFields?: CheckpointField[];
   onApproved: () => void;
   onRejected: () => void;
 }
@@ -28,21 +40,41 @@ export function CheckpointReview({
   squadId,
   runId,
   checkpointStepName,
+  checkpointType,
   stepOutputs,
+  sourceStepOutput,
+  checkpointFields,
   onApproved,
   onRejected,
 }: CheckpointReviewProps) {
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [stepImages, setStepImages] = useState<Record<string, string[]>>({});
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
 
   const entries = Object.entries(stepOutputs);
+  const busy = approving || rejecting;
 
   async function handleApprove() {
+    if (checkpointType === "checkpoint-select" && selectedOption === null) {
+      toast.error("Selecione uma opcao antes de confirmar.");
+      return;
+    }
+
     setApproving(true);
     try {
+      let body: Record<string, unknown> = {};
+      if (checkpointType === "checkpoint-input") {
+        body = { data: formData };
+      } else if (checkpointType === "checkpoint-select" && selectedOption !== null) {
+        body = { selectedIndex: selectedOption };
+      }
+
       const res = await fetch(`/api/squads/${squadId}/runs/${runId}/approve`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         toast.success("Checkpoint aprovado! Pipeline retomado.");
@@ -78,8 +110,201 @@ export function CheckpointReview({
     }
   }
 
-  const busy = approving || rejecting;
+  // --- checkpoint-input variant ---
+  if (checkpointType === "checkpoint-input") {
+    const fields = checkpointFields ?? [];
+    return (
+      <Card className="border-blue-500/30 bg-blue-500/5">
+        <CardContent className="p-6">
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-lg">&#128221;</span>
+              <h3 className="text-base font-semibold">
+                Briefing: {checkpointStepName}
+              </h3>
+              <Badge className="bg-blue-500/15 text-blue-500 border-blue-500/30">
+                Aguardando dados
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Preencha as informacoes abaixo para continuar o pipeline
+            </p>
+          </div>
 
+          <div className="mb-6 space-y-4">
+            {fields.map((field) => (
+              <div key={field.name} className="space-y-1.5">
+                <label className="text-sm font-medium">{field.label}</label>
+                {field.type === "textarea" ? (
+                  <Textarea
+                    value={formData[field.name] ?? ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, [field.name]: e.target.value }))
+                    }
+                    placeholder={field.label}
+                    rows={4}
+                  />
+                ) : field.type === "select" && field.options ? (
+                  <select
+                    value={formData[field.name] ?? ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, [field.name]: e.target.value }))
+                    }
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="">Selecione...</option>
+                    {field.options.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    value={formData[field.name] ?? ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, [field.name]: e.target.value }))
+                    }
+                    placeholder={field.label}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-blue-500/20">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReject}
+              disabled={busy}
+              className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+            >
+              {rejecting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <XCircle className="mr-2 h-4 w-4" />
+              )}
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleApprove}
+              disabled={busy}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {approving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+              )}
+              Enviar e continuar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // --- checkpoint-select variant ---
+  if (checkpointType === "checkpoint-select") {
+    const options = parseSelectOptions(sourceStepOutput ?? "");
+    return (
+      <Card className="border-purple-500/30 bg-purple-500/5">
+        <CardContent className="p-6">
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-lg">&#128203;</span>
+              <h3 className="text-base font-semibold">
+                Selecao: {checkpointStepName}
+              </h3>
+              <Badge className="bg-purple-500/15 text-purple-500 border-purple-500/30">
+                Aguardando selecao
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Escolha uma das opcoes geradas pelo agente
+            </p>
+          </div>
+
+          <div className="mb-6 space-y-2">
+            {options.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Nenhuma opcao detectada no output do step anterior.
+              </p>
+            )}
+            {options.map((option, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setSelectedOption(idx)}
+                className={`w-full text-left rounded-lg border p-3 transition-colors ${
+                  selectedOption === idx
+                    ? "border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30"
+                    : "border-border bg-background/50 hover:bg-muted/50"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      selectedOption === idx
+                        ? "bg-purple-500 text-white"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{option.title}</p>
+                    {option.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-3">
+                        {option.description}
+                      </p>
+                    )}
+                  </div>
+                  {selectedOption === idx && (
+                    <CheckCircle2 className="h-5 w-5 shrink-0 text-purple-500" />
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-purple-500/20">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReject}
+              disabled={busy}
+              className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+            >
+              {rejecting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <XCircle className="mr-2 h-4 w-4" />
+              )}
+              Rejeitar
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleApprove}
+              disabled={busy || selectedOption === null}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              {approving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+              )}
+              Confirmar selecao
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // --- checkpoint-approve / checkpoint (default) variant ---
   return (
     <Card className="border-amber-500/30 bg-amber-500/5">
       <CardContent className="p-6">
@@ -91,7 +316,7 @@ export function CheckpointReview({
               Checkpoint: {checkpointStepName}
             </h3>
             <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30">
-              Aguardando aprovação
+              Aguardando aprovacao
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -179,6 +404,8 @@ export function CheckpointReview({
   );
 }
 
+// --- Helpers ---
+
 function simpleMarkdown(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -190,4 +417,44 @@ function simpleMarkdown(text: string): string {
     .replace(/^(\d+)\.\s+(.+)$/gm, "<li>$1. $2</li>")
     .replace(/^[-–]\s+(.+)$/gm, "<li>$1</li>")
     .replace(/\n/g, "<br />");
+}
+
+interface SelectOption {
+  title: string;
+  description: string;
+}
+
+function parseSelectOptions(text: string): SelectOption[] {
+  if (!text.trim()) return [];
+
+  // Try to detect numbered items: "1. Title" or "1) Title" patterns
+  const numberedPattern = /^\s*(\d+)[.)]\s+(.+)/gm;
+  const matches: SelectOption[] = [];
+  let match;
+
+  while ((match = numberedPattern.exec(text)) !== null) {
+    const fullLine = (match[2] ?? "").trim();
+    // Split title from description at first period, colon, or dash followed by space
+    const separatorIdx = fullLine.search(/[.:–-]\s/);
+    if (separatorIdx > 0) {
+      matches.push({
+        title: fullLine.slice(0, separatorIdx).trim(),
+        description: fullLine.slice(separatorIdx + 1).trim().replace(/^\s*[-–]\s*/, ""),
+      });
+    } else {
+      matches.push({ title: fullLine, description: "" });
+    }
+  }
+
+  if (matches.length > 0) return matches;
+
+  // Fallback: split by double newlines and treat each block as an option
+  const blocks = text.split(/\n{2,}/).filter((b) => b.trim());
+  return blocks.map((block, i) => {
+    const lines = block.trim().split("\n");
+    return {
+      title: lines[0]?.replace(/^\d+[.)]\s*/, "").trim() || `Opcao ${i + 1}`,
+      description: lines.slice(1).join(" ").trim(),
+    };
+  });
 }

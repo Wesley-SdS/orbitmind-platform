@@ -6,11 +6,20 @@ import { PipelineChat } from "./pipeline-chat";
 import { PipelineStepsView } from "./pipeline-view";
 import { CheckpointReview } from "./checkpoint-review";
 
+interface CheckpointField {
+  name: string;
+  label: string;
+  type: string;
+  options?: string[];
+}
+
 interface PipelineStep {
   step: number;
   name: string;
   type: string;
   agentId?: string;
+  sourceStepId?: string;
+  checkpointFields?: CheckpointField[];
 }
 
 interface Agent {
@@ -104,18 +113,26 @@ export function PipelineSection({ squadId, pipeline, agents }: PipelineSectionPr
 
   return (
     <div className="space-y-6">
-      {isWaitingApproval && pipelineRun && (
-        <CheckpointReview
-          squadId={squadId}
-          runId={pipelineRun.runId}
-          checkpointStepName={
-            pipeline.find(s => `step-${s.step}` === pipelineRun.checkpointStepId)?.name ?? "Checkpoint"
-          }
-          stepOutputs={pipelineRun.stepOutputs}
-          onApproved={loadData}
-          onRejected={loadData}
-        />
-      )}
+      {isWaitingApproval && pipelineRun && (() => {
+        const checkpointStep = pipeline.find(s => `step-${s.step}` === pipelineRun.checkpointStepId);
+        const checkpointType = checkpointStep?.type ?? "checkpoint-approve";
+        const sourceOutput = checkpointStep?.sourceStepId
+          ? pipelineRun.stepOutputs[checkpointStep.sourceStepId]?.content
+          : undefined;
+        return (
+          <CheckpointReview
+            squadId={squadId}
+            runId={pipelineRun.runId}
+            checkpointStepName={checkpointStep?.name ?? "Checkpoint"}
+            checkpointType={checkpointType}
+            stepOutputs={pipelineRun.stepOutputs}
+            sourceStepOutput={sourceOutput}
+            checkpointFields={checkpointStep?.checkpointFields}
+            onApproved={loadData}
+            onRejected={loadData}
+          />
+        );
+      })()}
       <div className="grid gap-6 lg:grid-cols-[350px_1fr]">
         <PipelineStepsView
           pipeline={pipeline}
