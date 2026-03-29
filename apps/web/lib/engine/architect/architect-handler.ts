@@ -477,19 +477,22 @@ Depois apresente visualmente com emojis, equipe numerada e pipeline.
 Pergunte: "Posso **criar agora**, ou quer **ajustar**?"
 
 ## Brief do Squad (OBRIGATÓRIO para TODOS os squads)
-Durante o discovery, SEMPRE colete estas informações:
+Você DEVE fazer EXATAMENTE estas perguntas, nesta ORDEM, uma por vez:
 
-1. Pergunte o NICHO ou ÁREA de atuação específica (ex: "recrutamento tech", "marketing digital", "suporte ao cliente")
-2. Pergunte o PÚBLICO-ALVO (quem serão os destinatários do trabalho do squad)
-3. Pergunte o TOM preferido. Apresente estas 6 opções:
+Pergunta 1: "Qual o nicho ou área específica desse squad?" (espere resposta)
+Pergunta 2: "Quem é o público-alvo?" (espere resposta)
+Pergunta 3: "Qual tom preferido?" + apresente as 6 opções numeradas:
    1. 📚 Educativo — Direto, didático, informativo
    2. 🔥 Provocativo — Desafia, questiona, gera reflexão
    3. ✨ Inspiracional — Motiva, storytelling, emocional
    4. 😄 Humorístico — Leve, divertido, informal
    5. 🎯 Autoridade — Expert, técnico, baseado em dados
    6. 💬 Conversacional — Como conversa entre colegas
-4. Pergunte os PILARES ou TEMAS recorrentes (3-5 temas centrais do squad)
-5. Se envolve publicação/comunicação, pergunte as PLATAFORMAS alvo
+(espere número)
+Pergunta 4: "Quais são os 3-5 pilares ou temas recorrentes?" (espere resposta)
+Pergunta 5 (se envolve publicação): "Quais plataformas alvo?" (espere resposta)
+
+NÃO invente outras perguntas. NÃO pule nenhuma. Após coletar TODAS, gere o design.
 
 SEMPRE inclua no design JSON um campo "contentBrief" com as respostas:
 \`\`\`json
@@ -574,7 +577,7 @@ Se o usuário mencionar publicação em Instagram, LinkedIn ou qualquer rede soc
   const design = extractDesignJson(result.output);
 
   if (design) {
-    // Send progress message BEFORE research
+    // Send progress message BEFORE research — awaited so polling/WS picks it up immediately
     await sendArchitectMessage(squadId, "🔍 Pesquisando melhores práticas do domínio para enriquecer o squad...");
 
     // Do web search directly (not via LLM)
@@ -601,9 +604,11 @@ Se o usuário mencionar publicação em Instagram, LinkedIn ou qualquer rede soc
         };
       }
 
-      // Send research results message
+      // Send research results message — ALWAYS send, not just when results > 0
       if (allResults.length > 0) {
         await sendArchitectMessage(squadId, `📊 Pesquisa concluída! Encontrei **${allResults.length} fontes** sobre "${nicho}".\n\n🧠 Finalizando o design do squad...`);
+      } else {
+        await sendArchitectMessage(squadId, "📊 Pesquisa concluída! Montando o design...");
       }
     } catch {
       // Research failure is not blocking
@@ -618,6 +623,7 @@ Se o usuário mencionar publicação em Instagram, LinkedIn ou qualquer rede soc
       proposedDesign: design,
     });
     // Ask the user to name the squad — use LLM for creative suggestions
+    await sendArchitectMessage(squadId, "✨ Gerando sugestões de nome para o squad...");
     const nameAdapter = createAdapter({ name: ARCHITECT_AGENT.name, role: ARCHITECT_AGENT.role, config: {} }, providerConfig);
     const nameResult = await nameAdapter.chat([{
       role: "user",
@@ -1393,6 +1399,53 @@ function extractDesignJson(output: string): ArchitectConversationState["proposed
     } catch { /* */ }
   }
 
+  // Aggressive fallback: find JSON with "agents" anywhere in the output
+  const jsonStart = output.indexOf('{"ready"');
+  if (jsonStart === -1) {
+    // Try finding by "agents" key
+    const agentsIdx = output.indexOf('"agents"');
+    if (agentsIdx > 0) {
+      // Walk backwards to find the opening brace
+      let braceIdx = output.lastIndexOf('{', agentsIdx);
+      while (braceIdx > 0) {
+        try {
+          // Try to parse from this brace to the end
+          const candidate = output.substring(braceIdx);
+          // Find matching closing brace
+          let depth = 0;
+          let endIdx = -1;
+          for (let i = 0; i < candidate.length; i++) {
+            if (candidate[i] === '{') depth++;
+            if (candidate[i] === '}') depth--;
+            if (depth === 0) { endIdx = i + 1; break; }
+          }
+          if (endIdx > 0) {
+            const parsed = JSON.parse(candidate.substring(0, endIdx));
+            if (parsed.agents && Array.isArray(parsed.agents)) return parsed;
+          }
+        } catch { /* continue searching */ }
+        braceIdx = output.lastIndexOf('{', braceIdx - 1);
+        if (braceIdx < 0) break;
+      }
+    }
+  }
+
+  if (jsonStart >= 0) {
+    try {
+      let depth = 0;
+      let endIdx = -1;
+      for (let i = jsonStart; i < output.length; i++) {
+        if (output[i] === '{') depth++;
+        if (output[i] === '}') depth--;
+        if (depth === 0) { endIdx = i + 1; break; }
+      }
+      if (endIdx > 0) {
+        const parsed = JSON.parse(output.substring(jsonStart, endIdx));
+        if (parsed.agents && Array.isArray(parsed.agents)) return parsed;
+      }
+    } catch { /* ignore */ }
+  }
+
   return null;
 }
 
@@ -1403,6 +1456,34 @@ function stripJsonFromOutput(output: string): string {
     const offset = cleaned.length - cleaned.trimStart().length;
     cleaned = cleaned.slice(offset + bareEnd);
   }
+
+  // Also strip any embedded JSON object with "agents" array (aggressive fallback match)
+  const agentsIdx = cleaned.indexOf('"agents"');
+  if (agentsIdx > 0) {
+    let braceIdx = cleaned.lastIndexOf('{', agentsIdx);
+    while (braceIdx >= 0) {
+      try {
+        const candidate = cleaned.substring(braceIdx);
+        let depth = 0;
+        let endIdx = -1;
+        for (let i = 0; i < candidate.length; i++) {
+          if (candidate[i] === '{') depth++;
+          if (candidate[i] === '}') depth--;
+          if (depth === 0) { endIdx = i + 1; break; }
+        }
+        if (endIdx > 0) {
+          const parsed = JSON.parse(candidate.substring(0, endIdx));
+          if (parsed.agents && Array.isArray(parsed.agents)) {
+            cleaned = cleaned.substring(0, braceIdx) + cleaned.substring(braceIdx + endIdx);
+            break;
+          }
+        }
+      } catch { /* continue */ }
+      braceIdx = cleaned.lastIndexOf('{', braceIdx - 1);
+      if (braceIdx < 0) break;
+    }
+  }
+
   return cleaned.trim();
 }
 
