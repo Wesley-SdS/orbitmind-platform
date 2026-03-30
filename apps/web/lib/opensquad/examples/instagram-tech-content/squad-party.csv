@@ -1,0 +1,4 @@
+id,name,title,icon,execution,path
+researcher,Nícolas Notícia,Tech News Researcher,🔍,subagent,./agents/researcher.agent.md
+instagram-feed-creator,Caio Carrossel,Instagram Feed Creator,📸,inline,./agents/instagram-feed-creator.agent.md
+reviewer,Flora Feedback,Content Quality Reviewer,✅,inline,./agents/reviewer.agent.md

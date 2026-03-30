@@ -1,0 +1,35 @@
+squad:
+  code: instagram-tech-content
+  name: "Instagram Tech Content"
+  description: "Squad de produção de conteúdo para Instagram Feed focado em tecnologia e IA para a comunidade tech brasileira"
+  icon: "📸"
+  version: "1.0.0"
+  performance_mode: high
+  language: pt-BR
+
+  skills:
+    - web_search
+    - web_fetch
+
+  data:
+    - pipeline/data/research-brief.md
+    - pipeline/data/domain-framework.md
+    - pipeline/data/quality-criteria.md
+    - pipeline/data/output-examples.md
+    - pipeline/data/anti-patterns.md
+    - pipeline/data/tone-of-voice.md
+
+  agents:
+    - id: researcher
+      name: "Nícolas Notícia"
+      file: "./agents/researcher.agent.md"
+    - id: instagram-feed-creator
+      name: "Caio Carrossel"
+      file: "./agents/instagram-feed-creator.agent.md"
+    - id: reviewer
+      name: "Flora Feedback"
+      file: "./agents/reviewer.agent.md"
+
+  pipeline:
+    file: pipeline/pipeline.yaml
+    on_reject: step-06

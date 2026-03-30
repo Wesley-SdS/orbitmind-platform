@@ -1,0 +1,39 @@
+pipeline:
+  name: "Instagram Tech Content Pipeline"
+  description: "Pesquisa notícias tech/IA, gera ângulos, cria carrossel Instagram e revisa qualidade"
+  version: "1.0.0"
+
+  steps:
+    - file: pipeline/steps/step-01-research-focus.md
+      type: checkpoint
+    - file: pipeline/steps/step-02-research.md
+      agent: researcher
+      execution: subagent
+    - file: pipeline/steps/step-03-news-selection.md
+      type: checkpoint
+    - file: pipeline/steps/step-04-generate-angles.md
+      agent: instagram-feed-creator
+      execution: inline
+    - file: pipeline/steps/step-05-angle-selection.md
+      type: checkpoint
+    - file: pipeline/steps/step-06-create-content.md
+      agent: instagram-feed-creator
+      execution: inline
+    - file: pipeline/steps/step-07-content-approval.md
+      type: checkpoint
+    - file: pipeline/steps/step-08-review.md
+      agent: reviewer
+      execution: inline
+    - file: pipeline/steps/step-09-final-approval.md
+      type: checkpoint
+
+  checkpoints:
+    - step-01-research-focus
+    - step-03-news-selection
+    - step-05-angle-selection
+    - step-07-content-approval
+    - step-09-final-approval
+
+  on_reject:
+    from: step-08-review
+    to: step-06-create-content
