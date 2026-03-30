@@ -26,7 +26,11 @@ export async function GET(req: Request): Promise<Response> {
     }
 
     const messages = await getMessagesByConversationId(ARCHITECT_SQUAD_ID, conversationId);
-    return NextResponse.json(messages);
+    // Filter out internal state snapshots — they should not appear in chat UI
+    const visible = messages.filter(
+      (m) => !(m.metadata as Record<string, unknown> | null)?.isStateSnapshot,
+    );
+    return NextResponse.json(visible);
   } catch {
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
