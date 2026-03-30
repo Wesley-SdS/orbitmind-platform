@@ -1,8 +1,14 @@
 export type ArchitectPhase =
   | "idle"
-  | "discovery"
+  | "discovery"            // Phase 1: structured questions (deterministic)
+  | "investigation"        // Phase 1.5: Sherlock analyzing reference profiles
+  | "research"             // Phase 2: web search for domain knowledge
+  | "extraction"           // Phase 3: generate operational artifacts
+  | "design-review"        // Phase 4: present design for user approval
   | "naming"
   | "design"
+  | "build"                // Phase 5: generate rich agent definitions
+  | "validate"             // Phase 6: quality gates
   | "list-action"
   | "edit-select"
   | "edit-modify"
@@ -29,7 +35,33 @@ export interface ArchitectConversationState {
     targetPlatforms?: string[];
     tonePreference?: string;
     contentPillars?: string[];
+    // New: structured discovery from OpenSquad
+    references?: string[];           // URLs of reference profiles
+    domains?: string[];              // Knowledge domains identified
+    investigationMode?: string;      // single_post, profile_1, profile_5_10
   };
+
+  // Research & extraction data (new phases)
+  researchData?: {
+    webSearchResults?: string[];
+    sherlockResults?: string;
+    consolidatedAnalysis?: string;
+  };
+  extractionData?: {
+    operationalFramework?: string;
+    outputExamples?: string;
+    antiPatterns?: string;
+    voiceGuidance?: string;
+    qualityCriteria?: string;
+    bestPracticesContent?: string;
+  };
+  // Build data
+  buildData?: {
+    generatedAgents?: Array<{ name: string; role: string; content: string }>;
+    validationResults?: Array<{ gate: string; agent?: string; passed: boolean; details: string }>;
+  };
+  // Awaiting user confirmation before build
+  awaitingBuildConfirmation?: boolean;
   proposedDesign?: {
     name: string;
     code: string;
