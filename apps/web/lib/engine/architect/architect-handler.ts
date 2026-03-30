@@ -11,6 +11,14 @@ import { getTopMemories } from "@/lib/db/queries/squad-memories";
 import { ARCHITECT_AGENT, ARCHITECT_SQUAD_ID } from "./architect-agent";
 import type { ArchitectConversationState } from "./architect-state";
 import { detectIntent } from "./architect-state";
+import { extractDesignJson, stripJsonFromOutput } from "./architect-json";
+import {
+  handleStructuredDiscovery,
+  handleResearchPhase,
+  handleBuildPhase,
+  handleValidatePhase,
+  handleDesignPhase,
+} from "./architect-workflow";
 import {
   setActionConversationId,
   handleCreateTasks, handleViewTasks, handleMoveTask, handleDeleteTask,
@@ -74,9 +82,13 @@ export async function handleArchitectMessage(
   let state = architectStates.get(stateKey);
 
   if (!state) {
-    state = conversationId
-      ? await recoverStateFromConversation(orgId, squadId, conversationId)
-      : await recoverStateFromHistory(orgId, squadId);
+    // Try to recover from persisted state in DB first
+    state = (await loadPersistedState(squadId, conversationId)) ?? undefined;
+    if (!state) {
+      state = conversationId
+        ? await recoverStateFromConversation(orgId, squadId, conversationId)
+        : await recoverStateFromHistory(orgId, squadId);
+    }
     architectStates.set(stateKey, state);
   }
 
@@ -118,7 +130,24 @@ export async function handleArchitectMessage(
 
   // If in active flow (discovery/design/edit), continue that flow
   if (state.phase === "discovery") {
-    await handleDiscovery(state, squadId, userMessage, providerConfig);
+    const { companyPrompt } = await buildOrgContext(state.orgId);
+    await handleStructuredDiscovery({
+      state, squadId, orgId, providerConfig, companyPrompt,
+      sendMessage: sendArchitectMessage,
+      sendMessageWithMeta: sendArchitectMessageWithMeta,
+    }, userMessage);
+  } else if (state.phase === "investigation" || state.phase === "research" || state.phase === "extraction") {
+    // These phases are auto-advancing (no user input needed)
+    // If we're here, user sent a message during a running phase — acknowledge
+    await sendArchitectMessage(squadId, "⏳ Processando... aguarde um momento.");
+  } else if (state.phase === "design-review") {
+    // User is reviewing the design from the new workflow
+    const { companyPrompt } = await buildOrgContext(state.orgId);
+    await handleDesignPhase({
+      state, squadId, orgId, providerConfig, companyPrompt,
+      sendMessage: sendArchitectMessage,
+      sendMessageWithMeta: sendArchitectMessageWithMeta,
+    });
   } else if (state.phase === "naming") {
     await handleNaming(state, squadId, userMessage);
   } else if (state.phase === "design") {
@@ -152,17 +181,44 @@ export async function handleArchitectMessage(
   } else if (state.phase === "skill-confirm") {
     await handleSkillConfirm(state, userMessage);
   } else {
+    // ── PRIORITY: If there's a proposed design pending, check for approval FIRST ──
+    if (state.proposedDesign) {
+      const lower = userMessage.trim().toLowerCase();
+      const approvalWords = ["sim", "yes", "ok", "pode", "confirma", "aprova", "manda", "bora", "perfeito", "show", "gostei", "go", "vamos"];
+      const rejectionWords = ["cancelar", "cancela", "desistir", "parar", "não", "nao"];
+      const isApproval = approvalWords.some((kw) => lower.startsWith(kw) || lower === kw) ||
+        (lower.includes("criar") && (lower.includes("sim") || lower.includes("pode") || lower.includes("ok")));
+      const isRejection = rejectionWords.some((kw) => lower.includes(kw));
+
+      if (isApproval && !isRejection) {
+        // Route to design approval
+        state.phase = "design";
+        await handleDesignApproval(state, squadId, userMessage, providerConfig);
+        architectStates.set(stateKey, state);
+        return;
+      }
+    }
+
     // Idle or complete — detect intent
     const intent = detectIntent(userMessage);
 
     switch (intent) {
-      case "create":
+      case "create": {
         state.phase = "discovery";
         state.discoveryStep = 0;
         state.discovery = {};
         state.proposedDesign = undefined;
-        await handleDiscovery(state, squadId, userMessage, providerConfig);
+        state.researchData = undefined;
+        state.extractionData = undefined;
+        state.buildData = undefined;
+        const { companyPrompt: cp } = await buildOrgContext(state.orgId);
+        await handleStructuredDiscovery({
+          state, squadId, orgId, providerConfig, companyPrompt: cp,
+          sendMessage: sendArchitectMessage,
+          sendMessageWithMeta: sendArchitectMessageWithMeta,
+        }, userMessage);
         break;
+      }
 
       case "edit":
         await startEditFlow(state, squadId, orgId, userMessage, providerConfig);
@@ -261,6 +317,85 @@ export async function handleArchitectMessage(
   }
 
   architectStates.set(stateKey, state);
+
+  // Persist state to DB so it survives page reloads
+  try {
+    await persistState(squadId, conversationId, state);
+  } catch { /* non-blocking */ }
+}
+
+// ===================== STATE PERSISTENCE =====================
+
+async function persistState(squadId: string, conversationId: string | undefined, state: ArchitectConversationState): Promise<void> {
+  if (!conversationId) return;
+  // Store state as a special "state" message in the conversation
+  // Only persist fields that matter for recovery (not huge content)
+  const persistable = {
+    phase: state.phase,
+    orgId: state.orgId,
+    discoveryStep: state.discoveryStep,
+    discovery: state.discovery,
+    proposedDesign: state.proposedDesign,
+    nameSuggestions: state.nameSuggestions,
+    createdSquadId: state.createdSquadId,
+    editSquadId: state.editSquadId,
+    editSquadName: state.editSquadName,
+    awaitingBuildConfirmation: state.awaitingBuildConfirmation,
+  };
+  const stateJson = JSON.stringify(persistable);
+
+  // Upsert: find existing state message or create new
+  const history = await getMessagesByConversationId(squadId, conversationId, 100);
+  const existingState = history.find(
+    (m) => m.role === "agent" && (m.metadata as Record<string, unknown> | null)?.isStateSnapshot,
+  );
+
+  if (existingState) {
+    // Update existing — use raw SQL since createMessage always inserts
+    const { db } = await import("@/lib/db");
+    const { messages } = await import("@/lib/db/schema");
+    const { eq } = await import("drizzle-orm");
+    await db.update(messages)
+      .set({ content: stateJson })
+      .where(eq(messages.id, existingState.id));
+  } else {
+    await createMessage({
+      squadId,
+      agentId: null,
+      content: stateJson,
+      role: "agent",
+      metadata: { isStateSnapshot: true, conversationId, agentName: "system", agentIcon: "💾", isArchitect: true },
+    });
+  }
+}
+
+async function loadPersistedState(squadId: string, conversationId: string | undefined): Promise<ArchitectConversationState | null> {
+  if (!conversationId) return null;
+  try {
+    const history = await getMessagesByConversationId(squadId, conversationId, 100);
+    const stateMsg = history.find(
+      (m) => m.role === "agent" && (m.metadata as Record<string, unknown> | null)?.isStateSnapshot,
+    );
+    if (stateMsg) {
+      const parsed = JSON.parse(stateMsg.content) as Partial<ArchitectConversationState>;
+      // Reconstruct full state with defaults
+      return {
+        phase: parsed.phase || "idle",
+        orgId: parsed.orgId || "",
+        discoveryStep: parsed.discoveryStep || 0,
+        discovery: parsed.discovery || {},
+        proposedDesign: parsed.proposedDesign,
+        nameSuggestions: parsed.nameSuggestions,
+        createdSquadId: parsed.createdSquadId,
+        editSquadId: parsed.editSquadId,
+        editSquadName: parsed.editSquadName,
+        awaitingBuildConfirmation: parsed.awaitingBuildConfirmation,
+      };
+    }
+  } catch (err) {
+    console.error("[Architect] Failed to load persisted state:", err);
+  }
+  return null;
 }
 
 // ===================== COMPANY WIZARD =====================
@@ -701,11 +836,26 @@ async function handleDesignApproval(
       state.phase = "idle";
       return;
     }
-    await sendArchitectMessage(squadId, "Criando seu squad...");
+
+    // Build phase: generate rich agent definitions via LLM
+    const { companyPrompt } = await buildOrgContext(state.orgId);
+    const workflowCtx = {
+      state, squadId, orgId: state.orgId, providerConfig, companyPrompt,
+      sendMessage: sendArchitectMessage,
+      sendMessageWithMeta: sendArchitectMessageWithMeta,
+    };
+
     try {
+      // Generate rich agent definitions
+      await handleBuildPhase(workflowCtx);
+
+      // Now create the squad in DB (buildSquadFromDesign uses the original design)
       const created = await buildSquadFromDesign(state);
       state.createdSquadId = created.id;
-      state.phase = "idle";
+
+      // Run quality gates validation
+      await handleValidatePhase(workflowCtx);
+
       const d = state.proposedDesign!;
       // Check if the squad needs integrations to be configured
       const publishingSkills = (d.skills || []).filter(s =>
@@ -813,7 +963,15 @@ async function handleListAction(state: ArchitectConversationState, squadId: stri
     state.phase = "discovery";
     state.discoveryStep = 0;
     state.discovery = {};
-    await handleDiscovery(state, squadId, userMessage, providerConfig);
+    state.researchData = undefined;
+    state.extractionData = undefined;
+    state.buildData = undefined;
+    const { companyPrompt: cpList } = await buildOrgContext(state.orgId);
+    await handleStructuredDiscovery({
+      state, squadId, orgId, providerConfig, companyPrompt: cpList,
+      sendMessage: sendArchitectMessage,
+      sendMessageWithMeta: sendArchitectMessageWithMeta,
+    }, userMessage);
     return;
   }
   if (intent === "delete") {
@@ -1376,131 +1534,4 @@ async function buildSquadFromDesign(state: ArchitectConversationState) {
   return squad;
 }
 
-// ===================== JSON Extraction =====================
-
-function extractDesignJson(output: string): ArchitectConversationState["proposedDesign"] | null {
-  const fencedMatch =
-    output.match(/```(?:json:squad-design|json)?\s*\n([\s\S]*?)\n\s*```/) ||
-    output.match(/```\s*\n?(\{[\s\S]*?"agents"[\s\S]*?\})\n?\s*```/);
-
-  if (fencedMatch) {
-    try {
-      const parsed = JSON.parse(fencedMatch[1]!);
-      if (parsed.agents && Array.isArray(parsed.agents)) return parsed;
-    } catch { /* */ }
-  }
-
-  const bareEnd = findBareJsonEnd(output.trimStart());
-  if (bareEnd > 0) {
-    const offset = output.length - output.trimStart().length;
-    try {
-      const parsed = JSON.parse(output.slice(offset, offset + bareEnd));
-      if (parsed.agents && Array.isArray(parsed.agents)) return parsed;
-    } catch { /* */ }
-  }
-
-  // Aggressive fallback: find JSON with "agents" anywhere in the output
-  const jsonStart = output.indexOf('{"ready"');
-  if (jsonStart === -1) {
-    // Try finding by "agents" key
-    const agentsIdx = output.indexOf('"agents"');
-    if (agentsIdx > 0) {
-      // Walk backwards to find the opening brace
-      let braceIdx = output.lastIndexOf('{', agentsIdx);
-      while (braceIdx > 0) {
-        try {
-          // Try to parse from this brace to the end
-          const candidate = output.substring(braceIdx);
-          // Find matching closing brace
-          let depth = 0;
-          let endIdx = -1;
-          for (let i = 0; i < candidate.length; i++) {
-            if (candidate[i] === '{') depth++;
-            if (candidate[i] === '}') depth--;
-            if (depth === 0) { endIdx = i + 1; break; }
-          }
-          if (endIdx > 0) {
-            const parsed = JSON.parse(candidate.substring(0, endIdx));
-            if (parsed.agents && Array.isArray(parsed.agents)) return parsed;
-          }
-        } catch { /* continue searching */ }
-        braceIdx = output.lastIndexOf('{', braceIdx - 1);
-        if (braceIdx < 0) break;
-      }
-    }
-  }
-
-  if (jsonStart >= 0) {
-    try {
-      let depth = 0;
-      let endIdx = -1;
-      for (let i = jsonStart; i < output.length; i++) {
-        if (output[i] === '{') depth++;
-        if (output[i] === '}') depth--;
-        if (depth === 0) { endIdx = i + 1; break; }
-      }
-      if (endIdx > 0) {
-        const parsed = JSON.parse(output.substring(jsonStart, endIdx));
-        if (parsed.agents && Array.isArray(parsed.agents)) return parsed;
-      }
-    } catch { /* ignore */ }
-  }
-
-  return null;
-}
-
-function stripJsonFromOutput(output: string): string {
-  let cleaned = output.replace(/```(?:json:squad-design|json)?\s*\n[\s\S]*?\n\s*```\s*/g, "");
-  const bareEnd = findBareJsonEnd(cleaned.trimStart());
-  if (bareEnd > 0) {
-    const offset = cleaned.length - cleaned.trimStart().length;
-    cleaned = cleaned.slice(offset + bareEnd);
-  }
-
-  // Also strip any embedded JSON object with "agents" array (aggressive fallback match)
-  const agentsIdx = cleaned.indexOf('"agents"');
-  if (agentsIdx > 0) {
-    let braceIdx = cleaned.lastIndexOf('{', agentsIdx);
-    while (braceIdx >= 0) {
-      try {
-        const candidate = cleaned.substring(braceIdx);
-        let depth = 0;
-        let endIdx = -1;
-        for (let i = 0; i < candidate.length; i++) {
-          if (candidate[i] === '{') depth++;
-          if (candidate[i] === '}') depth--;
-          if (depth === 0) { endIdx = i + 1; break; }
-        }
-        if (endIdx > 0) {
-          const parsed = JSON.parse(candidate.substring(0, endIdx));
-          if (parsed.agents && Array.isArray(parsed.agents)) {
-            cleaned = cleaned.substring(0, braceIdx) + cleaned.substring(braceIdx + endIdx);
-            break;
-          }
-        }
-      } catch { /* continue */ }
-      braceIdx = cleaned.lastIndexOf('{', braceIdx - 1);
-      if (braceIdx < 0) break;
-    }
-  }
-
-  return cleaned.trim();
-}
-
-function findBareJsonEnd(text: string): number {
-  if (!text.startsWith("{")) return 0;
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (escape) { escape = false; continue; }
-    if (ch === "\\") { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === "{" || ch === "[") depth++;
-    if (ch === "}" || ch === "]") depth--;
-    if (depth === 0) return i + 1;
-  }
-  return 0;
-}
+// JSON extraction utilities moved to ./architect-json.ts
