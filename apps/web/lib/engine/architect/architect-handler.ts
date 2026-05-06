@@ -123,8 +123,6 @@ export async function handleArchitectMessage(
 
   const providerConfig: ProviderConfig = {
     provider: llmProvider.provider,
-    authMethod: llmProvider.authMethod,
-    credential: llmProvider.credential,
     defaultModel: llmProvider.defaultModel || "",
   };
 

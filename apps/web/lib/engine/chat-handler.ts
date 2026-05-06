@@ -93,11 +93,9 @@ export async function handleChatMessage(options: ChatHandlerOptions) {
       content: m.content,
     }));
 
-    // 7. Create adapter using factory (provider-agnostic)
+    // 7. Create adapter using factory (provider-agnostic, roteado via Vercel AI Gateway)
     const providerConfig: ProviderConfig = {
       provider: llmProvider.provider,
-      authMethod: llmProvider.authMethod,
-      credential: llmProvider.credential,
       defaultModel: llmProvider.defaultModel || "",
     };
 

@@ -100,8 +100,6 @@ export async function POST(
 
     const providerConfig: ProviderConfig = {
       provider: llmProvider.provider,
-      authMethod: llmProvider.authMethod,
-      credential: llmProvider.credential,
       defaultModel: llmProvider.defaultModel || "",
     };
 
