@@ -182,14 +182,31 @@ export async function handleArchitectMessage(
     // ── PRIORITY: If there's a proposed design pending, check for approval FIRST ──
     if (state.proposedDesign) {
       const lower = userMessage.trim().toLowerCase();
-      const approvalWords = ["sim", "yes", "ok", "pode", "confirma", "aprova", "manda", "bora", "perfeito", "show", "gostei", "go", "vamos"];
-      const rejectionWords = ["cancelar", "cancela", "desistir", "parar", "não", "nao"];
-      const isApproval = approvalWords.some((kw) => lower.startsWith(kw) || lower === kw) ||
-        (lower.includes("criar") && (lower.includes("sim") || lower.includes("pode") || lower.includes("ok")));
-      const isRejection = rejectionWords.some((kw) => lower.includes(kw));
+      const approvalWords = [
+        "sim", "yes", "ok", "pode", "confirma", "aprova", "aprovar",
+        "manda", "bora", "perfeito", "show", "gostei", "go", "vamos",
+        "criar", "criar agora", "criar squad", "criar o squad",
+        "cria", "cria agora", "monta", "monte", "vai",
+      ];
+      const editIntents = ["ajustar", "editar", "modificar", "alterar", "mudar", "trocar"];
+      const rejectionWords = ["cancelar", "cancela", "desistir", "parar", "não", "nao", "nao quero"];
+
+      // Match aprovacao se a mensagem comeca com / equivale a / contem ate 30 chars uma palavra de aprovacao
+      const isApproval = approvalWords.some((kw) => lower === kw || lower.startsWith(kw + " ") || lower.startsWith(kw + "!")) ||
+        approvalWords.some((kw) => lower.length <= 30 && lower.includes(kw));
+      const isEdit = editIntents.some((kw) => lower.includes(kw));
+      const isRejection = rejectionWords.some((kw) => lower === kw || lower.startsWith(kw + " "));
+
+      if (isEdit && !isRejection) {
+        // User quer ajustar — vai pra edicao do design
+        state.phase = "edit-modify";
+        state.editSquadName = state.proposedDesign.name;
+        await handleEditModify(state, squadId, userMessage, providerConfig);
+        architectStates.set(stateKey, state);
+        return;
+      }
 
       if (isApproval && !isRejection) {
-        // Route to design approval
         state.phase = "design";
         await handleDesignApproval(state, squadId, userMessage, providerConfig);
         architectStates.set(stateKey, state);
@@ -1442,22 +1459,41 @@ async function sendArchitectMessageWithMeta(squadId: string, content: string, me
 async function recoverStateFromConversation(orgId: string, squadId: string, conversationId: string): Promise<ArchitectConversationState> {
   const history = await getMessagesByConversationId(squadId, conversationId, 50);
 
+  // 1. Procura design proposto: pode estar em metadata.proposedDesign OU
+  //    embutido no content via bloco ```json:squad-design.
   for (let i = history.length - 1; i >= 0; i--) {
-    const meta = history[i]!.metadata as Record<string, unknown> | null;
+    const msg = history[i]!;
+    const meta = msg.metadata as Record<string, unknown> | null;
     if (meta?.proposedDesign) {
       return {
         phase: "design", orgId, discovery: {}, discoveryStep: 5,
         proposedDesign: meta.proposedDesign as ArchitectConversationState["proposedDesign"],
       };
     }
+    if (msg.role === "agent" && /```json:squad-design/i.test(msg.content)) {
+      try {
+        const { extractDesignJson } = await import("./architect-json");
+        const design = extractDesignJson(msg.content);
+        if (design) {
+          return {
+            phase: "design", orgId, discovery: {}, discoveryStep: 5,
+            proposedDesign: design,
+          };
+        }
+      } catch { /* ignora e segue */ }
+    }
   }
 
-  const userMsgCount = history.filter((m) => m.role === "user").length;
+  // 2. Sem design ainda. Se ja ha mensagens do usuario, assumimos discovery
+  //    em andamento (em vez de idle, que travava o orquestrador no caminho
+  //    do handleGeneral em vez do handleStructuredDiscovery).
+  const userMessages = history.filter((m) => m.role === "user");
+  const firstUserContent = userMessages[0]?.content;
   return {
-    phase: userMsgCount > 0 ? "idle" : "idle",
+    phase: userMessages.length > 0 ? "discovery" : "idle",
     orgId,
-    discovery: { purpose: history.find((m) => m.role === "user")?.content },
-    discoveryStep: userMsgCount,
+    discovery: firstUserContent ? { purpose: firstUserContent } : {},
+    discoveryStep: userMessages.length,
   };
 }
 
