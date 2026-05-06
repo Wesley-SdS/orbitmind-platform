@@ -1,17 +1,18 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { Send, Paperclip, Maximize2, X, Loader2 } from "lucide-react";
+import { Send, Paperclip, Maximize2, X, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
 interface ChatInputProps {
   onSend: (content: string) => void;
+  onStop?: () => void;
   disabled?: boolean;
   loading?: boolean;
 }
 
-export function ChatInput({ onSend, disabled, loading }: ChatInputProps) {
+export function ChatInput({ onSend, onStop, disabled, loading }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -83,18 +84,27 @@ export function ChatInput({ onSend, disabled, loading }: ChatInputProps) {
               <Maximize2 className="h-3.5 w-3.5" />
             </Button>
           </div>
-          <Button
-            size="icon"
-            className="shrink-0 h-9 w-9"
-            onClick={handleSend}
-            disabled={!value.trim() || disabled || loading}
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
+          {loading && onStop ? (
+            <Button
+              size="icon"
+              variant="destructive"
+              className="shrink-0 h-9 w-9"
+              onClick={onStop}
+              title="Interromper"
+              type="button"
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+            </Button>
+          ) : (
+            <Button
+              size="icon"
+              className="shrink-0 h-9 w-9"
+              onClick={handleSend}
+              disabled={!value.trim() || disabled || loading}
+            >
               <Send className="h-4 w-4" />
-            )}
-          </Button>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -128,14 +138,17 @@ export function ChatInput({ onSend, disabled, loading }: ChatInputProps) {
               <Button variant="outline" size="sm" onClick={() => setIsExpanded(false)}>
                 Voltar
               </Button>
-              <Button size="sm" onClick={handleSend} disabled={!value.trim() || disabled || loading}>
-                {loading ? (
-                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                ) : (
+              {loading && onStop ? (
+                <Button size="sm" variant="destructive" onClick={onStop} type="button">
+                  <Square className="mr-2 h-3.5 w-3.5 fill-current" />
+                  Parar
+                </Button>
+              ) : (
+                <Button size="sm" onClick={handleSend} disabled={!value.trim() || disabled || loading}>
                   <Send className="mr-2 h-3.5 w-3.5" />
-                )}
-                {loading ? "Processando..." : "Enviar"}
-              </Button>
+                  Enviar
+                </Button>
+              )}
             </div>
           </div>
         </div>

@@ -190,6 +190,21 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchi
     window.location.href = "/chat";
   }
 
+  async function handleStop() {
+    // Libera UI imediatamente
+    setTypingAgent(null);
+    if (isArchitect && conversationId) {
+      // Sinaliza ao backend para limpar estado pendente
+      try {
+        await fetch("/api/chat/architect/cancel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversationId }),
+        });
+      } catch { /* best-effort */ }
+    }
+  }
+
   const subtitle = isArchitect
     ? "Criar e gerenciar squads"
     : `${agents.length} agentes`;
@@ -225,7 +240,7 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchi
         </div>
       </div>
       <div className="shrink-0">
-        <ChatInput onSend={handleSend} loading={!!typingAgent} />
+        <ChatInput onSend={handleSend} onStop={handleStop} loading={!!typingAgent} />
       </div>
     </div>
   );

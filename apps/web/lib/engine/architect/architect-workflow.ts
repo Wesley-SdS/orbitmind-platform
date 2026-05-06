@@ -46,10 +46,12 @@ export interface WorkflowContext {
 
 async function withProgress<T>(ctx: WorkflowContext, message: string, fn: () => Promise<T>): Promise<T> {
   await ctx.sendMessage(ctx.squadId, message);
-  const tid = setTimeout(async () => {
-    try { await ctx.sendMessage(ctx.squadId, "⏳ Ainda processando..."); } catch { /* */ }
-  }, 12000);
-  try { return await fn(); } finally { clearTimeout(tid); }
+  const start = Date.now();
+  const interval = setInterval(async () => {
+    const sec = Math.floor((Date.now() - start) / 1000);
+    try { await ctx.sendMessage(ctx.squadId, `⏳ Ainda processando... (${sec}s)`); } catch { /* */ }
+  }, 20000);
+  try { return await fn(); } finally { clearInterval(interval); }
 }
 
 /** Skill display names + icons for user-facing messages */
