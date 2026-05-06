@@ -38,6 +38,8 @@ coverage/
 # Tools
 .playwright-cli/
 .claude/skills/
+.claude/settings.json
+.claude/settings.local.json
 
 # Documentation (screenshots)
 docs/screenshots/
