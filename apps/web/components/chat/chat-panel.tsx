@@ -39,6 +39,13 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchi
     setMessages(initialMessages);
   }, [initialMessages]);
 
+  // Clear typing indicator when parent signals response arrived
+  useEffect(() => {
+    if (!waitingResponse) {
+      setTypingAgent(null);
+    }
+  }, [waitingResponse]);
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     setTimeout(() => {
@@ -110,8 +117,10 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchi
       }
     }
 
-    // Poll for response
+    // Poll for response — track message count to detect when backend is done
     if (isArchitect && conversationId) {
+      let lastMsgCount = 0;
+      let stableCount = 0;
       const pollHistory = async () => {
         const histRes = await fetch(`/api/chat/architect/history?conversationId=${conversationId}`);
         if (histRes.ok) {
@@ -122,12 +131,27 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchi
               createdAt: typeof m.createdAt === "string" ? m.createdAt : new Date(m.createdAt as unknown as string).toISOString(),
             }));
             setMessages(parsed);
+
+            // Only clear typing when messages stabilize (no new messages for 2 consecutive polls)
+            const agentMsgs = parsed.filter((m) => m.role !== "user");
+            if (agentMsgs.length > 0) {
+              if (agentMsgs.length === lastMsgCount) {
+                stableCount++;
+              } else {
+                stableCount = 0;
+              }
+              lastMsgCount = agentMsgs.length;
+              if (stableCount >= 2) {
+                setTypingAgent(null);
+              }
+            }
+
             if (parsed.some((m) => m.role === "agent" && m.content.includes("criado com sucesso"))) {
+              setTypingAgent(null);
               onSquadCreated?.();
             }
           }
         }
-        setTypingAgent(null);
       };
       const polls = [2000, 4000, 6000, 8000, 10000, 13000, 16000, 20000, 25000, 30000, 40000, 50000, 60000];
       polls.forEach(ms => setTimeout(pollHistory, ms));
@@ -138,9 +162,9 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchi
         setTypingAgent(firstAgent);
       }
       const pollSquadMessages = async () => {
-        const res = await fetch(`/api/chat/${squadId}`);
-        if (res.ok) {
-          const data = await res.json();
+        const res2 = await fetch(`/api/chat/${squadId}`);
+        if (res2.ok) {
+          const data = await res2.json();
           if (Array.isArray(data)) {
             const parsed = (data as ChatMessage[]).map((m) => ({
               ...m,
@@ -201,7 +225,7 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchi
         </div>
       </div>
       <div className="shrink-0">
-        <ChatInput onSend={handleSend} />
+        <ChatInput onSend={handleSend} loading={!!typingAgent} />
       </div>
     </div>
   );

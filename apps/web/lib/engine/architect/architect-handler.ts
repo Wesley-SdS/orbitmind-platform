@@ -803,16 +803,22 @@ async function handleNaming(
     chosenName = userMessage.trim();
   }
 
-  state.proposedDesign!.name = chosenName;
+  const design = state.proposedDesign!;
+  design.name = chosenName;
   state.phase = "design";
 
-  await sendArchitectMessageWithMeta(squadId,
-    `Ótimo! O squad vai se chamar **"${chosenName}"** ✨\n\nPosso **criar agora**, ou quer **ajustar** algo antes? Você também pode:\n- **Detalhar** as responsabilidades dos agentes\n- **Trocar o nome** de algum agente (ex: "troca o nome do revisor para X")`,
-    {
-      agentName: "Arquiteto", agentIcon: "🧠", isArchitect: true,
-      proposedDesign: state.proposedDesign,
-    }
-  );
+  // Show design summary with the chosen name
+  let msg = `🎨 **Squad: ${chosenName}**\n\n**Agentes:**\n`;
+  design.agents.forEach((a: { icon?: string; name: string; description?: string }, i: number) => {
+    msg += `${i + 1}. ${a.icon || "🤖"} **${a.name}** — ${a.description || a.name}\n`;
+  });
+  msg += `\n**Pipeline:** ${design.pipeline.length} steps`;
+  msg += `\n\nTudo certo? Ou quer **ajustar** algo antes?\n- **Detalhar** as responsabilidades dos agentes\n- **Trocar o nome** de algum agente (ex: "troca o nome do revisor para X")`;
+
+  await sendArchitectMessageWithMeta(squadId, msg, {
+    agentName: "Arquiteto", agentIcon: "🧠", isArchitect: true,
+    proposedDesign: design,
+  });
 }
 
 // ===================== DESIGN APPROVAL =====================

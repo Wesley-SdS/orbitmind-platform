@@ -58,6 +58,27 @@ async function withProgress<T>(ctx: WorkflowContext, message: string, fn: () => 
   try { return await fn(); } finally { clearTimeout(tid); }
 }
 
+/** Skill display names + icons for user-facing messages */
+const SKILL_DISPLAY: Record<string, { label: string; icon: string }> = {
+  web_search: { label: "Pesquisa na Web", icon: "🔍" },
+  web_fetch: { label: "Leitura de Páginas", icon: "🌐" },
+  instagram_publisher: { label: "Publicação no Instagram", icon: "📸" },
+  image_fetcher: { label: "Busca de Imagens", icon: "🖼️" },
+  linkedin_publisher: { label: "Publicação no LinkedIn", icon: "💼" },
+  blotato_publisher: { label: "Publicação Social", icon: "📢" },
+  canva_designer: { label: "Design Gráfico", icon: "🎨" },
+  apify_scraper: { label: "Análise de Concorrentes", icon: "📊" },
+};
+
+function formatSkillsDisplay(skills: string[]): string {
+  return skills
+    .map((s) => {
+      const info = SKILL_DISPLAY[s];
+      return info ? `${info.icon} ${info.label}` : s;
+    })
+    .join("\n");
+}
+
 /** Auto-detect skills from purpose + platforms (OpenSquad: no longer asks) */
 function autoDetectSkills(purpose: string, platforms: string[]): string[] {
   const skills = new Set(["web_search", "web_fetch"]);
@@ -148,7 +169,7 @@ export async function handleStructuredDiscovery(ctx: WorkflowContext, userMessag
         state.discovery.customRequirements = detectedSkills.join(","); // temp storage for skills
 
         await ctx.sendMessage(squadId,
-          summary + `\n🔧 **Skills detectadas:** ${detectedSkills.join(", ")}`);
+          summary + `\n\n⚡ **Capacidades do Squad**\n\n${formatSkillsDisplay(detectedSkills)}`);
 
         await ctx.sendMessage(squadId,
           "**6/6 — Tem perfis ou posts de referência?** (opcional)\n\n" +
@@ -449,22 +470,7 @@ Apresente visualmente e pergunte: "Tudo certo? Ou quer ajustar algo?"` }]),
     state.proposedDesign = design;
     state.phase = "naming";
 
-    const display = stripJsonFromOutput(result.output);
-    if (display.trim()) {
-      await ctx.sendMessageWithMeta(squadId, display, {
-        agentName: "Arquiteto", agentIcon: "🧠", isArchitect: true, proposedDesign: design,
-      });
-    } else {
-      // Show fallback design message
-      let msg = `🎨 **Design: ${design.name}**\n\n**Agentes:**\n`;
-      design.agents.forEach((a, i) => { msg += `${i + 1}. ${a.icon} **${a.name}** — ${a.description}\n`; });
-      msg += `\n**Pipeline:** ${design.pipeline.length} steps\n**Skills:** ${design.skills?.join(", ")}\n\nTudo certo? Ou quer ajustar?`;
-      await ctx.sendMessageWithMeta(squadId, msg, {
-        agentName: "Arquiteto", agentIcon: "🧠", isArchitect: true, proposedDesign: design,
-      });
-    }
-
-    // Name suggestions
+    // Ask for name FIRST, then show design after user picks a name
     await ctx.sendMessage(squadId, "✨ Gerando sugestões de nome...");
     const nameResult = await adapter.chat([{ role: "user",
       content: `Sugira 3 nomes criativos curtos em português para squad "${design.description}".\nAgentes: ${design.agents.map((a) => a.name).join(", ")}\n\nFormato:\n**Como quer chamar esse squad?**\n\n1. **Nome 1**\n2. **Nome 2**\n3. **Nome 3**\n\nEscolha uma ou digite o nome que preferir!` }]);
@@ -472,16 +478,10 @@ Apresente visualmente e pergunte: "Tudo certo? Ou quer ajustar algo?"` }]),
     await ctx.sendMessage(squadId, nameResult.output);
   } catch (err) {
     console.error("[Architect] Design error:", err);
-    // Fallback — never leave user stuck
+    // Fallback — never leave user stuck. Ask name first.
     const fb = generateFallbackDesign(state, detectedSkills);
     state.proposedDesign = fb;
     state.phase = "naming";
-    let msg = `🎨 **Design: ${fb.name}**\n\n**Agentes:**\n`;
-    fb.agents.forEach((a, i) => { msg += `${i + 1}. ${a.icon} **${a.name}** — ${a.description}\n`; });
-    msg += `\n**Pipeline:** ${fb.pipeline.length} steps\n\nTudo certo? Ou quer ajustar?`;
-    await ctx.sendMessageWithMeta(squadId, msg, {
-      agentName: "Arquiteto", agentIcon: "🧠", isArchitect: true, proposedDesign: fb,
-    });
     state.nameSuggestions = [fb.name];
     await ctx.sendMessage(squadId, `**Como quer chamar esse squad?**\n\n1. **${fb.name}**\n\nDigite o nome que preferir!`);
   }

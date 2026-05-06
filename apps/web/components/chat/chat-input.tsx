@@ -1,16 +1,17 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { Send, Paperclip, Maximize2, X } from "lucide-react";
+import { Send, Paperclip, Maximize2, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
 interface ChatInputProps {
   onSend: (content: string) => void;
   disabled?: boolean;
+  loading?: boolean;
 }
 
-export function ChatInput({ onSend, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, loading }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -86,9 +87,13 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
             size="icon"
             className="shrink-0 h-9 w-9"
             onClick={handleSend}
-            disabled={!value.trim() || disabled}
+            disabled={!value.trim() || disabled || loading}
           >
-            <Send className="h-4 w-4" />
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </div>
@@ -123,9 +128,13 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
               <Button variant="outline" size="sm" onClick={() => setIsExpanded(false)}>
                 Voltar
               </Button>
-              <Button size="sm" onClick={handleSend} disabled={!value.trim() || disabled}>
-                <Send className="mr-2 h-3.5 w-3.5" />
-                Enviar
+              <Button size="sm" onClick={handleSend} disabled={!value.trim() || disabled || loading}>
+                {loading ? (
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-3.5 w-3.5" />
+                )}
+                {loading ? "Processando..." : "Enviar"}
               </Button>
             </div>
           </div>

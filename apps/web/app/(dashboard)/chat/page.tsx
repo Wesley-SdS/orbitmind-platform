@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { Plus, Sparkles, ClipboardList, Bot, BarChart3, MessageSquare, Trash2 } from "lucide-react";
+import { Plus, Sparkles, ClipboardList, Bot, BarChart3, MessageSquare, Trash2, Search, X, ChevronDown, ChevronUp } from "lucide-react";
 import { PageLoader } from "@/components/ui/page-loader";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ChatInput } from "@/components/chat/chat-input";
 import type { ChatMessage } from "@orbitmind/shared";
@@ -53,6 +55,10 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [waitingResponse, setWaitingResponse] = useState(false);
   const skipNextLoad = useRef(false);
+  const [squadSearchOpen, setSquadSearchOpen] = useState(false);
+  const [squadSearch, setSquadSearch] = useState("");
+  const [convSearchOpen, setConvSearchOpen] = useState(false);
+  const [convSearch, setConvSearch] = useState("");
 
   const isArchitectConversation = !!currentConversationId;
   const isSquadChat = !!selectedSquadId && !currentConversationId;
@@ -179,6 +185,14 @@ export default function ChatPage() {
     loadConversations();
   }
 
+  const activeSquads = squads.filter((s) => s.status === "active");
+  const filteredSquads = squadSearch
+    ? activeSquads.filter((s) => s.name.toLowerCase().includes(squadSearch.toLowerCase()))
+    : activeSquads;
+  const filteredConversations = convSearch
+    ? conversations.filter((c) => (c.title || "Conversa").toLowerCase().includes(convSearch.toLowerCase()))
+    : conversations;
+
   const selectedName = isArchitectConversation
     ? "Arquiteto"
     : squads.find((s) => s.id === selectedSquadId)?.name ?? "";
@@ -188,22 +202,45 @@ export default function ChatPage() {
   return (
     <div className="-m-6 flex h-[calc(100vh-3.5rem)]">
       {/* Sidebar */}
-      <div className="w-72 shrink-0 border-r border-border/50 bg-muted/30 flex flex-col">
+      <div className="w-72 shrink-0 border-r border-border/50 bg-muted/30 flex flex-col overflow-hidden">
         <div className="shrink-0 border-b border-border/50 p-2">
           <Button variant="outline" className="w-full justify-start gap-2 text-sm" onClick={startNewConversation}>
             <Plus className="h-4 w-4" />
             Nova Conversa
           </Button>
         </div>
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="p-2 space-y-1">
             {/* Squads */}
             {squads.length > 0 && (
-              <div className="px-3 py-1.5">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Squads</p>
-              </div>
+              <>
+                <div className="flex items-center justify-between px-3 py-1.5">
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Squads</p>
+                  <button
+                    onClick={() => { setSquadSearchOpen((v) => !v); setSquadSearch(""); }}
+                    className="p-0.5 rounded hover:bg-accent/50 transition-colors"
+                  >
+                    {squadSearchOpen ? (
+                      <X className="h-3 w-3 text-muted-foreground" />
+                    ) : (
+                      <Search className="h-3 w-3 text-muted-foreground" />
+                    )}
+                  </button>
+                </div>
+                {squadSearchOpen && (
+                  <div className="px-2 pb-1">
+                    <Input
+                      placeholder="Buscar squads..."
+                      value={squadSearch}
+                      onChange={(e) => setSquadSearch(e.target.value)}
+                      className="h-7 text-xs"
+                      autoFocus
+                    />
+                  </div>
+                )}
+              </>
             )}
-            {squads.filter((s) => s.status === "active").map((squad) => (
+            {filteredSquads.slice(0, squadSearchOpen ? undefined : 3).map((squad) => (
               <button
                 key={squad.id}
                 onClick={() => selectSquad(squad.id)}
@@ -219,14 +256,51 @@ export default function ChatPage() {
                 <div className="h-2 w-2 rounded-full bg-green-500" />
               </button>
             ))}
+            {!squadSearchOpen && filteredSquads.length > 3 && (
+              <button
+                onClick={() => setSquadSearchOpen(true)}
+                className="flex w-full items-center justify-center gap-1 px-3 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronDown className="h-3 w-3" />
+                Ver todos ({filteredSquads.length})
+              </button>
+            )}
+
+            {/* Separator */}
+            {squads.length > 0 && conversations.length > 0 && (
+              <Separator className="my-2" />
+            )}
 
             {/* Conversations */}
             {conversations.length > 0 && (
-              <div className="px-3 py-1.5 mt-2">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Conversas</p>
-              </div>
+              <>
+                <div className="flex items-center justify-between px-3 py-1.5">
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Conversas</p>
+                  <button
+                    onClick={() => { setConvSearchOpen((v) => !v); setConvSearch(""); }}
+                    className="p-0.5 rounded hover:bg-accent/50 transition-colors"
+                  >
+                    {convSearchOpen ? (
+                      <X className="h-3 w-3 text-muted-foreground" />
+                    ) : (
+                      <Search className="h-3 w-3 text-muted-foreground" />
+                    )}
+                  </button>
+                </div>
+                {convSearchOpen && (
+                  <div className="px-2 pb-1">
+                    <Input
+                      placeholder="Buscar conversas..."
+                      value={convSearch}
+                      onChange={(e) => setConvSearch(e.target.value)}
+                      className="h-7 text-xs"
+                      autoFocus
+                    />
+                  </div>
+                )}
+              </>
             )}
-            {conversations.map((conv) => (
+            {filteredConversations.slice(0, convSearchOpen ? undefined : 3).map((conv) => (
               <div
                 key={conv.conversationId}
                 className={`group flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
@@ -251,6 +325,15 @@ export default function ChatPage() {
                 </button>
               </div>
             ))}
+            {!convSearchOpen && filteredConversations.length > 3 && (
+              <button
+                onClick={() => setConvSearchOpen(true)}
+                className="flex w-full items-center justify-center gap-1 px-3 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronDown className="h-3 w-3" />
+                Ver todas ({filteredConversations.length})
+              </button>
+            )}
           </div>
         </ScrollArea>
       </div>
@@ -305,7 +388,7 @@ export default function ChatPage() {
               </div>
             </div>
             <div className="shrink-0">
-              <ChatInput onSend={handleFreeSend} />
+              <ChatInput onSend={handleFreeSend} loading={waitingResponse} />
             </div>
           </div>
         )}
