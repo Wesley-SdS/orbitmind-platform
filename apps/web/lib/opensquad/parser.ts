@@ -22,19 +22,21 @@ function resolveOpenSquadDir(): string {
     path.join(process.cwd(), "apps", "web", "lib", "opensquad"),
   ];
 
+  // Primary check: look for core/ directory (always present)
+  for (const dir of candidates) {
+    try {
+      if (fs.existsSync(path.join(dir, "core"))) return dir;
+    } catch { /* skip */ }
+  }
+
+  // Fallback: check for config.yaml (optional)
   for (const dir of candidates) {
     try {
       if (fs.existsSync(path.join(dir, "config.yaml"))) return dir;
     } catch { /* skip */ }
   }
 
-  // Last resort — try __dirname-based relative
-  try {
-    const fromDirname = path.resolve(__dirname);
-    if (fs.existsSync(path.join(fromDirname, "core"))) return fromDirname;
-  } catch { /* skip */ }
-
-  console.warn("[OpenSquad Parser] Could not find opensquad dir, using fallback");
+  console.warn("[OpenSquad Parser] Could not find opensquad dir, using __dirname fallback");
   return candidates[0]!;
 }
 

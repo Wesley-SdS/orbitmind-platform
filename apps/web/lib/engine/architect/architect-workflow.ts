@@ -44,13 +44,24 @@ export interface WorkflowContext {
 
 // ── Helpers ──
 
+const PROGRESS_MESSAGES = [
+  "⏳ Processando...",
+  "⚙️ Analisando padrões e frameworks...",
+  "🧠 Gerando definições detalhadas...",
+  "📝 Refinando critérios de qualidade...",
+  "🔄 Quase lá...",
+];
+
 async function withProgress<T>(ctx: WorkflowContext, message: string, fn: () => Promise<T>): Promise<T> {
   await ctx.sendMessage(ctx.squadId, message);
   const start = Date.now();
+  let tick = 0;
   const interval = setInterval(async () => {
     const sec = Math.floor((Date.now() - start) / 1000);
-    try { await ctx.sendMessage(ctx.squadId, `⏳ Ainda processando... (${sec}s)`); } catch { /* */ }
-  }, 20000);
+    const progressMsg = PROGRESS_MESSAGES[Math.min(tick, PROGRESS_MESSAGES.length - 1)]!;
+    try { await ctx.sendMessage(ctx.squadId, `${progressMsg} (${sec}s)`); } catch { /* */ }
+    tick++;
+  }, 15000);
   try { return await fn(); } finally { clearInterval(interval); }
 }
 
@@ -224,6 +235,10 @@ Retorne APENAS o JSON valido.`;
   return parseDiscoveryDecision(r.output);
 }
 
+/** Global timeout for the entire post-discovery pipeline (research → extraction → design → naming).
+ *  Prevents permanently stuck states if any LLM call hangs. */
+const POST_DISCOVERY_TIMEOUT_MS = 300_000; // 5 minutes
+
 async function transitionFromDiscovery(ctx: WorkflowContext): Promise<void> {
   const { state, squadId } = ctx;
   state.discovery.performanceMode = "high";
@@ -238,23 +253,35 @@ async function transitionFromDiscovery(ctx: WorkflowContext): Promise<void> {
   await ctx.sendMessage(squadId,
     summary + `\n\n⚡ **Capacidades detectadas**\n\n${formatSkillsDisplay(detectedSkills)}`);
 
-  if (state.discovery.references && state.discovery.references.length > 0) {
-    state.phase = "investigation";
+  // Wrap the entire post-discovery chain in a timeout to prevent stuck states
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("Post-discovery pipeline timeout")), POST_DISCOVERY_TIMEOUT_MS),
+  );
+
+  const runPipeline = async () => {
+    if (state.discovery.references && state.discovery.references.length > 0) {
+      state.phase = "investigation";
+      await ctx.sendMessage(squadId,
+        `🔍 **Investigando ${state.discovery.references.length} perfil(is) (~30s cada)...**\nEnquanto isso, vou pesquisar sobre o domínio.`);
+      await handleInvestigationPhase(ctx);
+    } else {
+      state.phase = "research";
+      await ctx.sendMessage(squadId, "🔎 **Iniciando pesquisa de mercado (~1-2 minutos)...**");
+      await handleResearchPhase(ctx);
+    }
+  };
+
+  try {
+    await Promise.race([runPipeline(), timeoutPromise]);
+  } catch (e) {
+    console.error("[Architect] Post-discovery error:", e);
+    const isTimeout = e instanceof Error && e.message.includes("timeout");
     await ctx.sendMessage(squadId,
-      `🔍 **Investigando ${state.discovery.references.length} perfil(is) (~30s cada)...**\nEnquanto isso, vou pesquisar sobre o domínio.`);
-    try { await handleInvestigationPhase(ctx); } catch (e) {
-      console.error("[Architect] Post-discovery error:", e);
-      await ctx.sendMessage(squadId, "⚠️ Erro no processamento. Tente \"criar squad\" novamente.");
-      state.phase = "idle";
-    }
-  } else {
-    state.phase = "research";
-    await ctx.sendMessage(squadId, "🔎 **Iniciando pesquisa de mercado (~1-2 minutos)...**");
-    try { await handleResearchPhase(ctx); } catch (e) {
-      console.error("[Architect] Post-discovery error:", e);
-      await ctx.sendMessage(squadId, "⚠️ Erro no processamento. Tente \"criar squad\" novamente.");
-      state.phase = "idle";
-    }
+      isTimeout
+        ? "⚠️ O processamento demorou demais e foi interrompido. Diga \"criar squad\" para tentar novamente."
+        : "⚠️ Erro no processamento. Diga \"criar squad\" para tentar novamente.",
+    );
+    state.phase = "idle";
   }
 }
 
@@ -372,11 +399,13 @@ export async function handleResearchPhase(ctx: WorkflowContext): Promise<void> {
 
   try {
     const { webSearch } = await import("@orbitmind/engine");
+    // Truncate nicho to first 60 chars to avoid overly long search queries
+    const shortNicho = nicho.length > 60 ? nicho.substring(0, 60).replace(/\s\S*$/, "") : nicho;
     const searches = [
-      { label: `frameworks e melhores práticas para "${nicho}"`, q: `${nicho} melhores práticas framework` },
-      { label: `anti-patterns e erros comuns em "${nicho}"`, q: `${nicho} erros comuns evitar` },
-      { label: "critérios de qualidade e benchmarks", q: `${nicho} critérios qualidade` },
-      { label: "vocabulário e exemplos de sucesso", q: `${nicho} exemplos sucesso vocabulário profissional` },
+      { label: `frameworks e melhores práticas para "${shortNicho}"`, q: `${shortNicho} melhores práticas framework` },
+      { label: `anti-patterns e erros comuns em "${shortNicho}"`, q: `${shortNicho} erros comuns evitar` },
+      { label: "critérios de qualidade e benchmarks", q: `${shortNicho} critérios qualidade` },
+      { label: "vocabulário e exemplos de sucesso", q: `${shortNicho} exemplos sucesso vocabulário profissional` },
     ];
 
     const allResults: Array<{ title: string; snippet: string }> = [];
@@ -454,8 +483,17 @@ Retorne APENAS o JSON válido.` }]),
   }
 
   await ctx.sendMessage(squadId, "✅ **Conhecimento extraído!** Projetando o squad...");
+  // NOTE: phase is set to "design-review" to signal auto-advancing.
+  // handleDesignPhase will set it to "naming" on success or keep it recoverable on failure.
   state.phase = "design-review";
-  await handleDesignPhase(ctx);
+  try {
+    await handleDesignPhase(ctx);
+  } catch (e) {
+    console.error("[Architect] Design phase failed:", e);
+    // Recover: go back to idle so user can retry
+    state.phase = "idle";
+    await ctx.sendMessage(squadId, "⚠️ Erro ao projetar o squad. Diga \"criar squad\" para tentar novamente.");
+  }
 }
 
 // ══════════════════════════════════════════════════════════

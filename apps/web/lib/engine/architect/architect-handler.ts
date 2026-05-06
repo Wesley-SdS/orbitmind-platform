@@ -36,6 +36,28 @@ import {
 
 const architectStates = new Map<string, ArchitectConversationState>();
 
+// ── Mutex: impede execuções concorrentes por stateKey ──
+const activeLocks = new Map<string, Promise<void>>();
+
+async function withMutex(key: string, fn: () => Promise<void>): Promise<void> {
+  // Espera qualquer execução anterior terminar
+  while (activeLocks.has(key)) {
+    await activeLocks.get(key);
+  }
+  let resolve: () => void;
+  const promise = new Promise<void>((r) => { resolve = r; });
+  activeLocks.set(key, promise);
+  try {
+    await fn();
+  } finally {
+    activeLocks.delete(key);
+    resolve!();
+  }
+}
+
+/** Phases that auto-advance (no user input needed) — skip processing if active */
+const AUTO_ADVANCING_PHASES = new Set(["investigation", "research", "extraction", "design-review"]);
+
 export function getArchitectState(orgId: string) {
   return architectStates.get(orgId);
 }
@@ -71,6 +93,35 @@ async function ensureArchitectSquad(orgId: string) {
 }
 
 export async function handleArchitectMessage(
+  orgId: string,
+  userId: string,
+  userMessage: string,
+  conversationId?: string,
+): Promise<void> {
+  const squadId = ARCHITECT_SQUAD_ID;
+  const stateKey = conversationId || orgId;
+
+  // ── Guard: se uma fase auto-advancing está rodando, apenas acknowledge ──
+  const currentState = architectStates.get(stateKey);
+  if (currentState && AUTO_ADVANCING_PHASES.has(currentState.phase)) {
+    const meta: Record<string, unknown> = { agentName: "Arquiteto", agentIcon: "🧠", isArchitect: true };
+    if (conversationId) meta.conversationId = conversationId;
+    const msg = await createMessage({
+      squadId, agentId: null, content: "⏳ Ainda processando a etapa anterior... aguarde um momento.",
+      role: "agent", metadata: meta,
+    });
+    try {
+      const { wsManager } = await import("@/lib/realtime/ws-manager");
+      wsManager.broadcastToSquad(squadId, { type: "CHAT_MESSAGE", message: { ...msg, createdAt: msg.createdAt.toISOString() } });
+    } catch { /* WS */ }
+    return;
+  }
+
+  // ── Mutex: serializa execuções para este stateKey ──
+  return withMutex(stateKey, () => _handleArchitectMessage(orgId, userId, userMessage, conversationId));
+}
+
+async function _handleArchitectMessage(
   orgId: string,
   userId: string,
   userMessage: string,
@@ -134,18 +185,11 @@ export async function handleArchitectMessage(
       sendMessage: sendArchitectMessage,
       sendMessageWithMeta: sendArchitectMessageWithMeta,
     }, userMessage);
-  } else if (state.phase === "investigation" || state.phase === "research" || state.phase === "extraction") {
-    // These phases are auto-advancing (no user input needed)
-    // If we're here, user sent a message during a running phase — acknowledge
+  } else if (state.phase === "investigation" || state.phase === "research" || state.phase === "extraction" || state.phase === "design-review") {
+    // These phases are auto-advancing (no user input needed).
+    // Guard in handleArchitectMessage already blocks concurrent calls,
+    // but if we somehow get here, just acknowledge.
     await sendArchitectMessage(squadId, "⏳ Processando... aguarde um momento.");
-  } else if (state.phase === "design-review") {
-    // User is reviewing the design from the new workflow
-    const { companyPrompt } = await buildOrgContext(state.orgId);
-    await handleDesignPhase({
-      state, squadId, orgId, providerConfig, companyPrompt,
-      sendMessage: sendArchitectMessage,
-      sendMessageWithMeta: sendArchitectMessageWithMeta,
-    });
   } else if (state.phase === "naming") {
     await handleNaming(state, squadId, userMessage);
   } else if (state.phase === "design") {

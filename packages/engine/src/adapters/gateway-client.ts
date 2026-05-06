@@ -39,8 +39,8 @@ function buildGatewayId(provider: LlmProviderType, model: string): string {
 
 // Timeout duro para qualquer chamada LLM. Sem isso, uma chamada que trava no
 // gateway/socket fica pendente indefinidamente e congela o pipeline.
-const DEFAULT_TIMEOUT_MS = Number(process.env.AI_GATEWAY_TIMEOUT_MS ?? "120000");
-const DEFAULT_MAX_OUTPUT_TOKENS = Number(process.env.AI_GATEWAY_MAX_OUTPUT_TOKENS ?? "4096");
+const DEFAULT_TIMEOUT_MS = Number(process.env.AI_GATEWAY_TIMEOUT_MS ?? "180000");
+const DEFAULT_MAX_OUTPUT_TOKENS = Number(process.env.AI_GATEWAY_MAX_OUTPUT_TOKENS ?? "32768");
 
 class GatewayAdapter implements LlmAdapter {
   constructor(
