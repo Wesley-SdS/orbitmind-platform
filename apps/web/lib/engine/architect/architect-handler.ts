@@ -1405,10 +1405,16 @@ let _currentConversationId: string | undefined;
 
 /** Get messages scoped to current conversation or full squad */
 async function getHistory(squadId: string, limit = 30) {
-  if (_currentConversationId) {
-    return getMessagesByConversationId(squadId, _currentConversationId, limit);
-  }
-  return getMessagesBySquadId(squadId, undefined, limit);
+  // CRITICO: nunca passar mensagens isStateSnapshot:true para o LLM. Sao
+  // snapshots do orquestrador serializados como JSON e o LLM passa a imitar
+  // o formato, vazando o state na resposta.
+  const raw = _currentConversationId
+    ? await getMessagesByConversationId(squadId, _currentConversationId, limit + 5)
+    : await getMessagesBySquadId(squadId, undefined, limit + 5);
+  const filtered = raw.filter(
+    (m) => !(m.metadata as Record<string, unknown> | null)?.isStateSnapshot,
+  );
+  return filtered.slice(0, limit);
 }
 
 async function sendArchitectMessage(squadId: string, content: string) {
