@@ -21,7 +21,6 @@ import { ARCHITECT_AGENT } from "./architect-agent";
 import type { ArchitectConversationState } from "./architect-state";
 import {
   getRelevantBestPractices,
-  getPlatformOptions,
   getExampleSquad,
   getSherlockPromptForPlatform,
   getBestPractice,
@@ -44,11 +43,6 @@ export interface WorkflowContext {
 }
 
 // ── Helpers ──
-
-const TONE_OPTIONS: Record<string, string> = {
-  "1": "Educativo", "2": "Provocativo", "3": "Inspiracional",
-  "4": "Humorístico", "5": "Autoridade", "6": "Conversacional",
-};
 
 async function withProgress<T>(ctx: WorkflowContext, message: string, fn: () => Promise<T>): Promise<T> {
   await ctx.sendMessage(ctx.squadId, message);
@@ -94,152 +88,235 @@ function autoDetectSkills(purpose: string, platforms: string[]): string[] {
 }
 
 // ══════════════════════════════════════════════════════════
-// PHASE 1: DISCOVERY — 6 deterministic questions (natural language)
-// Performance mode REMOVED — always agile (OpenSquad sync 2026-03-30)
+// PHASE 1: DISCOVERY — agentico (LLM decide a proxima pergunta)
+// O LLM extrai info da resposta e gera a proxima pergunta adequada
+// ao tipo de squad (dev, marketing, suporte, etc.). Quando ja tem
+// contexto suficiente, ele marca complete:true e seguimos para
+// investigation/research.
 // ══════════════════════════════════════════════════════════
 
-export async function handleStructuredDiscovery(ctx: WorkflowContext, userMessage: string): Promise<void> {
-  const { state, squadId } = ctx;
-  const step = state.discoveryStep;
+const MAX_DISCOVERY_TURNS = 8;
+const MIN_DISCOVERY_TURNS = 4;
 
-  if (step >= 1) {
-    try { saveDiscoveryAnswer(state, step, userMessage); } catch (e) { console.error("[Architect] saveDiscoveryAnswer:", e); }
-  }
+interface DiscoveryDecision {
+  extracted?: {
+    purpose?: string;
+    audience?: string;
+    tonePreference?: string;
+    contentPillars?: string[];
+    targetPlatforms?: string[];
+    targetFormats?: string[];
+    references?: string[];
+    squadKind?: ArchitectConversationState["discovery"]["squadKind"];
+  };
+  complete?: boolean;
+  nextQuestion?: string;
+}
 
-  state.discoveryStep++;
-  const next = state.discoveryStep;
+function applyExtracted(
+  state: ArchitectConversationState,
+  ex: DiscoveryDecision["extracted"] | undefined,
+): void {
+  if (!ex) return;
+  const d = state.discovery;
+  if (ex.purpose) { d.purpose = ex.purpose; d.nicho = ex.purpose; }
+  if (ex.audience) d.audience = ex.audience;
+  if (ex.tonePreference) d.tonePreference = ex.tonePreference;
+  if (ex.contentPillars?.length) d.contentPillars = ex.contentPillars;
+  if (ex.targetPlatforms?.length) d.targetPlatforms = ex.targetPlatforms;
+  if (ex.targetFormats?.length) d.targetFormats = ex.targetFormats;
+  if (ex.references?.length) d.references = ex.references;
+  if (ex.squadKind) d.squadKind = ex.squadKind;
+}
 
+function buildDiscoveryStateSummary(state: ArchitectConversationState): string {
+  const d = state.discovery;
+  const lines: string[] = [];
+  if (d.squadKind) lines.push(`squadKind: ${d.squadKind}`);
+  if (d.purpose) lines.push(`purpose: ${d.purpose}`);
+  if (d.audience) lines.push(`audience: ${d.audience}`);
+  if (d.tonePreference) lines.push(`tonePreference: ${d.tonePreference}`);
+  if (d.contentPillars?.length) lines.push(`contentPillars: ${d.contentPillars.join(", ")}`);
+  if (d.targetPlatforms?.length) lines.push(`targetPlatforms: ${d.targetPlatforms.join(", ")}`);
+  if (d.targetFormats?.length) lines.push(`targetFormats: ${d.targetFormats.join(", ")}`);
+  if (d.references?.length) lines.push(`references: ${d.references.join(", ")}`);
+  return lines.length ? lines.join("\n") : "(vazio)";
+}
+
+function parseDiscoveryDecision(raw: string): DiscoveryDecision {
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (!m) return {};
   try {
-    switch (next) {
-      case 1:
-        await ctx.sendMessage(squadId,
-          "**1/6 — O que esse squad deve fazer?**\n\n" +
-          "Descreva o resultado final que você quer. Exemplos:\n" +
-          "- Criar conteúdo para Instagram sobre tecnologia\n" +
-          "- Gerenciar atendimento ao cliente SaaS\n" +
-          "- Automatizar pipeline de desenvolvimento\n" +
-          "- Marketing digital B2B para gerar leads");
-        return;
-
-      case 2:
-        await ctx.sendMessage(squadId,
-          "**2/6 — Para quem é esse conteúdo/serviço?**\n\n" +
-          "1. Empresários e executivos (B2B)\n" +
-          "2. Consumidores finais (B2C)\n" +
-          "3. Desenvolvedores e técnicos\n" +
-          "4. Empreendedores e startups\n" +
-          "5. Outro (descreva)");
-        return;
-
-      case 3:
-        await ctx.sendMessage(squadId,
-          "**3/6 — Qual personalidade o conteúdo deve ter?**\n\n" +
-          "1. 📚 **Educativo** — Direto, didático, informativo\n" +
-          "2. 🔥 **Provocativo** — Desafia, questiona, gera reflexão\n" +
-          "3. ✨ **Inspiracional** — Motiva, storytelling, emocional\n" +
-          "4. 😄 **Humorístico** — Leve, divertido, informal\n" +
-          "5. 🎯 **Autoridade** — Expert, técnico, baseado em dados\n" +
-          "6. 💬 **Conversacional** — Como conversa entre colegas");
-        return;
-
-      case 4:
-        await ctx.sendMessage(squadId,
-          "**4/6 — Quais os 3-5 temas ou pilares recorrentes?**\n\n" +
-          "Exemplos: IA, automação, produtividade, vendas, growth...\n" +
-          "Separe por vírgula.");
-        return;
-
-      case 5: {
-        const platforms = getPlatformOptions();
-        const lines = platforms.map((p, i) => `${i + 1}. **${p.name}**`);
-        await ctx.sendMessage(squadId,
-          "**5/6 — Em quais plataformas quer publicar?**\n\n" +
-          lines.join("\n") +
-          "\n\nQuais te interessam? Pode escolher mais de uma.\nOu digite **pular** se não for um squad de conteúdo.");
-        return;
-      }
-
-      case 6: {
-        // Build summary + ask for references
-        const summary = buildDiscoverySummary(state);
-        const detectedSkills = autoDetectSkills(
-          state.discovery.purpose || "",
-          state.discovery.targetFormats || [],
-        );
-        state.discovery.customRequirements = detectedSkills.join(","); // temp storage for skills
-
-        await ctx.sendMessage(squadId,
-          summary + `\n\n⚡ **Capacidades do Squad**\n\n${formatSkillsDisplay(detectedSkills)}`);
-
-        await ctx.sendMessage(squadId,
-          "**6/6 — Tem perfis ou posts de referência?** (opcional)\n\n" +
-          "Cole URLs de perfis que admira (Instagram, YouTube, LinkedIn, Twitter/X).\n\n" +
-          "Ou digite **pular** para ir direto à pesquisa de mercado.");
-        return;
-      }
-
-      case 7: {
-        // References → transition to research/investigation
-        const lower = userMessage.trim().toLowerCase();
-        const skip = ["pular", "skip", "nao", "não", "nenhum", ""].includes(lower);
-        if (!skip) state.discovery.references = extractUrls(userMessage);
-
-        // Set performanceMode to always agile (OpenSquad removed perf modes)
-        state.discovery.performanceMode = "high"; // lean by default
-
-        if (state.discovery.references && state.discovery.references.length > 0) {
-          state.phase = "investigation";
-          await ctx.sendMessage(squadId,
-            `🔍 **Investigando ${state.discovery.references.length} perfil(is) (~30s cada)...**\n` +
-            "Enquanto isso, vou pesquisar sobre o domínio.");
-          try { await handleInvestigationPhase(ctx); } catch (e) {
-            console.error("[Architect] Post-discovery error:", e);
-            await ctx.sendMessage(squadId, "⚠️ Erro no processamento. Tente \"criar squad\" novamente.");
-            state.phase = "idle";
-          }
-        } else {
-          state.phase = "research";
-          await ctx.sendMessage(squadId,
-            "🔎 **Iniciando pesquisa de mercado (~1-2 minutos)...**");
-          try { await handleResearchPhase(ctx); } catch (e) {
-            console.error("[Architect] Post-discovery error:", e);
-            await ctx.sendMessage(squadId, "⚠️ Erro no processamento. Tente \"criar squad\" novamente.");
-            state.phase = "idle";
-          }
-        }
-        return;
-      }
-    }
-  } catch (err) {
-    console.error("[Architect] Discovery error:", err);
-    await ctx.sendMessage(squadId, "⚠️ Problema técnico. Pode responder normalmente.");
-    if (next < 7) { state.discoveryStep++; await handleStructuredDiscovery(ctx, ""); }
+    const parsed = JSON.parse(m[0]) as DiscoveryDecision;
+    return parsed;
+  } catch {
+    return {};
   }
 }
 
-function saveDiscoveryAnswer(state: ArchitectConversationState, step: number, answer: string): void {
-  const t = answer.trim();
-  const audienceMap: Record<string, string> = {
-    "1": "Empresários e executivos (B2B)", "2": "Consumidores finais (B2C)",
-    "3": "Desenvolvedores e técnicos", "4": "Empreendedores e startups",
-  };
-  switch (step) {
-    case 1: state.discovery.purpose = t; state.discovery.nicho = t; break;
-    case 2: state.discovery.audience = audienceMap[t] || t; break;
-    case 3: state.discovery.tonePreference = TONE_OPTIONS[t] || t; break;
-    case 4: state.discovery.contentPillars = t.split(/[,;]/).map((s) => s.trim()).filter(Boolean); break;
-    case 5: {
-      if (["pular", "skip", "nao", "não"].includes(t.toLowerCase())) {
-        state.discovery.targetFormats = []; state.discovery.targetPlatforms = [];
-      } else {
-        const plats = getPlatformOptions();
-        const nums = t.split(/[,;\s]+/).map((n) => parseInt(n, 10)).filter((n) => !isNaN(n));
-        const sel = nums.map((n) => plats[n - 1]).filter((p): p is { id: string; name: string } => !!p);
-        state.discovery.targetFormats = sel.map((p) => p.id);
-        state.discovery.targetPlatforms = sel.map((p) => p.name);
-      }
-      break;
+async function decideNextDiscoveryStep(
+  ctx: WorkflowContext,
+  userMessage: string,
+): Promise<DiscoveryDecision> {
+  const { state, providerConfig, companyPrompt } = ctx;
+  const adapter = createAdapter(
+    { name: ARCHITECT_AGENT.name, role: ARCHITECT_AGENT.role, config: {} },
+    providerConfig,
+  );
+
+  const history = (state.discovery.qaHistory ?? [])
+    .map((qa, i) => `Pergunta ${i + 1}: ${qa.q}\nResposta: ${qa.a}`)
+    .join("\n\n") || "(ainda sem perguntas)";
+
+  const stateSummary = buildDiscoveryStateSummary(state);
+  const turnsDone = state.discovery.qaHistory?.length ?? 0;
+  const remaining = Math.max(0, MAX_DISCOVERY_TURNS - turnsDone);
+  const minLeft = Math.max(0, MIN_DISCOVERY_TURNS - turnsDone);
+
+  const prompt = `Voce e o Arquiteto do OrbitMind, conduzindo um discovery para criar um squad de IA.
+
+OBJETIVO
+Coletar contexto suficiente para projetar o squad. As perguntas DEVEM ser adequadas ao tipo de squad (dev team, agencia de conteudo, suporte SaaS, vendas, ops/dados etc.). Nao force perguntas de marketing num squad de desenvolvimento, e vice-versa.
+
+CONTEXTO DA EMPRESA
+${companyPrompt || "(sem dados ainda)"}
+
+ESTADO ATUAL DO DISCOVERY
+${stateSummary}
+
+HISTORICO DA CONVERSA
+${history}
+
+ULTIMA RESPOSTA DO USUARIO
+${userMessage || "(primeira mensagem do fluxo)"}
+
+REGRAS
+1. Identifique squadKind logo na primeira oportunidade: "content" | "dev" | "support" | "sales" | "ops" | "data" | "other".
+2. Extraia tudo que conseguir da ultima resposta e do historico para preencher purpose, audience, tonePreference, contentPillars (3-5 itens), targetPlatforms, targetFormats, references (URLs).
+3. Para squad de "dev", "ops" e "data", NAO pergunte sobre tom de voz ou plataformas de publicacao. Foque em stack tecnica, ambiente de execucao, integracoes (Git/CI/issue tracker), criterios de qualidade.
+4. Para "content"/"sales", as perguntas tradicionais (audiencia, tom, pilares, plataformas) fazem sentido.
+5. Faca UMA pergunta por vez, curta e objetiva. Pode oferecer opcoes numeradas se ajudar a responder rapido.
+6. Voce ja fez ${turnsDone} perguntas (limite ${MAX_DISCOVERY_TURNS}). Restam ${remaining} turnos. ${minLeft > 0 ? `Faca pelo menos mais ${minLeft} pergunta(s).` : "Voce JA pode marcar complete:true se tiver contexto bom."}
+7. Marque complete:true APENAS quando tiver no minimo: purpose claro + audience/contexto + (para content: tom + 1+ pilar/plataforma).
+8. Se complete:true, pode (mas nao precisa) preencher nextQuestion com uma pergunta opcional sobre referencias/URLs antes de seguir.
+
+FORMATO DE SAIDA (JSON unico, sem markdown, sem comentarios)
+{
+  "extracted": {
+    "purpose": "string | omit",
+    "audience": "string | omit",
+    "tonePreference": "string | omit",
+    "contentPillars": ["..."],
+    "targetPlatforms": ["..."],
+    "targetFormats": ["..."],
+    "references": ["https://..."],
+    "squadKind": "content|dev|support|sales|ops|data|other"
+  },
+  "complete": false,
+  "nextQuestion": "string com a proxima pergunta (markdown ok). Omita se complete:true e nao precisa de mais info."
+}
+
+Retorne APENAS o JSON valido.`;
+
+  const r = await adapter.chat([{ role: "user", content: prompt }]);
+  return parseDiscoveryDecision(r.output);
+}
+
+async function transitionFromDiscovery(ctx: WorkflowContext): Promise<void> {
+  const { state, squadId } = ctx;
+  state.discovery.performanceMode = "high";
+
+  const detectedSkills = autoDetectSkills(
+    state.discovery.purpose || "",
+    state.discovery.targetFormats || [],
+  );
+  state.discovery.customRequirements = detectedSkills.join(",");
+
+  const summary = buildDiscoverySummary(state);
+  await ctx.sendMessage(squadId,
+    summary + `\n\n⚡ **Capacidades detectadas**\n\n${formatSkillsDisplay(detectedSkills)}`);
+
+  if (state.discovery.references && state.discovery.references.length > 0) {
+    state.phase = "investigation";
+    await ctx.sendMessage(squadId,
+      `🔍 **Investigando ${state.discovery.references.length} perfil(is) (~30s cada)...**\nEnquanto isso, vou pesquisar sobre o domínio.`);
+    try { await handleInvestigationPhase(ctx); } catch (e) {
+      console.error("[Architect] Post-discovery error:", e);
+      await ctx.sendMessage(squadId, "⚠️ Erro no processamento. Tente \"criar squad\" novamente.");
+      state.phase = "idle";
     }
+  } else {
+    state.phase = "research";
+    await ctx.sendMessage(squadId, "🔎 **Iniciando pesquisa de mercado (~1-2 minutos)...**");
+    try { await handleResearchPhase(ctx); } catch (e) {
+      console.error("[Architect] Post-discovery error:", e);
+      await ctx.sendMessage(squadId, "⚠️ Erro no processamento. Tente \"criar squad\" novamente.");
+      state.phase = "idle";
+    }
+  }
+}
+
+export async function handleStructuredDiscovery(ctx: WorkflowContext, userMessage: string): Promise<void> {
+  const { state, squadId } = ctx;
+  if (!state.discovery.qaHistory) state.discovery.qaHistory = [];
+  const isFirstTurn = state.discoveryStep === 0 && state.discovery.qaHistory.length === 0;
+
+  // Salva resposta no historico (exceto a 1a chamada que e a intencao inicial — guardada como Q0)
+  if (!isFirstTurn) {
+    const lastQ = state.discovery.qaHistory[state.discovery.qaHistory.length - 1];
+    if (lastQ && !lastQ.a) {
+      lastQ.a = userMessage;
+    } else {
+      state.discovery.qaHistory.push({ q: "(intencao inicial)", a: userMessage });
+    }
+  } else if (userMessage.trim()) {
+    state.discovery.qaHistory.push({ q: "(intencao inicial)", a: userMessage });
+  }
+
+  state.discoveryStep++;
+
+  // URLs detectadas em qualquer turno entram em references automaticamente
+  const urls = extractUrls(userMessage);
+  if (urls.length) state.discovery.references = [...new Set([...(state.discovery.references ?? []), ...urls])];
+
+  try {
+    let decision: DiscoveryDecision;
+    try {
+      decision = await decideNextDiscoveryStep(ctx, userMessage);
+    } catch (e) {
+      console.error("[Architect] Discovery LLM call falhou:", e);
+      // Fallback minimo: pergunta simples baseada no que falta
+      decision = {
+        extracted: state.discovery.purpose ? {} : { purpose: userMessage.trim() },
+        complete: false,
+        nextQuestion: state.discovery.purpose
+          ? "Qual o publico ou ambiente alvo desse squad?"
+          : "O que esse squad deve fazer? Descreva o resultado final que voce quer.",
+      };
+    }
+
+    applyExtracted(state, decision.extracted);
+
+    const turnsDone = state.discovery.qaHistory.length;
+    const reachedCap = turnsDone >= MAX_DISCOVERY_TURNS;
+    const hasMinimum = !!state.discovery.purpose;
+    const shouldComplete = (decision.complete && hasMinimum) || (reachedCap && hasMinimum);
+
+    if (shouldComplete) {
+      await transitionFromDiscovery(ctx);
+      return;
+    }
+
+    const nextQ = decision.nextQuestion?.trim()
+      || (hasMinimum
+        ? "Tem alguma referencia (URL de perfil/repo/site) que possa servir de modelo? Ou digite **pular**."
+        : "O que esse squad deve fazer? Descreva o resultado final que voce quer.");
+
+    state.discovery.qaHistory.push({ q: nextQ, a: "" });
+    await ctx.sendMessage(squadId, nextQ);
+  } catch (err) {
+    console.error("[Architect] Discovery error:", err);
+    await ctx.sendMessage(squadId, "⚠️ Tive um problema agora. Pode reformular ou digitar **pular** para seguir com o que ja temos.");
   }
 }
 
@@ -352,15 +429,21 @@ Gere em JSON:
 Retorne APENAS o JSON válido.` }]),
     );
 
+    // O LLM as vezes retorna campos aninhados (objeto/array). Forca string sempre.
+    const toStr = (v: unknown): string => {
+      if (v == null) return "";
+      if (typeof v === "string") return v;
+      try { return JSON.stringify(v); } catch { return String(v); }
+    };
     try {
       const m = result.output.match(/\{[\s\S]*\}/);
       if (m) {
         const p = JSON.parse(m[0]);
-        state.extractionData.operationalFramework = p.operationalFramework || "";
-        state.extractionData.outputExamples = p.outputExamples || "";
-        state.extractionData.antiPatterns = p.antiPatterns || "";
-        state.extractionData.voiceGuidance = p.voiceGuidance || "";
-        state.extractionData.qualityCriteria = p.qualityCriteria || "";
+        state.extractionData.operationalFramework = toStr(p.operationalFramework);
+        state.extractionData.outputExamples = toStr(p.outputExamples);
+        state.extractionData.antiPatterns = toStr(p.antiPatterns);
+        state.extractionData.voiceGuidance = toStr(p.voiceGuidance);
+        state.extractionData.qualityCriteria = toStr(p.qualityCriteria);
       }
     } catch { state.extractionData.operationalFramework = result.output; }
   } catch (e) {

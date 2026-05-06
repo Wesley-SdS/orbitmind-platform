@@ -39,6 +39,9 @@ export interface ArchitectConversationState {
     references?: string[];           // URLs of reference profiles
     domains?: string[];              // Knowledge domains identified
     investigationMode?: string;      // single_post, profile_1, profile_5_10
+    // Agentic discovery: histórico para o LLM decidir a próxima pergunta
+    qaHistory?: Array<{ q: string; a: string }>;
+    squadKind?: "content" | "dev" | "support" | "sales" | "ops" | "data" | "other";
   };
 
   // Research & extraction data (new phases)
