@@ -37,6 +37,11 @@ function buildGatewayId(provider: LlmProviderType, model: string): string {
   return `${GATEWAY_PROVIDER_PREFIX[provider]}/${model}`;
 }
 
+// Timeout duro para qualquer chamada LLM. Sem isso, uma chamada que trava no
+// gateway/socket fica pendente indefinidamente e congela o pipeline.
+const DEFAULT_TIMEOUT_MS = Number(process.env.AI_GATEWAY_TIMEOUT_MS ?? "120000");
+const DEFAULT_MAX_OUTPUT_TOKENS = Number(process.env.AI_GATEWAY_MAX_OUTPUT_TOKENS ?? "4096");
+
 class GatewayAdapter implements LlmAdapter {
   constructor(
     private readonly agent: AgentInfo,
@@ -56,11 +61,20 @@ class GatewayAdapter implements LlmAdapter {
       content: m.content,
     }));
 
-    const response = await generateText({
-      model: buildGatewayId(this.provider, this.model),
-      system,
-      messages: modelMessages,
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new Error(`Gateway timeout apos ${DEFAULT_TIMEOUT_MS}ms`)), DEFAULT_TIMEOUT_MS);
+    let response;
+    try {
+      response = await generateText({
+        model: buildGatewayId(this.provider, this.model),
+        system,
+        messages: modelMessages,
+        maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
+        abortSignal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
 
     const inputTokens = response.usage?.inputTokens ?? 0;
     const outputTokens = response.usage?.outputTokens ?? 0;
@@ -106,12 +120,21 @@ class GatewayAdapter implements LlmAdapter {
       return { role: m.role, content: m.content };
     });
 
-    const response = await generateText({
-      model: buildGatewayId(this.provider, this.model),
-      system,
-      messages: modelMessages,
-      tools: aiTools,
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new Error(`Gateway timeout apos ${DEFAULT_TIMEOUT_MS}ms`)), DEFAULT_TIMEOUT_MS);
+    let response;
+    try {
+      response = await generateText({
+        model: buildGatewayId(this.provider, this.model),
+        system,
+        messages: modelMessages,
+        tools: aiTools,
+        maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
+        abortSignal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
 
     const toolCalls: ToolCall[] = (response.toolCalls ?? []).map((tc) => ({
       id: tc.toolCallId,
