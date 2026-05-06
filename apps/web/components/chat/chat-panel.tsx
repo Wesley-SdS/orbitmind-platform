@@ -33,6 +33,7 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchi
     waitingResponse && isArchitect ? { id: "system-architect", name: "Arquiteto", icon: "🧠", role: "Architect" } : null,
   );
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Sync when initialMessages change (squad switch)
   useEffect(() => {
@@ -46,11 +47,17 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchi
     }
   }, [waitingResponse]);
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when messages change.
+  // Importante: rolar somente o container interno (scrollTop) — usar
+  // scrollIntoView pode escalar para ancestrais (html/body) e empurrar a
+  // pagina inteira para fora da viewport quando muitas mensagens chegam.
   useEffect(() => {
-    setTimeout(() => {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const id = setTimeout(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }, 50);
+    return () => clearTimeout(id);
   }, [messages, typingAgent]);
 
   const getAgent = useCallback(
@@ -223,7 +230,7 @@ export function ChatPanel({ squadId, squadName, initialMessages, agents, isArchi
           </Button>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto p-4">
+      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4">
         <div className="space-y-4">
           {messages.map((msg) => (
             <MessageBubble
