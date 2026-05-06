@@ -1,16 +1,13 @@
 import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { llmProviders } from "@/lib/db/schema";
-import { encryptCredential, decryptCredential } from "@/lib/crypto";
 
-// List providers for org (WITHOUT credential)
 export async function getLlmProvidersByOrgId(orgId: string) {
   const rows = await db
     .select({
       id: llmProviders.id,
       orgId: llmProviders.orgId,
       provider: llmProviders.provider,
-      authMethod: llmProviders.authMethod,
       label: llmProviders.label,
       defaultModel: llmProviders.defaultModel,
       isActive: llmProviders.isActive,
@@ -28,24 +25,7 @@ export async function getLlmProvidersByOrgId(orgId: string) {
   return rows;
 }
 
-// Get provider WITH decrypted credential (internal use only)
-export async function getLlmProviderWithCredential(providerId: string, orgId: string) {
-  const [provider] = await db
-    .select()
-    .from(llmProviders)
-    .where(and(eq(llmProviders.id, providerId), eq(llmProviders.orgId, orgId)))
-    .limit(1);
-
-  if (!provider) return null;
-  return {
-    ...provider,
-    credential: decryptCredential(provider.encryptedCredential),
-  };
-}
-
-// Get DEFAULT provider for org (WITH credential)
 export async function getDefaultLlmProvider(orgId: string) {
-  // Try default first
   let [provider] = await db
     .select()
     .from(llmProviders)
@@ -58,7 +38,6 @@ export async function getDefaultLlmProvider(orgId: string) {
     )
     .limit(1);
 
-  // Fallback: any active provider
   if (!provider) {
     [provider] = await db
       .select()
@@ -67,24 +46,16 @@ export async function getDefaultLlmProvider(orgId: string) {
       .limit(1);
   }
 
-  if (!provider) return null;
-  return {
-    ...provider,
-    credential: decryptCredential(provider.encryptedCredential),
-  };
+  return provider ?? null;
 }
 
-// Create provider
 export async function createLlmProvider(data: {
   orgId: string;
   provider: "anthropic" | "openai" | "gemini";
-  authMethod: "oauth_token" | "api_key";
-  credential: string;
   label: string;
   defaultModel?: string;
   isDefault?: boolean;
 }) {
-  // If marking as default, unmark current default
   if (data.isDefault) {
     await db
       .update(llmProviders)
@@ -92,7 +63,6 @@ export async function createLlmProvider(data: {
       .where(and(eq(llmProviders.orgId, data.orgId), eq(llmProviders.isDefault, true)));
   }
 
-  // Auto-default if first provider
   const existing = await db
     .select({ id: llmProviders.id })
     .from(llmProviders)
@@ -105,8 +75,6 @@ export async function createLlmProvider(data: {
     .values({
       orgId: data.orgId,
       provider: data.provider,
-      authMethod: data.authMethod,
-      encryptedCredential: encryptCredential(data.credential),
       label: data.label,
       defaultModel: data.defaultModel || getDefaultModelForProvider(data.provider),
       isDefault,
@@ -114,7 +82,6 @@ export async function createLlmProvider(data: {
     .returning({
       id: llmProviders.id,
       provider: llmProviders.provider,
-      authMethod: llmProviders.authMethod,
       label: llmProviders.label,
       defaultModel: llmProviders.defaultModel,
       isActive: llmProviders.isActive,
@@ -125,7 +92,6 @@ export async function createLlmProvider(data: {
   return created!;
 }
 
-// Update provider
 export async function updateLlmProvider(
   providerId: string,
   orgId: string,
@@ -134,7 +100,6 @@ export async function updateLlmProvider(
     defaultModel?: string;
     isActive?: boolean;
     isDefault?: boolean;
-    credential?: string;
   },
 ) {
   if (data.isDefault) {
@@ -149,7 +114,6 @@ export async function updateLlmProvider(
   if (data.defaultModel !== undefined) updateData.defaultModel = data.defaultModel;
   if (data.isActive !== undefined) updateData.isActive = data.isActive;
   if (data.isDefault !== undefined) updateData.isDefault = data.isDefault;
-  if (data.credential) updateData.encryptedCredential = encryptCredential(data.credential);
 
   const [updated] = await db
     .update(llmProviders)
@@ -167,14 +131,12 @@ export async function updateLlmProvider(
   return updated ?? null;
 }
 
-// Delete provider
 export async function deleteLlmProvider(providerId: string, orgId: string) {
   await db
     .delete(llmProviders)
     .where(and(eq(llmProviders.id, providerId), eq(llmProviders.orgId, orgId)));
 }
 
-// Record usage
 export async function recordLlmUsage(providerId: string, tokensUsed: number, costCents: number) {
   await db
     .update(llmProviders)

@@ -8,7 +8,6 @@ const updateSchema = z.object({
   defaultModel: z.string().optional(),
   isActive: z.boolean().optional(),
   isDefault: z.boolean().optional(),
-  credential: z.string().min(1).optional(),
 });
 
 export async function PATCH(

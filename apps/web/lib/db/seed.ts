@@ -5,7 +5,6 @@ import postgres from "postgres";
 import bcrypt from "bcryptjs";
 import { sql } from "drizzle-orm";
 import * as schema from "./schema";
-import { encryptCredential } from "../crypto";
 
 // Load .env manually since tsx doesn't load it
 try {
@@ -296,13 +295,11 @@ async function seed() {
   );
   console.log(`Created ${executionDefs.length} executions`);
 
-  // 8. LLM Provider demo
+  // 8. LLM Provider demo (chamadas roteadas via Vercel AI Gateway, sem credencial local)
   await db.insert(schema.llmProviders).values({
     id: "00000000-0000-0000-0000-000000000020",
     orgId: DEMO_ORG_ID,
     provider: "anthropic",
-    authMethod: "api_key",
-    encryptedCredential: encryptCredential("demo-token-placeholder"),
     label: "Claude (Demo)",
     defaultModel: "claude-sonnet-4-6",
     isActive: true,

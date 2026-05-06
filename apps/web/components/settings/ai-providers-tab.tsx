@@ -39,7 +39,6 @@ import {
 interface LlmProvider {
   id: string;
   provider: string;
-  authMethod: string;
   label: string;
   defaultModel: string | null;
   isActive: boolean;
@@ -54,11 +53,6 @@ const PROVIDER_META: Record<string, { name: string; icon: string; color: string;
   anthropic: { name: "Anthropic Claude", icon: "✦", color: "border-orange-500/30", models: ["Claude Opus", "Claude Sonnet", "Claude Haiku"] },
   openai: { name: "OpenAI", icon: "◈", color: "border-green-500/30", models: ["GPT-5.4", "o3 / o4-mini", "GPT-5.4 Mini"] },
   gemini: { name: "Google Gemini", icon: "◆", color: "border-blue-500/30", models: ["Gemini 3.1 Pro", "Gemini Flash", "Gemini 2.5 Pro"] },
-};
-
-const AUTH_LABELS: Record<string, string> = {
-  oauth_token: "OAuth Token",
-  api_key: "API Key",
 };
 
 interface ModelOption {
@@ -92,23 +86,10 @@ const MODEL_OPTIONS: Record<string, ModelOption[]> = {
   ],
 };
 
-const CREDENTIAL_CONFIG: Record<string, Record<string, { placeholder: string; help: string }>> = {
-  anthropic: {
-    api_key: { placeholder: "sk-ant-...", help: "Crie em console.anthropic.com > API Keys" },
-    oauth_token: { placeholder: "Cole seu OAuth token aqui...", help: "Obtenha via: claude config get oauth_token" },
-  },
-  openai: {
-    api_key: { placeholder: "sk-...", help: "Crie em platform.openai.com > API Keys" },
-  },
-  gemini: {
-    api_key: { placeholder: "AIza...", help: "Crie em aistudio.google.com > Get API Key" },
-  },
-};
-
-const LABEL_PLACEHOLDERS: Record<string, Record<string, string>> = {
-  anthropic: { api_key: "Ex: Anthropic Producao", oauth_token: "Ex: Meu Claude Max" },
-  openai: { api_key: "Ex: OpenAI Empresa" },
-  gemini: { api_key: "Ex: Google Gemini" },
+const LABEL_PLACEHOLDERS: Record<string, string> = {
+  anthropic: "Ex: Claude Producao",
+  openai: "Ex: OpenAI Empresa",
+  gemini: "Ex: Google Gemini",
 };
 
 export function AiProvidersTab() {
@@ -116,11 +97,8 @@ export function AiProvidersTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Form state
   const [step, setStep] = useState<1 | 2>(1);
   const [formProvider, setFormProvider] = useState<string>("");
-  const [formAuthMethod, setFormAuthMethod] = useState<string>("api_key");
-  const [formCredential, setFormCredential] = useState("");
   const [formLabel, setFormLabel] = useState("");
   const [formModel, setFormModel] = useState("");
   const [formIsDefault, setFormIsDefault] = useState(false);
@@ -141,8 +119,6 @@ export function AiProvidersTab() {
   function resetForm() {
     setStep(1);
     setFormProvider("");
-    setFormAuthMethod("api_key");
-    setFormCredential("");
     setFormLabel("");
     setFormModel("");
     setFormIsDefault(false);
@@ -151,8 +127,7 @@ export function AiProvidersTab() {
 
   function selectProvider(provider: string) {
     setFormProvider(provider);
-    setFormAuthMethod(provider === "anthropic" ? "oauth_token" : "api_key");
-    setFormModel("");
+    setFormModel(MODEL_OPTIONS[provider]?.[0]?.id ?? "");
     setTestResult(null);
     setStep(2);
   }
@@ -163,7 +138,7 @@ export function AiProvidersTab() {
     const res = await fetch("/api/llm-providers/test", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ provider: formProvider, authMethod: formAuthMethod, credential: formCredential }),
+      body: JSON.stringify({ provider: formProvider, model: formModel }),
     });
     setTestResult(await res.json());
     setTesting(false);
@@ -176,8 +151,6 @@ export function AiProvidersTab() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         provider: formProvider,
-        authMethod: formAuthMethod,
-        credential: formCredential,
         label: formLabel,
         defaultModel: formModel || undefined,
         isDefault: formIsDefault || providers.length === 0,
@@ -206,8 +179,7 @@ export function AiProvidersTab() {
     await loadProviders();
   }
 
-  const credConfig = CREDENTIAL_CONFIG[formProvider]?.[formAuthMethod] ?? { placeholder: "", help: "" };
-  const labelPlaceholder = LABEL_PLACEHOLDERS[formProvider]?.[formAuthMethod] ?? "Ex: Meu Provedor";
+  const labelPlaceholder = LABEL_PLACEHOLDERS[formProvider] ?? "Ex: Meu Provedor";
   const isFirstProvider = providers.length === 0;
 
   return (
@@ -215,7 +187,9 @@ export function AiProvidersTab() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Provedores de IA</h3>
-          <p className="text-sm text-muted-foreground">Configure seus provedores de IA para ativar os agentes</p>
+          <p className="text-sm text-muted-foreground">
+            Roteado via Vercel AI Gateway — sem necessidade de cadastrar API keys.
+          </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger render={<Button size="sm" />}>
@@ -227,13 +201,12 @@ export function AiProvidersTab() {
               <DialogTitle>{step === 1 ? "Escolha o Provedor" : `Configurar ${PROVIDER_META[formProvider]?.name ?? ""}`}</DialogTitle>
               <DialogDescription>
                 {step === 1
-                  ? "Selecione qual provedor de IA você quer configurar"
-                  : "Configure a credencial e modelo padrao"}
+                  ? "Selecione qual provedor de IA voce quer usar como padrao"
+                  : "Defina label e modelo padrao"}
               </DialogDescription>
             </DialogHeader>
 
             {step === 1 ? (
-              /* ===== STEP 1: Provider Selection ===== */
               <div className="grid grid-cols-3 gap-3 py-4">
                 {(["anthropic", "openai", "gemini"] as const).map((prov) => {
                   const meta = PROVIDER_META[prov]!;
@@ -248,39 +221,12 @@ export function AiProvidersTab() {
                       <div className="text-[10px] text-muted-foreground space-y-0.5">
                         {meta.models.map((m) => <div key={m}>{m}</div>)}
                       </div>
-                      <span className="text-[10px] text-muted-foreground mt-1">
-                        {prov === "anthropic" ? "OAuth ou API Key" : "API Key"}
-                      </span>
                     </button>
                   );
                 })}
               </div>
             ) : (
-              /* ===== STEP 2: Configuration ===== */
               <div className="space-y-4 py-4">
-                {/* Auth method — only for Anthropic */}
-                {formProvider === "anthropic" && (
-                  <div className="space-y-2">
-                    <Label>Metodo de autenticacao</Label>
-                    <div className="flex gap-2">
-                      {(["oauth_token", "api_key"] as const).map((method) => (
-                        <button
-                          key={method}
-                          onClick={() => { setFormAuthMethod(method); setTestResult(null); setFormCredential(""); }}
-                          className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                            formAuthMethod === method
-                              ? "border-primary bg-primary/5 font-medium"
-                              : "border-border/50 hover:border-primary/30"
-                          }`}
-                        >
-                          {method === "oauth_token" ? "OAuth Token (Plano Max)" : "API Key"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Label */}
                 <div className="space-y-2">
                   <Label>Label</Label>
                   <Input
@@ -290,24 +236,11 @@ export function AiProvidersTab() {
                   />
                 </div>
 
-                {/* Credential */}
-                <div className="space-y-2">
-                  <Label>{formAuthMethod === "oauth_token" ? "OAuth Token" : "API Key"}</Label>
-                  <Input
-                    type="password"
-                    placeholder={credConfig.placeholder}
-                    value={formCredential}
-                    onChange={(e) => { setFormCredential(e.target.value); setTestResult(null); }}
-                  />
-                  <p className="text-xs text-muted-foreground">{credConfig.help}</p>
-                </div>
-
-                {/* Model selection — rich dropdown */}
                 <div className="space-y-2">
                   <Label>Modelo padrao</Label>
-                  <Select value={formModel} onValueChange={(v) => { if (v) setFormModel(v); }}>
+                  <Select value={formModel} onValueChange={(v) => { if (v) { setFormModel(v); setTestResult(null); } }}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Automatico por tier do agente" />
+                      <SelectValue placeholder="Selecione um modelo" />
                     </SelectTrigger>
                     <SelectContent>
                       {(MODEL_OPTIONS[formProvider] || []).map((m) => (
@@ -323,7 +256,6 @@ export function AiProvidersTab() {
                   </Select>
                 </div>
 
-                {/* Default checkbox */}
                 <div className="flex items-center gap-2">
                   <Switch
                     checked={formIsDefault || isFirstProvider}
@@ -331,19 +263,18 @@ export function AiProvidersTab() {
                     disabled={isFirstProvider}
                   />
                   <Label className={isFirstProvider ? "text-muted-foreground" : ""}>
-                    Definir como padrão {isFirstProvider && "(automático — primeiro provedor)"}
+                    Definir como padrao {isFirstProvider && "(automatico — primeiro provedor)"}
                   </Label>
                 </div>
 
-                {/* Test button */}
                 <div className="flex items-center gap-3">
-                  <Button variant="outline" size="sm" onClick={handleTest} disabled={!formCredential || testing}>
+                  <Button variant="outline" size="sm" onClick={handleTest} disabled={!formModel || testing}>
                     {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                    Testar Conexão
+                    Testar Gateway
                   </Button>
                   {testResult && (
                     <span className={`text-xs ${testResult.valid ? "text-green-600" : "text-destructive"}`}>
-                      {testResult.valid ? "Conexão válida" : testResult.error || "Credencial inválida"}
+                      {testResult.valid ? "Roteamento OK" : testResult.error || "Falha no Gateway"}
                     </span>
                   )}
                 </div>
@@ -356,7 +287,7 @@ export function AiProvidersTab() {
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Voltar
                 </Button>
-                <Button onClick={handleSave} disabled={!formLabel || !formCredential || !testResult?.valid || saving}>
+                <Button onClick={handleSave} disabled={!formLabel || !formModel || saving}>
                   {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Salvar
                 </Button>
@@ -366,7 +297,6 @@ export function AiProvidersTab() {
         </Dialog>
       </div>
 
-      {/* ===== Provider List ===== */}
       {loading ? (
         <div className="text-sm text-muted-foreground">Carregando...</div>
       ) : providers.length === 0 ? (
@@ -375,7 +305,7 @@ export function AiProvidersTab() {
             <AlertCircle className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <h3 className="text-lg font-semibold">Nenhum provedor configurado</h3>
             <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-              Configure seu Claude, OpenAI ou Gemini para ativar respostas dos agentes no chat.
+              Escolha Claude, OpenAI ou Gemini para ativar respostas dos agentes no chat. As chamadas sao roteadas pelo Vercel AI Gateway.
             </p>
             <Button className="mt-4" onClick={() => setDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
@@ -410,14 +340,14 @@ export function AiProvidersTab() {
                           </Badge>
                         </CardTitle>
                         <CardDescription className="text-xs mt-0.5">
-                          {meta.name} · {modelName} · {AUTH_LABELS[p.authMethod] ?? p.authMethod}
+                          {meta.name} · {modelName}
                         </CardDescription>
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
                       <Switch checked={p.isActive} onCheckedChange={() => handleToggleActive(p.id, p.isActive)} />
                       {!p.isDefault && (
-                        <Button variant="ghost" size="sm" onClick={() => handleSetDefault(p.id)} title="Definir como padrão">
+                        <Button variant="ghost" size="sm" onClick={() => handleSetDefault(p.id)} title="Definir como padrao">
                           <Star className="h-4 w-4" />
                         </Button>
                       )}
@@ -428,7 +358,7 @@ export function AiProvidersTab() {
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Remover provedor?</AlertDialogTitle>
-                            <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+                            <AlertDialogDescription>Esta acao nao pode ser desfeita.</AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>

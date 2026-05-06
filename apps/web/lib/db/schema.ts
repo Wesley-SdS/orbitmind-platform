@@ -362,17 +362,10 @@ export const llmProviderTypeEnum = pgEnum("llm_provider_type", [
   "gemini",
 ]);
 
-export const llmAuthMethodEnum = pgEnum("llm_auth_method", [
-  "oauth_token",
-  "api_key",
-]);
-
 export const llmProviders = pgTable("llm_providers", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   provider: llmProviderTypeEnum("provider").notNull(),
-  authMethod: llmAuthMethodEnum("auth_method").notNull(),
-  encryptedCredential: text("encrypted_credential").notNull(),
   label: varchar("label", { length: 100 }).notNull(),
   defaultModel: varchar("default_model", { length: 100 }),
   isActive: boolean("is_active").notNull().default(true),

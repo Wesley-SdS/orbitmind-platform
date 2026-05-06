@@ -5,8 +5,6 @@ import { getLlmProvidersByOrgId, createLlmProvider } from "@/lib/db/queries";
 
 const createSchema = z.object({
   provider: z.enum(["anthropic", "openai", "gemini"]),
-  authMethod: z.enum(["oauth_token", "api_key"]),
-  credential: z.string().min(1),
   label: z.string().min(1).max(100),
   defaultModel: z.string().optional(),
   isDefault: z.boolean().optional(),
