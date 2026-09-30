@@ -1,0 +1,111 @@
+/* ──────────────────────────────────────────────
+   Landing page (/) — tema claro "bege orbital"
+   Tokens prefixados com om- para não colidir com o tema do app.
+   ────────────────────────────────────────────── */
+
+@theme {
+  --color-om-bg: #f3f1ec;
+  --color-om-band: #ece9e2;
+  --color-om-card: #fbfaf7;
+  --color-om-muted: #efede7;
+  --color-om-paper: #f7f5f0;
+  --color-om-fg: #1a1a17;
+  --color-om-body: #3a3934;
+  --color-om-fg-2: #5e5c55;
+  --color-om-fg-3: #6e6c65;
+  --color-om-fg-4: #8f8c84;
+  --color-om-line: rgb(26 26 23 / 0.08);
+  --color-om-line-strong: rgb(26 26 23 / 0.16);
+  --color-om-accent: #f2541b;
+  --color-om-accent-ink: #b53f14;
+
+  --animate-oml-pulse: oml-pulse 1.8s ease-in-out infinite;
+  --animate-oml-float: oml-float 7s ease-in-out infinite;
+  --animate-oml-marquee: oml-marquee 48s linear infinite;
+  --animate-oml-blink: oml-blink 1s steps(1) infinite;
+  --animate-oml-travel: oml-travel 6s linear infinite;
+  --animate-oml-travel-y: oml-travel-y 6s linear infinite;
+}
+
+/* As variáveis das fontes vêm do next/font no wrapper da landing,
+   então precisam ser resolvidas inline (não no :root). */
+@theme inline {
+  --font-om-serif: var(--font-instrument-serif), Georgia, serif;
+  --font-om-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+@keyframes oml-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes oml-spin-rev {
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes oml-marquee {
+  to { transform: translateX(-50%); }
+}
+
+@keyframes oml-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.35); }
+}
+
+@keyframes oml-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes oml-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes oml-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@keyframes oml-travel {
+  0% { left: 0%; opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+
+@keyframes oml-travel-y {
+  0% { top: 0%; opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* O app é dark por padrão (next-themes); a landing é sempre clara. */
+html:has(.om-landing) {
+  scroll-behavior: smooth;
+  color-scheme: light !important;
+  background-color: var(--color-om-bg);
+}
+
+body:has(.om-landing) {
+  background-color: var(--color-om-bg);
+}
+
+.om-landing ::selection {
+  background-color: var(--color-om-accent);
+  color: var(--color-om-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(.om-landing) {
+    scroll-behavior: auto;
+  }
+
+  .om-landing *,
+  .om-landing *::before,
+  .om-landing *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
