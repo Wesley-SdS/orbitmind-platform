@@ -4,19 +4,10 @@ import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Loader2, Github, Orbit } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Loader2, Github } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { landingButton } from "@/components/landing/primitives";
+import { AuthDivider, AuthError, AuthField, PasswordField } from "@/components/auth/auth-fields";
 
 function LoginForm() {
   const router = useRouter();
@@ -39,7 +30,7 @@ function LoginForm() {
     });
 
     if (result?.error) {
-      setError("Email ou senha invalidos.");
+      setError("E-mail ou senha inválidos.");
       setLoading(false);
       return;
     }
@@ -48,74 +39,59 @@ function LoginForm() {
   }
 
   return (
-    <Card className="border-border/50 shadow-2xl shadow-primary/5">
-      <CardHeader className="space-y-3 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <Orbit className="h-6 w-6" />
-        </div>
-        <CardTitle className="text-2xl font-bold">OrbitMind</CardTitle>
-        <CardDescription>
-          Entre na sua conta para acessar seus squads
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="voce@empresa.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Senha</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="********"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
-          </div>
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Entrar
-          </Button>
-        </form>
-        <div className="relative my-6">
-          <Separator />
-          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
-            ou continue com
-          </span>
-        </div>
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => signIn("github", { callbackUrl })}
+    <div>
+      <h1 className="text-[32px] font-semibold tracking-[-0.03em]">Entrar</h1>
+      <p className="mt-2 text-[15px] text-om-fg-2">Acesse seus squads, agentes e projetos.</p>
+
+      <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
+        <AuthField
+          id="email"
+          label="E-mail"
+          type="email"
+          placeholder="voce@empresa.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          autoComplete="email"
+        />
+        <PasswordField
+          id="password"
+          label="Senha"
+          placeholder="Sua senha"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          autoComplete="current-password"
+        />
+        {error && <AuthError>{error}</AuthError>}
+        <button
+          type="submit"
+          disabled={loading}
+          className={cn(landingButton({ size: "md" }), "mt-2 w-full disabled:opacity-60")}
         >
-          <Github className="mr-2 h-4 w-4" />
-          GitHub
-        </Button>
-      </CardContent>
-      <CardFooter className="justify-center">
-        <p className="text-sm text-muted-foreground">
-          Ainda nao tem conta?{" "}
-          <Link href="/register" className="font-medium text-primary underline-offset-4 hover:underline">
-            Criar conta
-          </Link>
-        </p>
-      </CardFooter>
-    </Card>
+          {loading && <Loader2 className="animate-spin" />}
+          Entrar
+        </button>
+      </form>
+
+      <AuthDivider>ou</AuthDivider>
+
+      <button
+        type="button"
+        onClick={() => signIn("github", { callbackUrl })}
+        className={cn(landingButton({ variant: "ghost", size: "md" }), "w-full font-medium")}
+      >
+        <Github />
+        Continuar com GitHub
+      </button>
+
+      <p className="mt-8 text-center text-sm text-om-fg-2">
+        Ainda não tem conta?{" "}
+        <Link href="/register" className="font-semibold text-om-fg underline-offset-4 hover:underline">
+          Criar conta grátis
+        </Link>
+      </p>
+    </div>
   );
 }
 

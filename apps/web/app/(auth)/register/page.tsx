@@ -4,18 +4,10 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, Orbit } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { landingButton } from "@/components/landing/primitives";
+import { AuthError, AuthField, PasswordField } from "@/components/auth/auth-fields";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -31,7 +23,7 @@ export default function RegisterPage() {
     setError("");
 
     if (password !== confirmPassword) {
-      setError("As senhas nao coincidem.");
+      setError("As senhas não coincidem.");
       return;
     }
 
@@ -62,7 +54,7 @@ export default function RegisterPage() {
     });
 
     if (result?.error) {
-      setError("Conta criada, mas falha ao entrar. Tente fazer login.");
+      setError("Conta criada, mas não foi possível entrar. Tente fazer login.");
       setLoading(false);
       return;
     }
@@ -71,83 +63,68 @@ export default function RegisterPage() {
   }
 
   return (
-    <Card className="border-border/50 shadow-2xl shadow-primary/5">
-      <CardHeader className="space-y-3 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <Orbit className="h-6 w-6" />
-        </div>
-        <CardTitle className="text-2xl font-bold">Criar conta</CardTitle>
-        <CardDescription>
-          Comece a orquestrar seus squads de IA
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Nome</Label>
-            <Input
-              id="name"
-              type="text"
-              placeholder="Seu nome"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              autoComplete="name"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="voce@empresa.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Senha</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Minimo 6 caracteres"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirmar senha</Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              placeholder="Repita a senha"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-            />
-          </div>
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Criar conta
-          </Button>
-        </form>
-      </CardContent>
-      <CardFooter className="justify-center">
-        <p className="text-sm text-muted-foreground">
-          Ja tem uma conta?{" "}
-          <Link href="/login" className="font-medium text-primary underline-offset-4 hover:underline">
-            Entrar
-          </Link>
-        </p>
-      </CardFooter>
-    </Card>
+    <div>
+      <h1 className="text-[32px] font-semibold tracking-[-0.03em]">Criar conta</h1>
+      <p className="mt-2 text-[15px] text-om-fg-2">
+        Comece grátis a orquestrar squads de IA. Sem cartão de crédito.
+      </p>
+
+      <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
+        <AuthField
+          id="name"
+          label="Nome"
+          type="text"
+          placeholder="Seu nome"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          autoComplete="name"
+        />
+        <AuthField
+          id="email"
+          label="E-mail"
+          type="email"
+          placeholder="voce@empresa.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          autoComplete="email"
+        />
+        <PasswordField
+          id="password"
+          label="Senha"
+          placeholder="Mínimo de 6 caracteres"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          autoComplete="new-password"
+        />
+        <PasswordField
+          id="confirmPassword"
+          label="Confirmar senha"
+          placeholder="Repita a senha"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+          autoComplete="new-password"
+        />
+        {error && <AuthError>{error}</AuthError>}
+        <button
+          type="submit"
+          disabled={loading}
+          className={cn(landingButton({ size: "md" }), "mt-2 w-full disabled:opacity-60")}
+        >
+          {loading && <Loader2 className="animate-spin" />}
+          Criar conta
+        </button>
+      </form>
+
+      <p className="mt-8 text-center text-sm text-om-fg-2">
+        Já tem uma conta?{" "}
+        <Link href="/login" className="font-semibold text-om-fg underline-offset-4 hover:underline">
+          Entrar
+        </Link>
+      </p>
+    </div>
   );
 }

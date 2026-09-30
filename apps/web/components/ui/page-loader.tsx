@@ -62,6 +62,9 @@ export function SectionLoader({
 }
 
 /** Orbiting dots animation -- space/orbit themed. */
+/** Laranja da marca, grafite e cinza quente (paleta OrbitMind). */
+const ORBIT_DOT_COLORS = ["#f2541b", "var(--foreground)", "#8f8c84"];
+
 function OrbitAnimation({ size }: { size: number }) {
   const dotSize = Math.max(4, Math.round(size / 10));
   const orbitRadius = (size - dotSize) / 2;
@@ -76,13 +79,13 @@ function OrbitAnimation({ size }: { size: number }) {
           height: dotSize * 2.5,
           marginLeft: -(dotSize * 2.5) / 2,
           marginTop: -(dotSize * 2.5) / 2,
-          background: "oklch(0.55 0.24 270)",
+          background: "var(--ring)",
           animation: "om-pulse 2s ease-in-out infinite",
         }}
       />
 
       {/* Orbit ring (subtle) */}
-      <div className="absolute inset-1 rounded-full border border-purple-500/20" />
+      <div className="absolute inset-1 rounded-full border border-foreground/10" />
 
       {/* Orbiting dots */}
       {[0, 1, 2].map((i) => (
@@ -103,8 +106,8 @@ function OrbitAnimation({ size }: { size: number }) {
               height: dotSize,
               marginLeft: -dotSize / 2,
               transform: `translateY(-${orbitRadius}px)`,
-              background: `oklch(${0.6 + i * 0.1} 0.22 ${265 + i * 15})`,
-              boxShadow: `0 0 ${dotSize * 2}px oklch(0.55 0.24 270 / 0.5)`,
+              background: ORBIT_DOT_COLORS[i],
+              boxShadow: `0 0 ${dotSize * 2}px rgb(242 84 27 / 0.35)`,
               animation: "om-dot-fade 1.8s ease-in-out infinite",
               animationDelay: `${i * -0.6}s`,
             }}
@@ -123,7 +126,7 @@ function ShimmerBar() {
         className="h-full w-full rounded-full"
         style={{
           background:
-            "linear-gradient(90deg, transparent, oklch(0.55 0.24 270 / 0.6), oklch(0.6 0.2 290 / 0.4), transparent)",
+            "linear-gradient(90deg, transparent, rgb(242 84 27 / 0.6), rgb(242 84 27 / 0.3), transparent)",
           animation: "om-shimmer 1.8s ease-in-out infinite",
         }}
       />
