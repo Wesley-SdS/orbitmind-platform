@@ -73,6 +73,38 @@ export const PRIORITY_LABELS = {
 export const HANDOFF_DELAY_MS = 3000;
 
 // ──────────────────────────────────────────────
+// Quote Requests (pedidos de orçamento da landing)
+// ──────────────────────────────────────────────
+
+export const QUOTE_ENGAGEMENTS = ["continuous", "project", "consulting"] as const;
+
+export const QUOTE_SOLUTION_TYPES = [
+  "web_platform",
+  "mobile_app",
+  "ai_agents",
+  "whatsapp_bots",
+  "integrations",
+  "legacy_evolution",
+  "other",
+] as const;
+
+export const QUOTE_TIMELINES = ["asap", "1_3_months", "3_6_months", "flexible"] as const;
+
+export const QUOTE_STATUSES = ["new", "contacted", "proposal_sent", "won", "lost"] as const;
+
+/** Faixas de projeto fechado e faixas mensais (desenvolvimento contínuo) no mesmo enum. */
+export const QUOTE_BUDGETS = [
+  "up_to_20k",
+  "20k_50k",
+  "50k_150k",
+  "over_150k",
+  "monthly_up_to_15k",
+  "monthly_15k_40k",
+  "monthly_over_40k",
+  "undecided",
+] as const;
+
+// ──────────────────────────────────────────────
 // Desk Grid
 // ──────────────────────────────────────────────
 

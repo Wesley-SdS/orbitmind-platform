@@ -1,4 +1,11 @@
 import { z } from "zod";
+import {
+  QUOTE_BUDGETS,
+  QUOTE_ENGAGEMENTS,
+  QUOTE_SOLUTION_TYPES,
+  QUOTE_STATUSES,
+  QUOTE_TIMELINES,
+} from "./constants";
 
 // ──────────────────────────────────────────────
 // Squad YAML Validation
@@ -145,8 +152,31 @@ export const squadStateSchema = z.object({
 });
 
 // ──────────────────────────────────────────────
+// Quote Request (landing / cotação)
+// ──────────────────────────────────────────────
+
+export const quoteRequestSchema = z.object({
+  engagement: z.enum(QUOTE_ENGAGEMENTS),
+  solutionTypes: z.array(z.enum(QUOTE_SOLUTION_TYPES)).min(1).max(QUOTE_SOLUTION_TYPES.length),
+  timeline: z.enum(QUOTE_TIMELINES),
+  budget: z.enum(QUOTE_BUDGETS),
+  name: z.string().trim().min(2).max(255),
+  email: z.string().trim().email().max(255),
+  company: z.string().trim().max(255).optional(),
+  phone: z.string().trim().max(40).optional(),
+  description: z.string().trim().min(10).max(5000),
+});
+
+export const quoteStatusUpdateSchema = z.object({
+  status: z.enum(QUOTE_STATUSES),
+});
+
+// ──────────────────────────────────────────────
 // Type Exports
 // ──────────────────────────────────────────────
+
+export type QuoteRequestInput = z.infer<typeof quoteRequestSchema>;
+export type QuoteStatus = z.infer<typeof quoteStatusUpdateSchema>["status"];
 
 export type SquadYaml = z.infer<typeof squadYamlSchema>;
 export type ValidatedPipelineStep = z.infer<typeof pipelineStepSchema>;

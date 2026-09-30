@@ -527,6 +527,35 @@ export const pipelineRuns = pgTable("pipeline_runs", {
 ]);
 
 // ──────────────────────────────────────────────
+// Quote Requests (pedidos de orçamento da landing)
+// ──────────────────────────────────────────────
+
+export const quoteEngagementEnum = pgEnum("quote_engagement", ["continuous", "project", "consulting"]);
+export const quoteStatusEnum = pgEnum("quote_status", [
+  "new", "contacted", "proposal_sent", "won", "lost",
+]);
+
+export const quoteRequests = pgTable("quote_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  engagement: quoteEngagementEnum("engagement").notNull(),
+  solutionTypes: jsonb("solution_types").$type<string[]>().notNull().default([]),
+  timeline: varchar("timeline", { length: 30 }).notNull(),
+  budget: varchar("budget", { length: 30 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  company: varchar("company", { length: 255 }),
+  phone: varchar("phone", { length: 40 }),
+  description: text("description").notNull(),
+  source: varchar("source", { length: 50 }).notNull().default("landing"),
+  status: quoteStatusEnum("status").notNull().default("new"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("quote_requests_status_idx").on(table.status),
+  index("quote_requests_created_at_idx").on(table.createdAt),
+]);
+
+// ──────────────────────────────────────────────
 // Relations
 // ──────────────────────────────────────────────
 
