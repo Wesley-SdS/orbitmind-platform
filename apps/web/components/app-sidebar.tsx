@@ -10,12 +10,13 @@ import {
   Link2,
   Settings,
   Building2,
-  Orbit,
   KanbanSquare,
   ShoppingBag,
   GitBranch,
   HelpCircle,
+  Inbox,
 } from "lucide-react";
+import { OrbitMark } from "@/components/landing/orbit-mark";
 import {
   Sidebar,
   SidebarContent,
@@ -45,15 +46,33 @@ const navItems = [
   { title: "Ajuda", href: "/help", icon: HelpCircle, id: "sidebar-help" },
 ];
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  /** Só a equipe OrbitMind vê os pedidos de orçamento do site. */
+  quotes?: { newCount: number } | null;
+}
+
+export function AppSidebar({ quotes = null }: AppSidebarProps) {
   const pathname = usePathname();
+  const items = quotes
+    ? [
+        navItems[0]!,
+        {
+          title: "Orçamentos",
+          href: "/orcamentos",
+          icon: Inbox,
+          id: "sidebar-orcamentos",
+          badge: quotes.newCount > 0 ? String(quotes.newCount) : undefined,
+        },
+        ...navItems.slice(1),
+      ]
+    : navItems;
 
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-border/50 px-4 py-4">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Orbit className="h-4 w-4" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-card ring-1 ring-border">
+            <OrbitMark className="size-5" />
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-semibold">OrbitMind</span>
@@ -66,7 +85,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navegação</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => {
+              {items.map((item) => {
                 const isActive =
                   pathname === item.href ||
                   (item.href !== "/" && pathname.startsWith(item.href));
