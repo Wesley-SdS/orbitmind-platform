@@ -1,236 +1,273 @@
-export interface FurnitureItem {
-  type: string;
-  x: number;
-  y: number;
-}
-
-export interface DeskPosition {
-  x: number;
-  y: number;
-  direction: "down" | "left" | "right" | "up";
-}
-
-export interface RoomDefinition {
-  id: string;
-  name: string;
-  icon: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: number;
-  floorType: string;
-  furniture: FurnitureItem[];
-  desks: DeskPosition[];
-}
+import type { OfficeRoom, OfficeSeat } from "./types";
 
 /**
- * Office layout — Gather.town inspired, spacious.
+ * Planta do escritório virtual — grid de 30 × 16 tiles, projeção isométrica.
  *
- * TS = 48px per tile. Rooms measured in tiles then converted.
- * 2-tile corridors between rooms, 1-tile margin at edges.
- *
- * Layout:
- * ┌──────────────┐  ┌─────────────────┐  ┌────────────┐
- * │ Research Lab  │  │ Creative Studio  │  │ Review Room│
- * │  6×5 tiles    │  │  7×5 tiles       │  │  5×5 tiles │
- * └──────────────┘  └─────────────────┘  └────────────┘
- *        ~~~~~~~~~~~~~~~ corridor (2 tiles) ~~~~~~~~~~~~~~~~
- * ┌──────────────┐  ┌──────────────┐  ┌────────────────┐
- * │ Strategy Room│  │ Publishing   │  │    Lobby        │
- * │  6×5 tiles    │  │  5×5 tiles   │  │  7×5 tiles     │
- * └──────────────┘  └──────────────┘  └────────────────┘
+ * Linha 1 (y 1..7):  Pesquisa (8) · Estúdio Criativo (10) · Revisão (6)
+ * Linha 2 (y 9..15): Estratégia (8) · Publicação (6) · Lobby (10)
+ * Corredores de 2 tiles entre as salas. Paredes externas em x = 0.7..1 e y = 0.7..1.
  */
 
-const T = 48; // tile size
-const GAP = T * 2; // corridor width (2 tiles)
-const MARGIN = T; // edge margin (1 tile)
+export const BUILDING_W = 30;
+export const BUILDING_D = 16;
 
-// Room sizes in tiles
-const R1W = 6, R2W = 7, R3W = 5; // row 1 widths
-const R4W = 6, R5W = 5, R6W = 7; // row 2 widths
-const RH = 5; // all rooms 5 tiles tall
+export const WALL_HEIGHT = 1.25;
+export const EXTERIOR_WALL_HEIGHT = 2.3;
+export const GLASS_HEIGHT = 1.05;
+export const WALL_THICKNESS = 0.18;
+export const EXTERIOR_WALL_THICKNESS = 0.3;
 
-// Row 1 X positions
-const R1X = MARGIN;
-const R2X = R1X + R1W * T + GAP;
-const R3X = R2X + R2W * T + GAP;
-
-// Y positions
-const ROW1Y = MARGIN;
-const ROW2Y = ROW1Y + RH * T + GAP;
-
-// Row 2 X positions
-const R4X = MARGIN;
-const R5X = R4X + R4W * T + GAP;
-const R6X = R5X + R5W * T + GAP;
-
-export const OFFICE_ROOMS: RoomDefinition[] = [
-  // === ROW 1 ===
-  {
-    id: "research",
-    name: "Research Lab",
-    icon: "🔍",
-    x: R1X, y: ROW1Y,
-    width: R1W * T, height: RH * T,
-    color: 0x3b82f6,
-    floorType: "lightWood",
-    furniture: [
-      { type: "whiteboard", x: 120, y: 8 },
-      { type: "plant-tree", x: 8, y: 148 },
-      { type: "lamp", x: 248, y: 8 },
-      { type: "bookshelf", x: 8, y: 8 },
-      { type: "microscope", x: 200, y: 148 },
-    ],
-    desks: [
-      { x: 96, y: 100, direction: "down" },
-      { x: 200, y: 100, direction: "down" },
-    ],
-  },
-  {
-    id: "creative",
-    name: "Creative Studio",
-    icon: "✍️",
-    x: R2X, y: ROW1Y,
-    width: R2W * T, height: RH * T,
-    color: 0xa855f7,
-    floorType: "carpet",
-    furniture: [
-      { type: "plant-flower", x: 8, y: 8 },
-      { type: "plant-small", x: 280, y: 148 },
-      { type: "bookshelf", x: 280, y: 8 },
-      { type: "old-tv", x: 8, y: 148 },
-      { type: "lamp", x: 148, y: 8 },
-    ],
-    desks: [
-      { x: 72, y: 88, direction: "down" },
-      { x: 172, y: 88, direction: "down" },
-      { x: 72, y: 168, direction: "down" },
-    ],
-  },
-  {
-    id: "review",
-    name: "Review Room",
-    icon: "✅",
-    x: R3X, y: ROW1Y,
-    width: R3W * T, height: RH * T,
-    color: 0x22c55e,
-    floorType: "beige",
-    furniture: [
-      { type: "whiteboard", x: 60, y: 8 },
-      { type: "plant-small", x: 192, y: 148 },
-      { type: "chair-desk", x: 8, y: 100 },
-      { type: "lamp", x: 192, y: 8 },
-    ],
-    desks: [
-      { x: 120, y: 120, direction: "down" },
-    ],
-  },
-
-  // === ROW 2 ===
-  {
-    id: "strategy",
-    name: "Strategy Room",
-    icon: "📊",
-    x: R4X, y: ROW2Y,
-    width: R4W * T, height: RH * T,
-    color: 0x06b6d4,
-    floorType: "darkWood",
-    furniture: [
-      { type: "whiteboard", x: 100, y: 8 },
-      { type: "plant-palm", x: 8, y: 148 },
-      { type: "glass-cabinet", x: 240, y: 8 },
-      { type: "pendulum-clock", x: 8, y: 8 },
-    ],
-    desks: [
-      { x: 96, y: 120, direction: "down" },
-      { x: 200, y: 120, direction: "down" },
-    ],
-  },
-  {
-    id: "publishing",
-    name: "Publishing",
-    icon: "📤",
-    x: R5X, y: ROW2Y,
-    width: R5W * T, height: RH * T,
-    color: 0xf59e0b,
-    floorType: "parquet",
-    furniture: [
-      { type: "plant-flower", x: 192, y: 148 },
-      { type: "shelf", x: 8, y: 8 },
-      { type: "cabinet", x: 8, y: 148 },
-      { type: "lamp", x: 192, y: 8 },
-    ],
-    desks: [
-      { x: 120, y: 100, direction: "down" },
-    ],
-  },
-  {
-    id: "lobby",
-    name: "Lobby",
-    icon: "☕",
-    x: R6X, y: ROW2Y,
-    width: R6W * T, height: RH * T,
-    color: 0x6b7280,
-    floorType: "stone",
-    furniture: [
-      // Seating area
-      { type: "sofa", x: 56, y: 48 },
-      { type: "armchair", x: 8, y: 100 },
-      { type: "armchair", x: 148, y: 100 },
-      // Coffee corner
-      { type: "coffee", x: 280, y: 8 },
-      // Plants & decor
-      { type: "plant-palm", x: 8, y: 8 },
-      { type: "plant-tree", x: 280, y: 148 },
-      { type: "plant-flower", x: 200, y: 148 },
-      // Extras
-      { type: "bookshelf", x: 200, y: 8 },
-      { type: "fish-tank", x: 8, y: 170 },
-      { type: "cat", x: 148, y: 170 },
-    ],
-    desks: [
-      { x: 250, y: 100, direction: "down" },
-    ],
-  },
+export const OFFICE_ROOMS: OfficeRoom[] = [
+  { id: "research", name: "Laboratório de Pesquisa", accent: "#2f6fd6", x: 1, y: 1, w: 8, h: 6, floor: "wood", doors: { e: [3, 4], s: [3, 4] } },
+  { id: "creative", name: "Estúdio Criativo", accent: "#8b5cf6", x: 11, y: 1, w: 10, h: 6, floor: "carpet", doors: { w: [3, 4], s: [4, 5] } },
+  { id: "review", name: "Sala de Revisão", accent: "#2e8b57", x: 23, y: 1, w: 6, h: 6, floor: "tile", doors: { w: [3, 4] } },
+  { id: "strategy", name: "Sala de Estratégia", accent: "#0b8fa8", x: 1, y: 9, w: 8, h: 6, floor: "darkwood", doors: { e: [3, 4], n: [3, 4] } },
+  { id: "publishing", name: "Publicação", accent: "#d98e04", x: 11, y: 9, w: 6, h: 6, floor: "parquet", doors: { w: [3, 4], e: [3, 4] } },
+  { id: "lobby", name: "Lobby · Café", accent: "#66645d", x: 19, y: 9, w: 10, h: 6, floor: "stone", doors: { w: [3, 4], n: [5, 6] } },
 ];
 
-export const AGENT_COLORS: Record<string, { primary: number; hair: number }> = {
-  researcher: { primary: 0x3b82f6, hair: 0x8B4513 },
-  strategist: { primary: 0x06b6d4, hair: 0x1a1a2e },
-  copywriter: { primary: 0xa855f7, hair: 0xf0d58c },
-  designer: { primary: 0xec4899, hair: 0xc0392b },
-  "seo-analyst": { primary: 0x22c55e, hair: 0xa67c52 },
-  reviewer: { primary: 0x10b981, hair: 0xb0b0b0 },
-  publisher: { primary: 0xf59e0b, hair: 0x1a1a2e },
-  // Dev pipeline roles
-  developer: { primary: 0x3b82f6, hair: 0x1a1a2e },
-  autofix: { primary: 0xf97316, hair: 0x6b4423 },
-  architect: { primary: 0x8b5cf6, hair: 0xa67c52 },
-  docs: { primary: 0x14b8a6, hair: 0xf0d58c },
-  ideator: { primary: 0xeab308, hair: 0x1a1a2e },
-  taskmaster: { primary: 0x6366f1, hair: 0xb0b0b0 },
-  qa: { primary: 0xef4444, hair: 0x6b4423 },
-  release: { primary: 0x22c55e, hair: 0x1a1a2e },
-  rebase: { primary: 0x64748b, hair: 0xa67c52 },
-  "project-sync": { primary: 0x0ea5e9, hair: 0xf0d58c },
-  default: { primary: 0x8b5cf6, hair: 0x6b4423 },
+export interface DeskSpec {
+  roomId: string;
+  x: number;
+  y: number;
+}
+
+/** Mesas (canto superior esquerdo do tampo, 1,6 × 0,8 tiles). A cadeira fica ao norte. */
+export const DESKS: DeskSpec[] = [
+  { roomId: "research", x: 2.2, y: 3.6 },
+  { roomId: "research", x: 5.4, y: 3.6 },
+  { roomId: "creative", x: 12.2, y: 3.6 },
+  { roomId: "creative", x: 15.2, y: 3.6 },
+  { roomId: "creative", x: 18.2, y: 3.6 },
+  { roomId: "review", x: 25.2, y: 3.8 },
+  { roomId: "strategy", x: 2.2, y: 12.0 },
+  { roomId: "publishing", x: 12.6, y: 11.8 },
+];
+
+/** Posição do agente sentado numa mesa: centro da cadeira. */
+export function deskSeat(desk: DeskSpec, deskIndex: number): OfficeSeat {
+  return { roomId: desk.roomId, x: desk.x + 0.8, y: desk.y - 0.45, deskIndex };
+}
+
+/** Pontos em pé, usados quando as mesas da sala acabam. */
+export const STANDING_SPOTS: OfficeSeat[] = [
+  { roomId: "strategy", x: 5.2, y: 11.2 },
+  { roomId: "strategy", x: 7.6, y: 11.2 },
+  { roomId: "lobby", x: 21.4, y: 12.2 },
+  { roomId: "lobby", x: 24.6, y: 12.2 },
+  { roomId: "lobby", x: 26.4, y: 11.2 },
+  { roomId: "lobby", x: 22.4, y: 14.2 },
+  { roomId: "review", x: 24.0, y: 5.6 },
+  { roomId: "publishing", x: 15.0, y: 11.2 },
+  { roomId: "research", x: 7.4, y: 5.8 },
+  { roomId: "creative", x: 14.0, y: 5.8 },
+  { roomId: "creative", x: 18.0, y: 5.8 },
+];
+
+/** Onde o avatar humano começa e o tile de entrada do prédio. */
+export const USER_START = { x: 23.2, y: 13.5 };
+
+export type FurnitureSpec =
+  | { type: "chair"; x: number; y: number }
+  | { type: "plant"; x: number; y: number; size?: number }
+  | { type: "bookshelf"; x: number; y: number; alongY?: boolean }
+  | { type: "sofa"; x: number; y: number; w?: number }
+  | { type: "rug"; x: number; y: number; w: number; d: number; color: number; line: number }
+  | { type: "counter"; x: number; y: number; w: number; d: number; h: number; color?: number }
+  | { type: "coffee"; x: number; y: number; z: number }
+  | { type: "cooler"; x: number; y: number }
+  | { type: "printer"; x: number; y: number }
+  | { type: "packages"; x: number; y: number }
+  | { type: "cabinet"; x: number; y: number }
+  | { type: "lamp"; x: number; y: number }
+  | { type: "table"; x: number; y: number; r: number }
+  | { type: "coffeeTable"; x: number; y: number }
+  | { type: "whiteboard"; x: number; yf: number; len: number; z: number; h: number; variant: "chart" | "mood" | "check" | "calendar" | "plan" }
+  | { type: "window"; x: number; f: number; len: number; z: number; h: number; alongX: boolean }
+  | { type: "screen"; x: number; yf: number; len: number; z: number; h: number }
+  | { type: "orbitMark"; x: number; yf: number; z: number; r: number };
+
+/** Mobília fixa, além das mesas do `DESKS` (cada mesa já traz sua cadeira). */
+export const FURNITURE: FurnitureSpec[] = [
+  // tapetes (chão)
+  { type: "rug", x: 13, y: 5.1, w: 4.2, d: 1.5, color: 0x6a5a8a, line: 0x4d4068 },
+  { type: "rug", x: 20.2, y: 10.5, w: 4.6, d: 3.2, color: 0xa45c4f, line: 0x7f4238 },
+  { type: "rug", x: 24.4, y: 3.2, w: 3.4, d: 2.4, color: 0x8fb3a0, line: 0x6f9482 },
+  { type: "rug", x: 4.6, y: 10.9, w: 4.0, d: 3.2, color: 0x5f8f9c, line: 0x4a7681 },
+
+  // janelas do prédio (parede norte y=1 e parede oeste x=1) + marca
+  { type: "window", x: 2.5, f: 1.0, len: 2.0, z: 0.95, h: 0.95, alongX: true },
+  { type: "window", x: 5.5, f: 1.0, len: 2.0, z: 0.95, h: 0.95, alongX: true },
+  { type: "window", x: 13, f: 1.0, len: 2.5, z: 0.95, h: 0.95, alongX: true },
+  { type: "window", x: 16.5, f: 1.0, len: 2.5, z: 0.95, h: 0.95, alongX: true },
+  { type: "window", x: 24.5, f: 1.0, len: 3.0, z: 0.95, h: 0.95, alongX: true },
+  { type: "window", x: 10.2, f: 1.0, len: 2.6, z: 0.95, h: 0.95, alongX: false },
+  { type: "window", x: 2.4, f: 1.0, len: 2.2, z: 0.95, h: 0.95, alongX: false },
+  { type: "orbitMark", x: 10, yf: 1.0, z: 1.5, r: 0.42 },
+
+  // Pesquisa
+  { type: "whiteboard", x: 3.2, yf: 1.02, len: 2.4, z: 1.0, h: 0.8, variant: "chart" },
+  { type: "bookshelf", x: 1.15, y: 4.2, alongY: true },
+  { type: "plant", x: 8.2, y: 6.2 },
+  { type: "plant", x: 1.3, y: 1.3, size: 0.8 },
+  { type: "cooler", x: 8.2, y: 1.3 },
+  { type: "lamp", x: 1.4, y: 6.2 },
+
+  // Estúdio Criativo
+  { type: "whiteboard", x: 13.2, yf: 1.02, len: 3.2, z: 1.0, h: 0.8, variant: "mood" },
+  { type: "bookshelf", x: 11.2, y: 1.4, alongY: true },
+  { type: "printer", x: 19.6, y: 5.6 },
+  { type: "plant", x: 20.2, y: 1.4 },
+  { type: "plant", x: 11.3, y: 6.2 },
+  { type: "lamp", x: 20.2, y: 6.3 },
+
+  // Revisão
+  { type: "whiteboard", x: 24.2, yf: 1.02, len: 2.6, z: 1.0, h: 0.8, variant: "check" },
+  { type: "plant", x: 23.4, y: 6.2 },
+  { type: "plant", x: 28.2, y: 6.2 },
+  { type: "cabinet", x: 28.3, y: 1.3 },
+
+  // Estratégia
+  { type: "table", x: 6.6, y: 12.4, r: 0.95 },
+  { type: "chair", x: 5.2, y: 11.4 },
+  { type: "chair", x: 7.4, y: 11.4 },
+  { type: "chair", x: 5.2, y: 13.0 },
+  { type: "chair", x: 7.4, y: 13.0 },
+  { type: "whiteboard", x: 2.6, yf: 9.2, len: 3.8, z: 0.45, h: 0.72, variant: "plan" },
+  { type: "plant", x: 8.2, y: 14.2 },
+  { type: "cabinet", x: 1.2, y: 13.4 },
+
+  // Publicação
+  { type: "whiteboard", x: 12.0, yf: 9.2, len: 2.6, z: 0.45, h: 0.72, variant: "calendar" },
+  { type: "bookshelf", x: 11.2, y: 12.6, alongY: true },
+  { type: "packages", x: 15.4, y: 13.2 },
+  { type: "plant", x: 16.2, y: 14.2 },
+  { type: "lamp", x: 16.2, y: 9.4 },
+
+  // Lobby
+  { type: "sofa", x: 20.6, y: 10.6, w: 1.9 },
+  { type: "sofa", x: 20.3, y: 12.7, w: 0.85 },
+  { type: "sofa", x: 23.6, y: 12.7, w: 0.85 },
+  { type: "coffeeTable", x: 22.0, y: 11.75 },
+  { type: "counter", x: 25.4, y: 9.3, w: 2.2, d: 0.62, h: 0.92, color: 0x3a3733 },
+  { type: "coffee", x: 25.55, y: 9.35, z: 0.92 },
+  { type: "counter", x: 25.6, y: 13.0, w: 2.4, d: 0.7, h: 1.0, color: 0x1a1a17 },
+  { type: "orbitMark", x: 26.2, yf: 13.72, z: 0.42, r: 0.32 },
+  { type: "screen", x: 22.4, yf: 9.2, len: 1.6, z: 0.4, h: 0.72 },
+  { type: "plant", x: 19.3, y: 14.2 },
+  { type: "plant", x: 28.2, y: 9.4, size: 1.15 },
+  { type: "plant", x: 19.3, y: 9.4, size: 0.9 },
+  { type: "cooler", x: 28.2, y: 14.2 },
+  { type: "lamp", x: 24.6, y: 14.3 },
+];
+
+/** Células bloqueadas para navegação (footprint da mobília), em tiles inteiros. */
+export function blockedCells(): Array<[number, number]> {
+  const cells: Array<[number, number]> = [];
+  const block = (x: number, y: number, w: number, d: number): void => {
+    for (let cx = Math.floor(x); cx < Math.ceil(x + w); cx++) {
+      for (let cy = Math.floor(y); cy < Math.ceil(y + d); cy++) cells.push([cx, cy]);
+    }
+  };
+  for (const desk of DESKS) block(desk.x, desk.y, 1.6, 0.8);
+  for (const f of FURNITURE) {
+    switch (f.type) {
+      case "bookshelf": block(f.x, f.y, f.alongY === false ? 1.4 : 0.42, f.alongY === false ? 0.42 : 1.4); break;
+      case "sofa": block(f.x, f.y, f.w ?? 1.8, 0.85); break;
+      case "counter": block(f.x, f.y, f.w, f.d); break;
+      case "table": block(f.x - f.r, f.y - f.r, f.r * 2, f.r * 2); break;
+      case "coffeeTable": block(f.x, f.y, 0.9, 0.55); break;
+      case "cabinet": block(f.x, f.y, 0.5, 1.2); break;
+      case "printer": block(f.x, f.y, 0.75, 0.6); break;
+      case "packages": block(f.x, f.y, 0.7, 0.7); break;
+      case "cooler": block(f.x, f.y, 0.36, 0.36); break;
+      case "plant": block(f.x, f.y, 0.4, 0.4); break;
+      case "lamp": block(f.x, f.y, 0.25, 0.25); break;
+      default: break;
+    }
+  }
+  return cells;
+}
+
+/** Cores de camisa e cabelo por papel (id do agente ou primeira palavra do papel). */
+export const AGENT_COLORS: Record<string, { primary: number; hair: number; skin: number }> = {
+  researcher: { primary: 0x2f6fd6, hair: 0x3b2a1a, skin: 0xf0c8a2 },
+  pesquisador: { primary: 0x2f6fd6, hair: 0x3b2a1a, skin: 0xf0c8a2 },
+  pesquisadora: { primary: 0x2f6fd6, hair: 0x3b2a1a, skin: 0xf0c8a2 },
+  strategist: { primary: 0x0b8fa8, hair: 0x1a1a17, skin: 0xc99671 },
+  estrategista: { primary: 0x0b8fa8, hair: 0x1a1a17, skin: 0xc99671 },
+  copywriter: { primary: 0x7c5cff, hair: 0x6b4423, skin: 0xc99671 },
+  redator: { primary: 0x7c5cff, hair: 0x6b4423, skin: 0xc99671 },
+  designer: { primary: 0xe0457b, hair: 0xc0392b, skin: 0xf0c8a2 },
+  "seo-analyst": { primary: 0x14a3a3, hair: 0x1a1a17, skin: 0x8d5a3b },
+  analista: { primary: 0x14a3a3, hair: 0x1a1a17, skin: 0x8d5a3b },
+  reviewer: { primary: 0x2e8b57, hair: 0xb0b0b0, skin: 0xf0c8a2 },
+  revisor: { primary: 0x2e8b57, hair: 0xb0b0b0, skin: 0xf0c8a2 },
+  revisora: { primary: 0x2e8b57, hair: 0xb0b0b0, skin: 0xf0c8a2 },
+  publisher: { primary: 0xd98e04, hair: 0xf0d58c, skin: 0xf0c8a2 },
+  publicador: { primary: 0xd98e04, hair: 0xf0d58c, skin: 0xf0c8a2 },
+  publicadora: { primary: 0xd98e04, hair: 0xf0d58c, skin: 0xf0c8a2 },
+  // Dev pipeline
+  developer: { primary: 0x2f6fd6, hair: 0x1a1a17, skin: 0xc99671 },
+  desenvolvedor: { primary: 0x2f6fd6, hair: 0x1a1a17, skin: 0xc99671 },
+  desenvolvedora: { primary: 0x2f6fd6, hair: 0x6b4423, skin: 0xf0c8a2 },
+  autofix: { primary: 0xf97316, hair: 0x6b4423, skin: 0xf0c8a2 },
+  architect: { primary: 0x8b5cf6, hair: 0xa67c52, skin: 0xc99671 },
+  arquiteto: { primary: 0x8b5cf6, hair: 0xa67c52, skin: 0xc99671 },
+  docs: { primary: 0x14b8a6, hair: 0xf0d58c, skin: 0xf0c8a2 },
+  ideator: { primary: 0xeab308, hair: 0x1a1a17, skin: 0x8d5a3b },
+  taskmaster: { primary: 0x6366f1, hair: 0xb0b0b0, skin: 0xc99671 },
+  qa: { primary: 0xef4444, hair: 0x6b4423, skin: 0xf0c8a2 },
+  code: { primary: 0x2e8b57, hair: 0x1a1a17, skin: 0x8d5a3b },
+  release: { primary: 0x22c55e, hair: 0x1a1a17, skin: 0xc99671 },
+  devops: { primary: 0x22c55e, hair: 0x1a1a17, skin: 0xc99671 },
+  rebase: { primary: 0x64748b, hair: 0xa67c52, skin: 0xf0c8a2 },
+  "project-sync": { primary: 0x0ea5e9, hair: 0xf0d58c, skin: 0xc99671 },
+  default: { primary: 0x8b5cf6, hair: 0x6b4423, skin: 0xf0c8a2 },
 };
 
-/** Assign agent to a room based on role */
+const EXTRA_PALETTE = [0x2f6fd6, 0xe0457b, 0x14a3a3, 0xd98e04, 0x7c5cff, 0x2e8b57, 0x0b8fa8, 0xf97316];
+const HAIR_PALETTE = [0x3b2a1a, 0x1a1a17, 0xc0392b, 0xf0d58c, 0xb0b0b0, 0x6b4423];
+const SKIN_PALETTE = [0xf0c8a2, 0xc99671, 0x8d5a3b];
+
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+/** Cores para um agente: pelo papel; se desconhecido, determinístico pelo id. */
+export function colorsForAgent(role: string, id: string): { primary: number; hair: number; skin: number } {
+  const key = role.toLowerCase().split(/\s+/)[0] ?? "";
+  const byRole = AGENT_COLORS[key];
+  if (byRole) return byRole;
+  const h = hashString(id);
+  return {
+    primary: EXTRA_PALETTE[h % EXTRA_PALETTE.length]!,
+    hair: HAIR_PALETTE[(h >> 3) % HAIR_PALETTE.length]!,
+    skin: SKIN_PALETTE[(h >> 6) % SKIN_PALETTE.length]!,
+  };
+}
+
+/** Sala de um agente a partir do papel. */
 export function getRoomForRole(role: string): string {
   const lower = role.toLowerCase();
-  // Marketing roles
+  // Marketing
   if (lower.includes("pesquis") || lower.includes("research") || lower.includes("analista") || lower.includes("seo")) return "research";
   if (lower.includes("estrat") || lower.includes("strateg") || lower.includes("planej")) return "strategy";
-  if (lower.includes("copy") || lower.includes("conteud") || lower.includes("cri")) return "creative";
+  if (lower.includes("copy") || lower.includes("conteud") || lower.includes("cri") || lower.includes("redat")) return "creative";
   if (lower.includes("revis") || lower.includes("review") || lower.includes("qualid")) return "review";
   if (lower.includes("public") || lower.includes("post") || lower.includes("social") || lower.includes("midia")) return "publishing";
-  // Dev pipeline roles (Fix 5)
-  if (lower.includes("developer") || lower.includes("autofix") || lower.includes("design")) return "creative";
-  if (lower.includes("architect") || lower.includes("taskmaster") || lower.includes("ideator")) return "strategy";
+  // Dev
+  if (lower.includes("develop") || lower.includes("desenvolv") || lower.includes("autofix") || lower.includes("design") || lower.includes("frontend") || lower.includes("backend")) return "creative";
+  if (lower.includes("architect") || lower.includes("arquitet") || lower.includes("taskmaster") || lower.includes("ideator")) return "strategy";
   if (lower.includes("docs")) return "research";
-  if (lower.includes("qa")) return "review";
-  if (lower.includes("release") || lower.includes("rebase") || lower.includes("project-sync")) return "publishing";
+  if (lower.includes("qa") || lower.includes("test")) return "review";
+  if (lower.includes("release") || lower.includes("deploy") || lower.includes("devops") || lower.includes("rebase") || lower.includes("project-sync")) return "publishing";
   return "lobby";
+}
+
+/** Rótulo curto da sala. */
+export function roomName(roomId: string): string {
+  return OFFICE_ROOMS.find((r) => r.id === roomId)?.name ?? roomId;
 }

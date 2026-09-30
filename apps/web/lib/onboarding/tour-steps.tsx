@@ -105,7 +105,7 @@ export const mainTourSteps = [
       {
         icon: <>🏢</>,
         title: "Escritório Virtual",
-        content: <>Visualize seus agentes trabalhando em tempo real num escritório virtual 3D estilo Gather.</>,
+        content: <>Visualize seus agentes trabalhando em tempo real num escritório virtual isométrico estilo Gather.</>,
         selector: "#sidebar-office",
         side: "right" as const,
         showControls: true,

@@ -68,13 +68,13 @@ export function AppSidebar({ quotes = null }: AppSidebarProps) {
     : navItems;
 
   return (
-    <Sidebar>
-      <SidebarHeader className="border-b border-border/50 px-4 py-4">
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="border-b border-border/50 px-4 py-4 group-data-[collapsible=icon]:px-2">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-card ring-1 ring-border">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-card ring-1 ring-border">
             <OrbitMark className="size-5" />
           </div>
-          <div className="flex flex-col">
+          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
             <span className="text-sm font-semibold">OrbitMind</span>
             <span className="text-xs text-muted-foreground">Platform</span>
           </div>
@@ -110,7 +110,7 @@ export function AppSidebar({ quotes = null }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t border-border/50 p-4">
+      <SidebarFooter className="border-t border-border/50 p-4 group-data-[collapsible=icon]:hidden">
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Plano Free</span>
