@@ -11,6 +11,7 @@ import { createPipelineRun, updatePipelineRun, saveStepOutput, getPipelineRunByR
 import { extractAndSaveMemories } from "@/lib/engine/memory-extractor";
 import { getTopMemories } from "@/lib/db/queries/squad-memories";
 import { waitForCheckpoint } from "@/lib/engine/checkpoint-manager";
+import { broadcastSquad, OFFICE_EVENTS } from "@/lib/realtime/broadcast";
 import { stringify as yamlStringify } from "yaml";
 import type { ContentBrief } from "@orbitmind/shared";
 
@@ -42,6 +43,9 @@ export async function POST(
     const llmProvider = await getDefaultLlmProvider(orgId);
     if (!llmProvider) {
       return NextResponse.json({ error: "Nenhum provedor de IA configurado." }, { status: 400 });
+    }
+    if (!process.env.AI_GATEWAY_API_KEY) {
+      return NextResponse.json({ error: "A chave do AI Gateway (AI_GATEWAY_API_KEY) não está configurada no servidor." }, { status: 400 });
     }
 
     const agentsList = squad.agents.map((a) => ({
@@ -91,9 +95,20 @@ export async function POST(
     );
 
     const executionMap = new Map<string, string>();
+    /** O humano rejeitou num checkpoint: a execução termina como "cancelled", não "failed". */
+    let rejectedAtCheckpoint = false;
 
     const events: PipelineEvents = {
-      onStateChange: () => {},
+      onStateChange: (state) => {
+        if (state.handoff) {
+          void broadcastSquad(squadId, {
+            type: OFFICE_EVENTS.HANDOFF_START,
+            runId: runner.runId,
+            from: state.handoff.from,
+            to: state.handoff.to,
+          });
+        }
+      },
       onCheckpoint: async (step, _context) => {
         console.log(`[Checkpoint] Step ${step.id} reached. RunId: ${runner.runId}. Waiting for approval...`);
         await updatePipelineRun(runner.runId, {
@@ -115,6 +130,7 @@ export async function POST(
         }
         // Block execution until human approves or rejects
         const response = await waitForCheckpoint(runner.runId, step.id);
+        if (response.trim().toLowerCase() === "cancelar") rejectedAtCheckpoint = true;
         console.log(`[Checkpoint] Step ${step.id} resolved with: "${response}"`);
         return response;
       },
@@ -129,6 +145,7 @@ export async function POST(
           version: 1,
         });
         executionMap.set(step.id, execution.id);
+        void broadcastSquad(squadId, { type: OFFICE_EVENTS.STEP_STARTED, runId: runner.runId, stepId: step.id, stepName: step.name, agentId });
       },
       onStepComplete: async (step, output) => {
         const metrics = runner.getStepMetrics(step.id);
@@ -153,6 +170,7 @@ export async function POST(
         await updatePipelineRun(runner.runId, {
           currentStepIndex: pipelineSteps.findIndex((s) => `step-${s.step}` === step.id) + 1,
         });
+        void broadcastSquad(squadId, { type: OFFICE_EVENTS.STEP_COMPLETED, runId: runner.runId, stepId: step.id, stepName: step.name, agentId: step.agent ?? null });
       },
       onError: async (step, error) => {
         console.error(`[Pipeline] Step ${step.id} (${step.name}) FAILED:`, error.message);
@@ -164,6 +182,7 @@ export async function POST(
             completedAt: new Date(),
           });
         }
+        void broadcastSquad(squadId, { type: OFFICE_EVENTS.STEP_FAILED, runId: runner.runId, stepId: step.id, stepName: step.name, agentId: step.agent ?? null, error: error.message });
       },
     };
 
@@ -202,11 +221,22 @@ export async function POST(
       pipelineConfig: pipelineSteps,
     });
 
+    void broadcastSquad(squadId, { type: OFFICE_EVENTS.PIPELINE_STARTED, runId, totalSteps: pipelineSteps.length });
+
     // Run pipeline in background
     void (async () => {
       try {
-        await runner.run();
+        const finalState = await runner.run();
+        if (finalState.status !== "completed") {
+          // rejeitado no checkpoint ou etapa com erro: nunca gravar "completed" por cima
+          const status = rejectedAtCheckpoint ? "cancelled" : "failed";
+          await updatePipelineRun(runId, { status, completedAt: new Date() });
+          void broadcastSquad(squadId, { type: status === "cancelled" ? OFFICE_EVENTS.PIPELINE_CANCELLED : OFFICE_EVENTS.PIPELINE_FAILED, runId });
+          await createAuditLog({ orgId, squadId, action: `pipeline.${status}`, actorType: "user", actorId: session.user.id, metadata: { runId } });
+          return;
+        }
         await updatePipelineRun(runId, { status: "completed", completedAt: new Date() });
+        void broadcastSquad(squadId, { type: OFFICE_EVENTS.PIPELINE_COMPLETED, runId });
 
         // Extract and save memories from completed run
         const completedRun = await getPipelineRunByRunIdAndSquad(runId, squadId);
@@ -229,6 +259,7 @@ export async function POST(
       } catch (error) {
         console.error(`[Pipeline] Run ${runId} FAILED:`, error);
         await updatePipelineRun(runId, { status: "failed", completedAt: new Date() });
+        void broadcastSquad(squadId, { type: OFFICE_EVENTS.PIPELINE_FAILED, runId, error: error instanceof Error ? error.message : "Unknown error" });
         await createAuditLog({
           orgId,
           squadId,
@@ -241,7 +272,8 @@ export async function POST(
     })();
 
     return NextResponse.json({ runId, status: "started" });
-  } catch {
+  } catch (err) {
+    console.error("[Pipeline] falha ao iniciar a execução", err);
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
 }

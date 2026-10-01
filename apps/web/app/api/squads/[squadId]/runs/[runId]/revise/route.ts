@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { getPipelineRunByRunIdAndSquad, updatePipelineRun } from "@/lib/db/queries/pipeline-runs";
 import { approveCheckpoint } from "@/lib/engine/checkpoint-manager";
 import { broadcastSquad, OFFICE_EVENTS } from "@/lib/realtime/broadcast";
 
+const reviseSchema = z.object({
+  feedback: z.string().trim().min(3, "Diga o que precisa ser ajustado.").max(4000),
+});
+
+/**
+ * "Devolver para ajustes": o checkpoint libera o pipeline, que volta à etapa
+ * que gerou a entrega com o feedback no prompt e para de novo neste checkpoint.
+ */
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ squadId: string; runId: string }> },
@@ -15,33 +24,21 @@ export async function POST(
     }
 
     const { squadId, runId } = await params;
-    const orgId = session.user.orgId;
-
     const pipelineRun = await getPipelineRunByRunIdAndSquad(runId, squadId);
-    if (!pipelineRun || pipelineRun.orgId !== orgId) {
+    if (!pipelineRun || pipelineRun.orgId !== session.user.orgId) {
       return NextResponse.json({ error: "Pipeline run nao encontrado." }, { status: 404 });
     }
-
     if (pipelineRun.status !== "waiting_approval") {
-      return NextResponse.json(
-        { error: "Pipeline run nao esta aguardando aprovacao." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Pipeline run nao esta aguardando aprovacao." }, { status: 400 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const payload = body as { data?: Record<string, string>; selectedIndex?: number };
-
-    let response = "continuar";
-    if (payload.data) {
-      response = JSON.stringify(payload.data);
-    } else if (payload.selectedIndex !== undefined) {
-      response = String(payload.selectedIndex);
+    const parsed = reviseSchema.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dados invalidos." }, { status: 400 });
     }
 
-    const resolved = approveCheckpoint(runId, response);
+    const resolved = approveCheckpoint(runId, JSON.stringify({ action: "revise", feedback: parsed.data.feedback }));
     if (!resolved) {
-      // Checkpoint was lost (server restarted). Mark as cancelled so user can re-run.
       await updatePipelineRun(runId, { status: "cancelled", completedAt: new Date() });
       return NextResponse.json(
         { error: "Checkpoint expirou (servidor reiniciou). Execute o pipeline novamente." },
@@ -49,15 +46,8 @@ export async function POST(
       );
     }
 
-    await updatePipelineRun(runId, {
-      status: "running",
-      approvedBy: session.user.id,
-      approvedAt: new Date(),
-      pausedAt: null,
-      checkpointStepId: null,
-    });
-
-    void broadcastSquad(squadId, { type: OFFICE_EVENTS.CHECKPOINT_RESOLVED, runId, decision: "approved" });
+    await updatePipelineRun(runId, { status: "running", pausedAt: null, checkpointStepId: null });
+    void broadcastSquad(squadId, { type: OFFICE_EVENTS.CHECKPOINT_RESOLVED, runId, decision: "revise" });
 
     return NextResponse.json({ ok: true });
   } catch {

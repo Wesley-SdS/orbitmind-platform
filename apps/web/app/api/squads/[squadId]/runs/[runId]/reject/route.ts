@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getPipelineRunByRunIdAndSquad, updatePipelineRun } from "@/lib/db/queries/pipeline-runs";
 import { rejectCheckpoint } from "@/lib/engine/checkpoint-manager";
+import { broadcastSquad, OFFICE_EVENTS } from "@/lib/realtime/broadcast";
 
 export async function POST(
   _req: Request,
@@ -42,6 +43,8 @@ export async function POST(
       completedAt: new Date(),
       pausedAt: null,
     });
+
+    void broadcastSquad(squadId, { type: OFFICE_EVENTS.CHECKPOINT_RESOLVED, runId, decision: "rejected" });
 
     return NextResponse.json({ ok: true });
   } catch {

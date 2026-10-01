@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { pipelineRuns } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, count, lte } from "drizzle-orm";
 
 export async function createPipelineRun(data: {
   squadId: string;
@@ -57,6 +57,15 @@ export async function getLatestPipelineRun(squadId: string) {
     .orderBy(desc(pipelineRuns.startedAt))
     .limit(1);
   return row ?? null;
+}
+
+/** Posição da execução na história do squad (1 = primeira), para o rótulo "EXEC #n". */
+export async function getPipelineRunNumber(squadId: string, startedAt: Date): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(pipelineRuns)
+    .where(and(eq(pipelineRuns.squadId, squadId), lte(pipelineRuns.startedAt, startedAt)));
+  return row?.n ?? 1;
 }
 
 export async function updatePipelineRun(

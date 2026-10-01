@@ -33,6 +33,15 @@ function resolveModelTier(provider: LlmProviderType, tier: string): string {
   return map[provider][tier] ?? fallback;
 }
 
+/**
+ * Modelo que um agente usa de fato: o modelo padrão do provedor, se houver;
+ * senão o modelo do tier do agente. Mesma regra do `createAdapter`.
+ */
+export function resolveAgentModel(provider: LlmProviderType, defaultModel: string | null | undefined, agentConfig: Record<string, unknown> | null | undefined): string {
+  const tier = agentConfig?.modelTier as string | undefined;
+  return defaultModel || resolveModelTier(provider, tier ?? "powerful");
+}
+
 function buildGatewayId(provider: LlmProviderType, model: string): string {
   return `${GATEWAY_PROVIDER_PREFIX[provider]}/${model}`;
 }
@@ -163,8 +172,7 @@ export function createAdapter(agent: AgentInfo, config: ProviderConfig): LlmAdap
     );
   }
 
-  const tier = (agent.config as Record<string, unknown> | null)?.modelTier as string | undefined;
-  const model = config.defaultModel || resolveModelTier(config.provider, tier ?? "powerful");
+  const model = resolveAgentModel(config.provider, config.defaultModel, agent.config as Record<string, unknown> | null);
   return new GatewayAdapter(agent, config.provider, model);
 }
 

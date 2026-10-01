@@ -41,8 +41,30 @@ export interface ToneOption {
   example: string;
 }
 
+/** Quantas vezes o mesmo checkpoint pode devolver o trabalho antes de seguir sem ajustes. */
+const MAX_REVISION_ROUNDS = 5;
+
+/**
+ * Resposta de checkpoint que pede ajustes: `{"action":"revise","feedback":"..."}`.
+ * Qualquer outra resposta (aprovação, dados, "cancelar") devolve null.
+ */
+export function parseRevisionResponse(response: string): { feedback: string } | null {
+  const trimmed = response.trim();
+  if (!trimmed.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as { action?: unknown; feedback?: unknown };
+    if (parsed.action !== "revise" || typeof parsed.feedback !== "string" || !parsed.feedback.trim()) return null;
+    return { feedback: parsed.feedback.trim() };
+  } catch {
+    return null;
+  }
+}
+
 export class PipelineRunner {
   private pipeline: PipelineDefinition;
+  /** Feedback de "devolver para ajustes" a aplicar na próxima execução de cada etapa. */
+  private revisionFeedback: Map<string, string> = new Map();
+  private revisionRounds: Map<string, number> = new Map();
   private stateMachine: StateMachine;
   private events: PipelineEvents;
   private adapter?: LlmAdapter;
@@ -98,6 +120,32 @@ export class PipelineRunner {
     return this.runContext.runId;
   }
 
+  /**
+   * Etapa que volta a rodar quando um checkpoint pede ajustes: a indicada em
+   * `sourceStepId` ou, sem ela, a última etapa com agente antes do checkpoint.
+   */
+  private findRevisionTarget(checkpoint: PipelineStep, checkpointIndex: number): number {
+    if (checkpoint.sourceStepId) {
+      const idx = this.pipeline.steps.findIndex((s) => s.id === checkpoint.sourceStepId);
+      if (idx >= 0 && idx < checkpointIndex) return idx;
+    }
+    for (let j = checkpointIndex - 1; j >= 0; j--) {
+      if (this.pipeline.steps[j]!.agent) return j;
+    }
+    return -1;
+  }
+
+  /** Bloco de prompt com os ajustes pedidos para a etapa (consome o feedback). */
+  private takeRevisionBlock(stepId: string): string {
+    const feedback = this.revisionFeedback.get(stepId);
+    if (!feedback) return "";
+    this.revisionFeedback.delete(stepId);
+    return `\n\n## AJUSTES PEDIDOS NA APROVAÇÃO
+A entrega anterior desta etapa voltou do checkpoint com o pedido abaixo. Refaça a entrega completa aplicando os ajustes; mantenha o que já estava bom.
+
+${feedback}`;
+  }
+
   async run(): Promise<SquadState> {
     this.events.onStateChange(this.stateMachine.start());
 
@@ -122,7 +170,23 @@ export class PipelineRunner {
 
         const response = await this.events.onCheckpoint(step, checkpointContext);
 
-        if (response.toLowerCase().includes("cancelar")) {
+        // "Devolver para ajustes": volta à etapa que gerou a entrega, com o feedback no prompt,
+        // e passa de novo por este checkpoint depois dela.
+        const revision = parseRevisionResponse(response);
+        if (revision) {
+          const targetIndex = this.findRevisionTarget(step, i);
+          const rounds = (this.revisionRounds.get(step.id) ?? 0) + 1;
+          if (targetIndex >= 0 && rounds <= MAX_REVISION_ROUNDS) {
+            this.revisionRounds.set(step.id, rounds);
+            this.revisionFeedback.set(this.pipeline.steps[targetIndex]!.id, revision.feedback);
+            this.events.onStateChange(this.stateMachine.resumeFromCheckpoint());
+            i = targetIndex;
+            continue;
+          }
+        }
+
+        // só o comando exato cancela: uma observação que menciona "cancelar" não derruba o pipeline
+        if (response.trim().toLowerCase() === "cancelar") {
           return this.stateMachine.fail();
         }
 
@@ -253,7 +317,7 @@ export class PipelineRunner {
     agent: { name: string; custom: string },
     tasks: AgentTask[],
   ): Promise<string> {
-    let previousOutput = "";
+    let previousOutput = this.takeRevisionBlock(step.id).trim();
     const sortedTasks = [...tasks].sort((a, b) => a.order - b.order);
     let totalTokens = 0;
     let totalCost = 0;
@@ -413,6 +477,8 @@ Este é o último step de execução antes da aprovação.
 Sua entrega deve ser o PRODUTO FINAL e COMPLETO — pronto para ser usado/publicado.
 Não entregue rascunhos, análises ou sugestões. Entregue o resultado pronto.`;
     }
+
+    basePrompt += this.takeRevisionBlock(step.id);
 
     // Check if this step requires images (social/content/publishing steps)
     const requiresImages = this.isImageRequiredStep(step);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getLatestPipelineRun } from "@/lib/db/queries/pipeline-runs";
+import { getLatestPipelineRun, getPipelineRunNumber } from "@/lib/db/queries/pipeline-runs";
 
 export async function GET(
   _req: Request,
@@ -13,10 +13,14 @@ export async function GET(
     const { squadId } = await params;
     const run = await getLatestPipelineRun(squadId);
 
-    if (!run) return NextResponse.json(null);
+    // execução de outra organização: responde como se não existisse
+    if (!run || run.orgId !== session.user.orgId) return NextResponse.json(null);
+
+    const runNumber = await getPipelineRunNumber(squadId, run.startedAt);
 
     return NextResponse.json({
       runId: run.runId,
+      runNumber,
       status: run.status,
       checkpointStepId: run.checkpointStepId,
       stepOutputs: run.stepOutputs ?? {},

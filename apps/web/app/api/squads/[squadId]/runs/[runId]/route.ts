@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { executions } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getPipelineRunByRunIdAndSquad } from "@/lib/db/queries/pipeline-runs";
+import { getSquadById } from "@/lib/db/queries/squads";
 
 export async function GET(
   _req: Request,
@@ -15,24 +16,35 @@ export async function GET(
 
     const { squadId, runId } = await params;
 
-    const [steps, pipelineRun] = await Promise.all([
-      db
-        .select({
-          id: executions.id,
-          pipelineStep: executions.pipelineStep,
-          agentId: executions.agentId,
-          status: executions.status,
-          tokensUsed: executions.tokensUsed,
-          durationMs: executions.durationMs,
-          startedAt: executions.startedAt,
-          completedAt: executions.completedAt,
-          error: executions.error,
-        })
-        .from(executions)
-        .where(and(eq(executions.squadId, squadId), eq(executions.runId, runId)))
-        .orderBy(executions.startedAt),
-      getPipelineRunByRunIdAndSquad(runId, squadId),
-    ]);
+    const pipelineRun = await getPipelineRunByRunIdAndSquad(runId, squadId);
+    if (pipelineRun && pipelineRun.orgId !== session.user.orgId) {
+      return NextResponse.json({ error: "Execucao nao encontrada." }, { status: 404 });
+    }
+
+    const steps = await db
+      .select({
+        id: executions.id,
+        pipelineStep: executions.pipelineStep,
+        agentId: executions.agentId,
+        status: executions.status,
+        tokensUsed: executions.tokensUsed,
+        estimatedCostCents: executions.estimatedCost,
+        durationMs: executions.durationMs,
+        startedAt: executions.startedAt,
+        completedAt: executions.completedAt,
+        error: executions.error,
+      })
+      .from(executions)
+      .where(and(eq(executions.squadId, squadId), eq(executions.runId, runId)))
+      .orderBy(executions.startedAt);
+
+    // sem pipeline run, só devolve passos se o squad for da organização (checado pelas execuções)
+    if (!pipelineRun && steps.length > 0) {
+      const squad = await getSquadById(squadId);
+      if (!squad || squad.orgId !== session.user.orgId) {
+        return NextResponse.json({ error: "Execucao nao encontrada." }, { status: 404 });
+      }
+    }
 
     return NextResponse.json({
       steps,

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
+import { resolveAgentModel } from "@orbitmind/engine";
 import { getAgentsBySquadId, createAgent, updateAgent } from "@/lib/db/queries";
+import { getSquadById } from "@/lib/db/queries/squads";
+import { getDefaultLlmProvider } from "@/lib/db/queries/llm-providers";
 import { invalidateAgents } from "@/lib/cache";
 
 export async function GET(
@@ -15,8 +18,19 @@ export async function GET(
     }
 
     const { squadId } = await params;
-    const agents = await getAgentsBySquadId(squadId);
-    return NextResponse.json(agents);
+    const squad = await getSquadById(squadId);
+    if (!squad || squad.orgId !== session.user.orgId) {
+      return NextResponse.json({ error: "Squad nao encontrado." }, { status: 404 });
+    }
+    const [agents, provider] = await Promise.all([
+      getAgentsBySquadId(squadId),
+      getDefaultLlmProvider(session.user.orgId),
+    ]);
+    // modelo efetivo de cada agente (mesma regra do motor), para o painel do escritório
+    return NextResponse.json(agents.map((a) => ({
+      ...a,
+      model: provider ? resolveAgentModel(provider.provider, provider.defaultModel, a.config as Record<string, unknown> | null) : null,
+    })));
   } catch {
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
