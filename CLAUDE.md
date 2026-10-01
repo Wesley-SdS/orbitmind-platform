@@ -12,6 +12,12 @@ OrbitMind é uma plataforma de orquestração de squads de agentes IA. Permite q
 
 ---
 
+## Backlog ativo — PRD v2
+
+Todo trabalho de produto segue [docs/prds/orbitmind-prd-v2.md](docs/prds/orbitmind-prd-v2.md). Antes de começar, leia a seção 0 (protocolo): pegue o próximo item do marco atual, marque *Implementado* e *Testado* só com evidência (PR e arquivo de teste) e registre a sessão no Log de sessões.
+
+---
+
 ## Stack
 
 | Camada | Tecnologia |
