@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { Moon, Sun, LogOut, User, ChevronDown } from "lucide-react";
@@ -15,8 +16,12 @@ import {
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export function TopBar() {
+  const pathname = usePathname();
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
+
+  // o escritório ocupa a tela inteira (o HUD dele faz o papel da barra)
+  if (pathname.startsWith("/office")) return null;
 
   const name = session?.user?.name ?? "";
   const email = session?.user?.email ?? "";

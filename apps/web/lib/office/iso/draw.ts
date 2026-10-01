@@ -1,5 +1,5 @@
 import { Graphics } from "pixi.js";
-import { TILE_H, TILE_W, Z_UNIT, poly, toScreen } from "./projection";
+import { TILE_H, TILE_W, Z_UNIT, isoRaw, poly, rotRect, toScreen } from "./projection";
 import { shade } from "./palette";
 
 export interface BoxOptions {
@@ -10,7 +10,8 @@ export interface BoxOptions {
 }
 
 /**
- * Caixa isométrica com três faces visíveis: +y (esquerda), +x (direita) e topo.
+ * Caixa isométrica com três faces visíveis: +y (esquerda), +x (direita) e topo,
+ * no espaço rotacionado. Recebe o footprint em coordenadas de MUNDO.
  * Luz vem do canto superior esquerdo, então a face esquerda é mais clara.
  */
 export function drawBox(
@@ -20,13 +21,15 @@ export function drawBox(
   color: number,
   o: BoxOptions = {},
 ): Graphics {
+  const r = rotRect(x, y, w, d);
   const top = o.top ?? shade(color, 1.14);
   const left = o.left ?? shade(color, 0.86);
   const right = o.right ?? shade(color, 0.64);
   const alpha = o.alpha ?? 1;
-  g.poly(poly([[x, y + d, z], [x + w, y + d, z], [x + w, y + d, z + h], [x, y + d, z + h]])).fill({ color: left, alpha });
-  g.poly(poly([[x + w, y, z], [x + w, y + d, z], [x + w, y + d, z + h], [x + w, y, z + h]])).fill({ color: right, alpha });
-  g.poly(poly([[x, y, z + h], [x + w, y, z + h], [x + w, y + d, z + h], [x, y + d, z + h]])).fill({ color: top, alpha });
+  const P = (px: number, py: number, pz: number): number[] => { const s = isoRaw(px, py, pz); return [s.x, s.y]; };
+  g.poly([...P(r.x, r.y + r.d, z), ...P(r.x + r.w, r.y + r.d, z), ...P(r.x + r.w, r.y + r.d, z + h), ...P(r.x, r.y + r.d, z + h)]).fill({ color: left, alpha });
+  g.poly([...P(r.x + r.w, r.y, z), ...P(r.x + r.w, r.y + r.d, z), ...P(r.x + r.w, r.y + r.d, z + h), ...P(r.x + r.w, r.y, z + h)]).fill({ color: right, alpha });
+  g.poly([...P(r.x, r.y, z + h), ...P(r.x + r.w, r.y, z + h), ...P(r.x + r.w, r.y + r.d, z + h), ...P(r.x, r.y + r.d, z + h)]).fill({ color: top, alpha });
   return g;
 }
 
@@ -60,18 +63,17 @@ export function drawCylinder(
   const hh = h * Z_UNIT;
   g.ellipse(cx, cy, rx, ry).fill(shade(side, 0.8));
   g.rect(cx - rx, cy - hh, rx * 2, hh).fill(side);
-  // sombreamento do lado direito
   g.rect(cx, cy - hh, rx, hh).fill({ color: 0x000000, alpha: 0.16 });
   g.ellipse(cx, cy - hh, rx, ry).fill(top);
   return g;
 }
 
-/** Ponto sobre a face norte de uma parede (plano y = yf): u ao longo de x, v = altura. */
+/** Ponto sobre um plano de parede paralelo ao eixo x do mundo (y = yf): u ao longo de x, v = altura. */
 export function faceN(yf: number): (u: number, v: number) => { x: number; y: number } {
   return (u, v) => toScreen(u, yf, v);
 }
 
-/** Ponto sobre a face oeste de uma parede (plano x = xf): u ao longo de y, v = altura. */
+/** Ponto sobre um plano de parede paralelo ao eixo y do mundo (x = xf): u ao longo de y, v = altura. */
 export function faceW(xf: number): (u: number, v: number) => { x: number; y: number } {
   return (u, v) => toScreen(xf, u, v);
 }

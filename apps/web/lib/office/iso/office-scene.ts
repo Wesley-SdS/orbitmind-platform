@@ -1,15 +1,18 @@
 import { Application, BlurFilter, Container, Graphics, type FederatedPointerEvent } from "pixi.js";
-import { TILE_H, TILE_W, Z_UNIT, toScreen, toWorld, type Vec2 } from "./projection";
+import {
+  TILE_H, TILE_W, Z_UNIT, getRotation, isoRaw, rotRect, setBuildingSize, setRotation, toScreen, toWorld, type Vec2,
+} from "./projection";
 import { NavGrid, simplifyPath } from "./pathfinding";
 import { drawBuildingBase, drawGlobalLight, drawRoomFloor, drawRug, drawWallAO } from "./floors";
 import { buildAllWalls } from "./walls";
-import { DeskActor, buildChair, buildFurniture, type Layers } from "./furniture";
+import { DeskActor, buildChair, buildFurniture, buildWindows, type Layers } from "./furniture";
 import { AgentActor, type ActorLook } from "./agent-actor";
 import { dashedPolyline } from "./draw";
 import { PALETTE, STATUS_COLORS } from "./palette";
 import {
-  BUILDING_D, BUILDING_W, DESKS, EXTERIOR_WALL_HEIGHT, FURNITURE, OFFICE_ROOMS, USER_START, blockedCells,
+  BUILDING_D, BUILDING_W, DESKS, EXTERIOR_WALL_HEIGHT, FURNITURE, OFFICE_ROOMS, USER_START, WINDOWS, blockedCells,
 } from "@/lib/office/room-layout";
+import { ZOOM_UNIT } from "@/lib/office/camera";
 import { USER_ID, type OfficeAgentStatus, type OfficeSeat } from "@/lib/office/types";
 
 export interface SceneAgentInput {
@@ -25,32 +28,46 @@ export interface SceneEvents {
   onFloorClick?: (pos: Vec2) => void;
   onZoomChange?: (zoom: number) => void;
   onUserPan?: () => void;
+  /** Um pé tocou o chão (para som de passos). */
+  onFootstep?: () => void;
+  /** A planta foi reconstruída (rotação da câmera). */
+  onRebuild?: () => void;
+  /** A câmera girou (0..3), para salvar a preferência. */
+  onRotationChange?: (rotation: number) => void;
 }
+
+/** Duração das metades da transição de rotação (esmaece → gira → reaparece), em segundos. */
+const FADE_OUT_S = 0.14;
+const FADE_IN_S = 0.2;
 
 export interface Anchor {
   x: number;
   y: number;
 }
 
-const MIN_ZOOM = 0.45;
-const MAX_ZOOM = 3;
+const MIN_ZOOM = 0.5 * ZOOM_UNIT;
+const MAX_ZOOM = 3 * ZOOM_UNIT;
+/** Meia-diagonal do gramado em tiles (prédio + 1,2 de folga atrás e 1,6 na frente, nos dois eixos). */
+const LAWN_SPAN = BUILDING_W + BUILDING_D + 5.6;
 export { USER_ID };
 
 /**
- * Cena PixiJS do escritório isométrico: constrói a planta uma vez, mantém os
- * atores dos agentes, a câmera (pan/zoom/seguir) e expõe âncoras em pixels
+ * Cena PixiJS do escritório isométrico: constrói a planta, mantém os atores
+ * dos agentes, a câmera (pan/zoom/seguir/girar) e expõe âncoras em pixels
  * para as etiquetas em HTML.
  */
 export class OfficeScene {
   private app: Application | null = null;
   private host: HTMLElement | null = null;
   private readonly world = new Container();
-  private readonly objects = new Container();
-  private readonly groundFx = new Graphics();
-  private readonly trails = new Graphics();
-  private readonly nav = new NavGrid(BUILDING_W, BUILDING_D);
-  private readonly desks: DeskActor[] = [];
+  private staticLayers: Container[] = [];
+  private objects = new Container();
+  private groundFx = new Graphics();
+  private trails = new Graphics();
+  private nav = new NavGrid(BUILDING_W, BUILDING_D);
+  private desks: DeskActor[] = [];
   private readonly actors = new Map<string, AgentActor>();
+  private lastAgents: SceneAgentInput[] = [];
   private readonly frameCbs = new Set<(dt: number) => void>();
   private readonly timers = new Set<ReturnType<typeof setTimeout>>();
   private user: AgentActor | null = null;
@@ -59,13 +76,21 @@ export class OfficeScene {
   private snapshotCanvas: HTMLCanvasElement | null = null;
   private snapshotBounds = { x: 0, y: 0, w: 1, h: 1 };
   private drag: { id: number; x: number; y: number; moved: boolean; wx: number; wy: number } | null = null;
+  /** Escala do último "ajustar à tela"; o zoom manual pode afastar até ela, mesmo abaixo de 50%. */
+  private fitScale = MIN_ZOOM;
   private pinch: { d: number; zoom: number } | null = null;
   private readonly pointers = new Map<number, { x: number; y: number }>();
   private cameraTween: { x: number; y: number } | null = null;
+  /** Transição de rotação em andamento; `pending` acumula cliques feitos durante ela. */
+  private fade: { phase: "out" | "in"; t: number; pending: number } | null = null;
   private inFlight = new Map<string, () => void>();
   private destroyed = false;
+  /** Cresce a cada reconstrução (rotação); o minimapa usa para recarregar a miniatura. */
+  version = 0;
 
-  constructor(private readonly events: SceneEvents = {}) {}
+  constructor(private readonly events: SceneEvents = {}) {
+    setBuildingSize(BUILDING_W, BUILDING_D);
+  }
 
   get zoom(): number {
     return this.world.scale.x;
@@ -73,6 +98,10 @@ export class OfficeScene {
 
   get ready(): boolean {
     return this.app !== null;
+  }
+
+  get rotation(): number {
+    return getRotation();
   }
 
   async init(host: HTMLElement): Promise<void> {
@@ -121,6 +150,11 @@ export class OfficeScene {
   // ---------------------------------------------------------------------------
 
   private buildStatic(): void {
+    const lawn = new Graphics();
+    const buildingShadow = new Graphics();
+    const buildingShadowLayer = new Container();
+    buildingShadowLayer.addChild(buildingShadow);
+    buildingShadowLayer.filters = [new BlurFilter({ strength: 8, quality: 3 })];
     const ground = new Graphics();
     const shadows = new Graphics();
     const lights = new Graphics();
@@ -131,10 +165,16 @@ export class OfficeScene {
     lightLayer.addChild(lights);
     lightLayer.filters = [new BlurFilter({ strength: 6, quality: 2 })];
 
-    drawBuildingBase(ground, shadows, BUILDING_W, BUILDING_D);
+    this.nav = new NavGrid(BUILDING_W, BUILDING_D);
+    this.desks = [];
+    this.objects = new Container();
+    this.groundFx = new Graphics();
+    this.trails = new Graphics();
+
+    drawBuildingBase(lawn, buildingShadow, ground, BUILDING_W, BUILDING_D);
     for (const room of OFFICE_ROOMS) drawRoomFloor(ground, room);
     const light = new Graphics();
-    drawGlobalLight(light, BUILDING_W, BUILDING_D);
+    drawGlobalLight(light);
     for (const room of OFFICE_ROOMS) drawWallAO(shadows, room);
     for (const f of FURNITURE) if (f.type === "rug") drawRug(ground, f.x, f.y, f.w, f.d, f.color, f.line);
 
@@ -147,6 +187,7 @@ export class OfficeScene {
 
     buildAllWalls(add, ground, OFFICE_ROOMS, this.nav);
     for (const [cx, cy] of blockedCells()) this.nav.blockCell(cx, cy);
+    buildWindows(layers, WINDOWS);
 
     DESKS.forEach((desk) => {
       const actor = new DeskActor(desk.x, desk.y);
@@ -156,13 +197,28 @@ export class OfficeScene {
     });
     for (const f of FURNITURE) buildFurniture(layers, f);
 
-    this.world.addChild(ground);
-    this.world.addChild(lightLayer);
-    this.world.addChild(light);
-    this.world.addChild(shadowLayer);
-    this.world.addChild(this.trails);
-    this.world.addChild(this.groundFx);
-    this.world.addChild(this.objects);
+    this.staticLayers = [lawn, buildingShadowLayer, ground, light, shadowLayer, lightLayer, this.trails, this.groundFx, this.objects];
+    for (const layer of this.staticLayers) this.world.addChild(layer);
+  }
+
+  /** Derruba a planta e constrói de novo (nova orientação), mantendo os atores. */
+  private rebuild(): void {
+    for (const finish of this.inFlight.values()) finish();
+    this.inFlight.clear();
+    for (const a of this.actors.values()) this.detachActor(a);
+    if (this.user) this.detachActor(this.user);
+    for (const layer of this.staticLayers) {
+      layer.removeFromParent();
+      layer.destroy({ children: true });
+    }
+    this.staticLayers = [];
+    this.buildStatic();
+    this.takeSnapshot();
+    if (this.user) { this.mountActor(this.user); this.user.refresh(); }
+    for (const a of this.actors.values()) { this.mountActor(a); a.refresh(); }
+    this.applyDeskStatuses();
+    this.version++;
+    this.events.onRebuild?.();
   }
 
   private createUser(): void {
@@ -178,7 +234,7 @@ export class OfficeScene {
     this.objects.addChild(actor.fx);
     actor.zIndex = actor.depth;
     this.objects.addChild(actor);
-    if (actor.id !== USER_ID) {
+    if (actor.id !== USER_ID && actor.listenerCount("pointertap") === 0) {
       actor.on("pointertap", (e: FederatedPointerEvent) => {
         if (this.drag?.moved) return;
         e.stopPropagation();
@@ -187,6 +243,12 @@ export class OfficeScene {
       actor.on("pointerover", () => { actor.setHovered(true); this.events.onAgentHover?.(actor.id); });
       actor.on("pointerout", () => { actor.setHovered(false); this.events.onAgentHover?.(null); });
     }
+  }
+
+  private detachActor(actor: AgentActor): void {
+    actor.ground.removeFromParent();
+    actor.fx.removeFromParent();
+    actor.removeFromParent();
   }
 
   private takeSnapshot(): void {
@@ -207,6 +269,7 @@ export class OfficeScene {
 
   /** Sincroniza os atores com a lista de agentes (cria, move de lugar, remove). */
   setAgents(list: SceneAgentInput[]): void {
+    this.lastAgents = list;
     const seen = new Set<string>();
     for (const a of list) {
       seen.add(a.id);
@@ -219,24 +282,26 @@ export class OfficeScene {
       } else if (!this.inFlight.has(a.id) && !actor.walking && (Math.abs(actor.wx - a.seat.x) > 0.01 || Math.abs(actor.wy - a.seat.y) > 0.01)) {
         actor.place(a.seat.x, a.seat.y, a.seat.deskIndex !== undefined);
       }
-      actor.look = a.look;
+      actor.setLook(a.look);
       if (!this.inFlight.has(a.id)) actor.setStatus(a.status);
-      const deskActor = a.seat.deskIndex !== undefined ? this.desks[a.seat.deskIndex] : undefined;
-      deskActor?.setStatus(a.status === "delivering" ? "off" : a.status);
     }
     for (const [id, actor] of this.actors) {
       if (seen.has(id)) continue;
-      this.unmountActor(actor);
+      this.detachActor(actor);
+      actor.destroy({ children: true });
       this.actors.delete(id);
     }
+    this.applyDeskStatuses();
     this.applySelection();
   }
 
-  private unmountActor(actor: AgentActor): void {
-    actor.ground.removeFromParent();
-    actor.fx.removeFromParent();
-    actor.removeFromParent();
-    actor.destroy({ children: true });
+  private applyDeskStatuses(): void {
+    const byDesk = new Map<number, OfficeAgentStatus | "off">();
+    for (const a of this.lastAgents) {
+      if (a.seat.deskIndex === undefined) continue;
+      byDesk.set(a.seat.deskIndex, a.status === "delivering" ? "off" : a.status);
+    }
+    this.desks.forEach((d, i) => d.setStatus(byDesk.get(i) ?? "off"));
   }
 
   setSelected(id: string | null): void {
@@ -259,8 +324,7 @@ export class OfficeScene {
 
   /**
    * Handoff: `fromId` levanta, anda até a frente da mesa de `toId` com o
-   * documento, espera um instante e volta a sentar. Enquanto anda, seu estado
-   * é "delivering" e a trilha tracejada aparece no chão.
+   * documento, espera um instante e volta a sentar.
    */
   handoff(fromId: string, toId: string, seatOf: (id: string) => OfficeSeat | null, onDone?: () => void): void {
     const from = this.actors.get(fromId);
@@ -277,8 +341,8 @@ export class OfficeScene {
       this.inFlight.delete(fromId);
       this.trails.clear();
       from.setDoc(false);
-      from.sit(homeSeat.x, homeSeat.y);
       if (homeSeat.deskIndex === undefined) from.place(homeSeat.x, homeSeat.y, false);
+      else from.sit(homeSeat.x, homeSeat.y);
       onDone?.();
     };
     this.inFlight.set(fromId, finish);
@@ -287,6 +351,7 @@ export class OfficeScene {
     this.drawTrail(pathOut, STATUS_COLORS.delivering);
     from.walk(pathOut, () => {
       this.after(1400, () => {
+        if (!this.inFlight.has(fromId)) return;
         this.trails.clear();
         from.setDoc(false);
         const back = this.findPath({ x: from.wx, y: from.wy }, { x: homeSeat.x, y: homeSeat.y });
@@ -316,7 +381,6 @@ export class OfficeScene {
   }
 
   private spotInFront(seat: OfficeSeat): Vec2 {
-    // cadeira fica ao norte da mesa: a frente da mesa está 1,7 tile ao sul do assento
     if (seat.deskIndex !== undefined) return { x: seat.x, y: seat.y + 1.7 };
     return { x: seat.x + 0.9, y: seat.y + 0.4 };
   }
@@ -325,7 +389,6 @@ export class OfficeScene {
     const raw = this.nav.findPath(from, to);
     if (raw.length === 0) return [];
     const path = simplifyPath(raw);
-    // começa da posição real e termina no ponto pedido (se andável)
     path[0] = { x: from.x, y: from.y };
     const last = this.nav.nearestWalkable(to.x, to.y);
     if (Math.floor(to.x) === last.x && Math.floor(to.y) === last.y) path[path.length - 1] = { x: to.x, y: to.y };
@@ -360,17 +423,22 @@ export class OfficeScene {
 
   fitToView(): void {
     const { w, h } = this.viewSize();
-    const b = this.snapshotBounds;
-    const scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.min(w / b.w, h / (b.h + 40)) * 0.94));
+    // como na prancha 01: o gramado passa 9 px de cada lado do palco e o centro do prédio fica 20 px abaixo do meio
+    const lawnW = (LAWN_SPAN * TILE_W) / 2;
+    const lawnH = (LAWN_SPAN * TILE_H) / 2;
+    const compact = w < 520;
+    const scale = Math.min(MAX_ZOOM, compact ? Math.min((w + 12) / lawnW, (h - 8) / lawnH) : Math.min((w + 18) / lawnW, (h - 110) / lawnH));
+    this.fitScale = scale;
+    const c = toScreen(BUILDING_W / 2 + 0.2, BUILDING_D / 2 + 0.2, 0);
     this.world.scale.set(scale);
-    this.world.position.set(w / 2 - (b.x + b.w / 2) * scale, h / 2 - (b.y + b.h / 2) * scale + 10);
+    this.world.position.set(w / 2 - c.x * scale, h / 2 - c.y * scale + (compact ? 15 : 20));
     this.cameraTween = null;
     this.events.onZoomChange?.(scale);
   }
 
   setZoom(next: number, around?: { x: number; y: number }): void {
     const { w, h } = this.viewSize();
-    const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next));
+    const z = Math.max(Math.min(MIN_ZOOM, this.fitScale), Math.min(MAX_ZOOM, next));
     const px = around?.x ?? w / 2;
     const py = around?.y ?? h / 2;
     const cur = this.world.scale.x;
@@ -384,6 +452,57 @@ export class OfficeScene {
 
   zoomBy(factor: number): void {
     this.setZoom(this.world.scale.x * factor);
+  }
+
+  /** Gira a câmera 90° (delta = ±1), mantendo o ponto do mundo que está no centro da tela. */
+  /** Gira a câmera 90° (delta = ±1) com uma transição curta; cliques durante ela se acumulam. */
+  rotate(delta: number): void {
+    if (!this.app || delta === 0) return;
+    if (this.fade) { this.fade.pending += delta; return; }
+    this.fade = { phase: "out", t: 0, pending: delta };
+  }
+
+  /** Aplica uma orientação salva (0..3) sem animação — usado ao abrir o escritório. */
+  setRotationTo(rotation: number): void {
+    const delta = ((((rotation - getRotation()) % 4) + 4) % 4);
+    if (delta !== 0) this.rotateNow(delta);
+  }
+
+  private rotateNow(delta: number): void {
+    if (!this.app) return;
+    const { w, h } = this.viewSize();
+    const center = this.unproject(w / 2, h / 2);
+    setRotation(getRotation() + delta);
+    this.trails.clear();
+    this.rebuild();
+    const s = this.world.scale.x;
+    const local = toScreen(center.x, center.y, 0);
+    this.world.position.set(w / 2 - local.x * s, h / 2 - local.y * s);
+    this.cameraTween = null;
+    this.events.onRotationChange?.(getRotation());
+  }
+
+  private stepFade(dt: number): void {
+    const f = this.fade;
+    if (!f) return;
+    f.t += dt;
+    if (f.phase === "out") {
+      this.world.alpha = Math.max(0, 1 - f.t / FADE_OUT_S);
+      if (f.t >= FADE_OUT_S) {
+        const delta = f.pending;
+        f.pending = 0;
+        if (delta % 4 !== 0) this.rotateNow(delta);
+        f.phase = "in";
+        f.t = 0;
+      }
+    } else {
+      this.world.alpha = Math.min(1, f.t / FADE_IN_S);
+      if (f.t >= FADE_IN_S) {
+        this.world.alpha = 1;
+        const more = f.pending;
+        this.fade = more % 4 !== 0 ? { phase: "out", t: 0, pending: more } : null;
+      }
+    }
   }
 
   /** Centraliza a câmera num agente (com animação). */
@@ -426,7 +545,8 @@ export class OfficeScene {
     const s = this.world.scale.x;
     const hasBubble = actor.status !== "idle" && !actor.look.isUser;
     const ty = actor.seated ? -22 : -25;
-    const offset = hasBubble ? ty - 16 - 12 - 12 : ty - 24;
+    // como no design: 12 px acima do balão, ou 6 px acima da cabeça
+    const offset = hasBubble ? ty - 16 - 12 - 12 : ty - 16 - 6;
     return {
       x: this.world.x + actor.x * s,
       y: this.world.y + (actor.y + offset) * s,
@@ -441,17 +561,21 @@ export class OfficeScene {
     this.cameraTween = { x: w / 2 - lx * s, y: h / 2 - ly * s };
   }
 
-  /** Âncora da etiqueta de uma sala. Linha de cima: acima da parede do fundo; linha de baixo: em frente ao vidro. */
+  /**
+   * Âncora da etiqueta de uma sala, no espaço rotacionado, como no design:
+   * salas encostadas na parede de fundo ganham a etiqueta centralizada acima
+   * dela (0,55 unidade acima do topo); as outras, abaixo da frente de vidro.
+   */
   roomAnchor(roomId: string): (Anchor & { placement: "above" | "below" }) | null {
     const room = OFFICE_ROOMS.find((r) => r.id === roomId);
     if (!room) return null;
-    if (room.y === 1) {
-      // canto direito da parede do fundo, longe das mesas encostadas nela
-      const p = this.project(room.x + room.w - 0.3, room.y, EXTERIOR_WALL_HEIGHT + 1.1);
-      return { ...p, placement: "above" };
+    const R = rotRect(room.x, room.y, room.w, room.h);
+    const s = this.world.scale.x;
+    const toAnchor = (p: { x: number; y: number }): Anchor => ({ x: this.world.x + p.x * s, y: this.world.y + p.y * s });
+    if (R.y <= 1.01) {
+      return { ...toAnchor(isoRaw(R.x + R.w / 2, R.y, EXTERIOR_WALL_HEIGHT + 0.55)), placement: "above" };
     }
-    const p = this.project(room.x + room.w / 2, room.y + room.h + 0.6, 0);
-    return { ...p, placement: "below" };
+    return { ...toAnchor(isoRaw(R.x + R.w / 2, R.y + R.d + 0.58, 0)), placement: "below" };
   }
 
   /** Retângulo visível em coordenadas locais do mundo (para o minimapa). */
@@ -461,7 +585,7 @@ export class OfficeScene {
     return { x: -this.world.x / s, y: -this.world.y / s, w: w / s, h: h / s };
   }
 
-  /** Imagem estática do escritório (tirada uma vez) e seus limites locais. */
+  /** Imagem estática do escritório (tirada a cada construção) e seus limites locais. */
   get minimap(): { canvas: HTMLCanvasElement; bounds: { x: number; y: number; w: number; h: number } } | null {
     return this.snapshotCanvas ? { canvas: this.snapshotCanvas, bounds: this.snapshotBounds } : null;
   }
@@ -492,16 +616,19 @@ export class OfficeScene {
   private tick(dt: number): void {
     if (!this.app) return;
     const step = Math.min(dt, 0.1);
+    this.stepFade(step);
+    let stepped = false;
     for (const a of this.actors.values()) {
-      a.update(step);
+      if (a.update(step)) stepped = true;
       a.zIndex = a.depth;
       a.fx.zIndex = a.depth - 0.4;
     }
     if (this.user) {
-      this.user.update(step);
+      if (this.user.update(step)) stepped = true;
       this.user.zIndex = this.user.depth;
       this.user.fx.zIndex = this.user.depth - 0.4;
     }
+    if (stepped) this.events.onFootstep?.();
     if (this.followId) {
       const actor = this.followId === USER_ID ? this.user : this.actors.get(this.followId);
       if (actor) {

@@ -16,7 +16,7 @@ const VirtualOffice = dynamic(() => import("@/components/office/virtual-office")
 
 export default function OfficePage() {
   return (
-    <div className="-m-6 h-[calc(100vh-3.5rem)] overflow-hidden">
+    <div className="-m-6 h-[100dvh] overflow-hidden">
       <VirtualOffice />
     </div>
   );

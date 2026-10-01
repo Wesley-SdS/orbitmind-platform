@@ -1,28 +1,40 @@
-import { Graphics } from "pixi.js";
-import { poly, toScreen } from "./projection";
+import { FillGradient, Graphics } from "pixi.js";
+import { isoRaw, poly, rotRect, rotatedSize, toScreen } from "./projection";
 import { FLOOR_COLORS, PALETTE } from "./palette";
 import { drawBox } from "./draw";
 import type { OfficeRoom } from "@/lib/office/types";
 
-/** Gramado, sombra projetada, laje e piso de concreto dos corredores. */
-export function drawBuildingBase(ground: Graphics, shadows: Graphics, W: number, D: number): void {
-  // gramado em volta
-  ground.poly(poly([[-1.2, -1.2], [W + 1.6, -1.2], [W + 1.6, D + 1.6], [-1.2, D + 1.6]])).fill(PALETTE.grass);
+function rawQuad(x: number, y: number, w: number, d: number): number[] {
+  const a = isoRaw(x, y);
+  const b = isoRaw(x + w, y);
+  const c = isoRaw(x + w, y + d);
+  const e = isoRaw(x, y + d);
+  return [a.x, a.y, b.x, b.y, c.x, c.y, e.x, e.y];
+}
+
+/**
+ * Gramado (com o véu de 12% do design), sombra projetada do prédio, laje e
+ * piso de concreto dos corredores. A sombra vai numa camada própria, com blur,
+ * ENTRE o gramado e a laje: acima do piso ela escurecia o escritório inteiro.
+ */
+export function drawBuildingBase(lawn: Graphics, buildingShadow: Graphics, ground: Graphics, W: number, D: number): void {
+  const lawnPoly = poly([[-1.2, -1.2], [W + 1.6, -1.2], [W + 1.6, D + 1.6], [-1.2, D + 1.6]]);
+  lawn.poly(lawnPoly).fill(PALETTE.grass);
   for (let x = -1; x < W + 1.6; x += 1) {
     for (let y = -1; y < D + 1.6; y += 1) {
       const inside = x >= 0 && x < W && y >= 0 && y < D;
       if (inside) continue;
       const a = toScreen(x + 0.25, y + 0.3);
       const b = toScreen(x + 0.7, y + 0.75);
-      ground.circle(a.x, a.y, 1.6).fill(PALETTE.grassDark);
-      ground.circle(b.x, b.y, 2).fill(PALETTE.grassLight);
+      lawn.circle(a.x, a.y, 1.6).fill(PALETTE.grassDark);
+      lawn.circle(b.x, b.y, 2).fill(PALETTE.grassLight);
     }
   }
-  // sombra da laje
-  shadows.poly(poly([[0.6, 0.6], [W + 0.9, 0.6], [W + 0.9, D + 0.9], [0.6, D + 0.9]])).fill({ color: 0x1a1a17, alpha: 0.35 });
-  // laje
+  lawn.poly(lawnPoly).fill({ color: 0x1a1a17, alpha: 0.12 });
+  // sombra da laje sempre para baixo-direita da tela (espaço rotacionado)
+  const R = rotRect(0, 0, W, D);
+  buildingShadow.poly(rawQuad(R.x + 0.6, R.y + 0.6, R.w + 0.3, R.d + 0.3)).fill({ color: 0x1a1a17, alpha: 0.35 });
   drawBox(ground, 0, 0, -0.5, W, D, 0.5, PALETTE.slab, { top: PALETTE.slabTop, left: 0xa89f90, right: 0x8f8677 });
-  // concreto com grade
   ground.poly(poly([[0, 0], [W, 0], [W, D], [0, D]])).fill(PALETTE.concrete);
   for (let x = 0; x <= W; x++) {
     const a = toScreen(x, 0);
@@ -37,7 +49,7 @@ export function drawBuildingBase(ground: Graphics, shadows: Graphics, W: number,
   ground.stroke({ width: 0.7, color: PALETTE.concreteLine, alpha: 0.7 });
 }
 
-/** Piso de uma sala, com o padrão do material desenhado tile a tile. */
+/** Piso de uma sala, com o padrão do material desenhado tile a tile (gira junto com a sala). */
 export function drawRoomFloor(g: Graphics, room: OfficeRoom): void {
   const { x, y, w, h } = room;
   const x1 = x + w;
@@ -48,7 +60,6 @@ export function drawRoomFloor(g: Graphics, room: OfficeRoom): void {
     case "wood": {
       const c = FLOOR_COLORS.wood;
       g.poly(quad(x, y, x1, y1)).fill(c.base);
-      // tábuas ao longo de x, 3 por tile, comprimento 2 com desencontro
       let row = 0;
       for (let v = y; v < y1 - 1e-6; v += 1 / 3, row++) {
         const v2 = Math.min(y1, v + 1 / 3);
@@ -131,9 +142,8 @@ export function drawRoomFloor(g: Graphics, room: OfficeRoom): void {
         for (let v = y; v < y1; v += 0.5) {
           const alt = (Math.round((u - x) * 2) + Math.round((v - y) * 2)) % 2 === 0;
           if (alt) g.poly(quad(u, v, u + 0.5, v + 0.5)).fill(c.alt);
-          // ripas: horizontais nos claros, verticais nos escuros
           for (let k = 1; k < 3; k++) {
-            const t = k / 3 * 0.5;
+            const t = (k / 3) * 0.5;
             const a = alt ? toScreen(u, v + t) : toScreen(u + t, v);
             const b = alt ? toScreen(u + 0.5, v + t) : toScreen(u + t, v + 0.5);
             g.moveTo(a.x, a.y).lineTo(b.x, b.y);
@@ -161,18 +171,35 @@ export function drawRoomFloor(g: Graphics, room: OfficeRoom): void {
   }
 }
 
-/** Luz global: mais claro no canto superior esquerdo, mais escuro no inferior direito. */
-export function drawGlobalLight(g: Graphics, W: number, D: number): void {
-  // dois véus triangulares em vez de gradiente: barato e suficiente
-  g.poly(poly([[0, 0], [W, 0], [0, D]])).fill({ color: 0xffffff, alpha: 0.07 });
-  g.poly(poly([[W, 0], [W, D], [0, D]])).fill({ color: 0x1a1a17, alpha: 0.06 });
+/**
+ * Luz global do design: gradiente do canto do fundo (branco 14%) ao canto da
+ * frente (grafite 14%), transparente a partir de 55% do caminho.
+ */
+export function drawGlobalLight(g: Graphics): void {
+  const { w, d } = rotatedSize();
+  const a = isoRaw(0, 0);
+  const b = isoRaw(w, 0);
+  const c = isoRaw(w, d);
+  const e = isoRaw(0, d);
+  const gradient = new FillGradient({
+    type: "linear",
+    start: { x: a.x, y: a.y },
+    end: { x: c.x, y: c.y },
+    textureSpace: "global",
+    colorStops: [
+      { offset: 0, color: "rgba(255,255,255,0.14)" },
+      { offset: 0.55, color: "rgba(255,255,255,0)" },
+      { offset: 1, color: "rgba(26,26,23,0.14)" },
+    ],
+  });
+  g.poly([a.x, a.y, b.x, b.y, c.x, c.y, e.x, e.y]).fill(gradient);
 }
 
-/** Oclusão de ambiente nas bases das paredes de fundo de uma sala. */
+/** Oclusão de ambiente nas bases das paredes de fundo (norte e oeste no espaço rotacionado). */
 export function drawWallAO(g: Graphics, room: OfficeRoom): void {
-  const { x, y, w, h } = room;
-  g.poly(poly([[x, y + 0.1], [x + w, y + 0.1], [x + w, y + 0.6], [x, y + 0.6]])).fill({ color: 0x1a1a17, alpha: 0.13 });
-  g.poly(poly([[x + 0.1, y], [x + 0.6, y], [x + 0.6, y + h], [x + 0.1, y + h]])).fill({ color: 0x1a1a17, alpha: 0.13 });
+  const R = rotRect(room.x, room.y, room.w, room.h);
+  g.poly(rawQuad(R.x, R.y + 0.1, R.w, 0.5)).fill({ color: 0x1a1a17, alpha: 0.13 });
+  g.poly(rawQuad(R.x + 0.1, R.y, 0.5, R.d)).fill({ color: 0x1a1a17, alpha: 0.13 });
 }
 
 /** Tapete no chão com duas bordas internas. */

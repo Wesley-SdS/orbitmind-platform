@@ -9,8 +9,8 @@ interface OfficeMinimapProps {
   onPanTo: (localX: number, localY: number) => void;
 }
 
-const W = 168;
-const H = 104;
+const W = 164;
+const H = 102;
 
 function hex(color: number): string {
   return `#${color.toString(16).padStart(6, "0")}`;
@@ -55,9 +55,18 @@ export function OfficeMinimap({ scene, onPanTo }: OfficeMinimapProps) {
       }
       const v = scene.viewportRect();
       const [vx, vy] = toMini(v.x, v.y);
-      ctx.strokeStyle = "#f2541b";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(vx, vy, v.w * scale, v.h * scale);
+      // retângulo da câmera, recortado à miniatura (como o quadro laranja do design)
+      const x0 = Math.max(2, vx);
+      const y0 = Math.max(2, vy);
+      const x1 = Math.min(W - 2, vx + v.w * scale);
+      const y1 = Math.min(H - 2, vy + v.h * scale);
+      if (x1 > x0 && y1 > y0) {
+        ctx.strokeStyle = "#f2541b";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(x0, y0, x1 - x0, y1 - y0, 3);
+        ctx.stroke();
+      }
     };
     draw();
     const off = scene.onFrame((dt) => {
@@ -78,7 +87,7 @@ export function OfficeMinimap({ scene, onPanTo }: OfficeMinimapProps) {
   }, [scene, onPanTo]);
 
   return (
-    <div className="pointer-events-auto absolute bottom-4 right-4 z-10 rounded-xl border border-[#1a1a17]/12 bg-[#fbfaf7]/85 p-1.5 shadow-[0_10px_28px_rgba(26,26,23,.12)] backdrop-blur-md dark:border-white/10 dark:bg-[#1e1d1a]/85">
+    <div className="pointer-events-auto absolute bottom-4 right-4 z-10 rounded-xl border border-[#1a1a17]/12 bg-[#fbfaf7]/86 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,.7),0_10px_28px_rgba(26,26,23,.12)] backdrop-blur-md dark:border-white/10 dark:bg-[#1e1d1a]/86">
       <canvas ref={canvasRef} style={{ width: W, height: H }} className="block cursor-crosshair rounded-md bg-[#e3ddd0] dark:bg-[#2a2824]" aria-label="Minimapa do escritório" />
     </div>
   );

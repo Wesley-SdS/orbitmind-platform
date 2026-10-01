@@ -2,20 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   MessageSquare,
   Bot,
   Users,
-  Link2,
+  Link as LinkIcon,
   Settings,
-  Building2,
-  KanbanSquare,
+  Building,
+  Columns3,
   ShoppingBag,
   GitBranch,
   HelpCircle,
   Inbox,
 } from "lucide-react";
+import { OfficeRail } from "@/components/office/office-rail";
 import { OrbitMark } from "@/components/landing/orbit-mark";
 import {
   Sidebar,
@@ -35,14 +37,14 @@ import { Progress } from "@/components/ui/progress";
 const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard, id: "sidebar-dashboard" },
   { title: "Chat", href: "/chat", icon: MessageSquare, id: "sidebar-chat" },
-  { title: "Board", href: "/board", icon: KanbanSquare, id: "sidebar-board" },
+  { title: "Board", href: "/board", icon: Columns3, id: "sidebar-board" },
   { title: "Squads", href: "/squads", icon: Bot, id: "sidebar-squads" },
   { title: "Agentes", href: "/agents", icon: Users, id: "sidebar-agents" },
   { title: "Pipeline", href: "/pipeline", icon: GitBranch, id: "sidebar-pipeline" },
   { title: "Marketplace", href: "/marketplace", icon: ShoppingBag, id: "sidebar-marketplace" },
-  { title: "Integrações", href: "/integrations", icon: Link2, id: "sidebar-integrations" },
+  { title: "Integrações", href: "/integrations", icon: LinkIcon, id: "sidebar-integrations" },
   { title: "Configurações", href: "/settings", icon: Settings, id: "sidebar-settings" },
-  { title: "Escritório", href: "/office", icon: Building2, id: "sidebar-office", badge: undefined as string | undefined },
+  { title: "Escritório", href: "/office", icon: Building, id: "sidebar-office", badge: undefined as string | undefined },
   { title: "Ajuda", href: "/help", icon: HelpCircle, id: "sidebar-help" },
 ];
 
@@ -53,6 +55,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ quotes = null }: AppSidebarProps) {
   const pathname = usePathname();
+  const { data: session } = useSession();
   const items = quotes
     ? [
         navItems[0]!,
@@ -66,6 +69,11 @@ export function AppSidebar({ quotes = null }: AppSidebarProps) {
         ...navItems.slice(1),
       ]
     : navItems;
+
+  // modo escritório: trilho de 64 px do design no lugar da sidebar
+  if (pathname.startsWith("/office")) {
+    return <OfficeRail items={items} userName={session?.user?.name} />;
+  }
 
   return (
     <Sidebar collapsible="icon">

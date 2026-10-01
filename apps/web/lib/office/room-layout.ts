@@ -1,4 +1,4 @@
-import type { OfficeRoom, OfficeSeat } from "./types";
+import type { AvatarLook, OfficeRoom, OfficeSeat } from "./types";
 
 /**
  * Planta do escritório virtual — grid de 30 × 16 tiles, projeção isométrica.
@@ -83,9 +83,25 @@ export type FurnitureSpec =
   | { type: "table"; x: number; y: number; r: number }
   | { type: "coffeeTable"; x: number; y: number }
   | { type: "whiteboard"; x: number; yf: number; len: number; z: number; h: number; variant: "chart" | "mood" | "check" | "calendar" | "plan" }
-  | { type: "window"; x: number; f: number; len: number; z: number; h: number; alongX: boolean }
   | { type: "screen"; x: number; yf: number; len: number; z: number; h: number }
-  | { type: "orbitMark"; x: number; yf: number; z: number; r: number };
+  | { type: "orbitMark"; x: number; yf: number; z: number; r: number; side?: "n" | "s" };
+
+/** Janela numa parede externa do prédio: `from` é a posição ao longo da parede (x para norte/sul, y para leste/oeste). */
+export interface WindowSpec {
+  side: "n" | "s" | "e" | "w";
+  from: number;
+  len: number;
+  z?: number;
+  h?: number;
+}
+
+/** Janelas em todas as fachadas: só as duas do fundo aparecem em cada orientação da câmera. */
+export const WINDOWS: WindowSpec[] = [
+  { side: "n", from: 2.5, len: 2.0 }, { side: "n", from: 5.5, len: 2.0 }, { side: "n", from: 13, len: 2.5 }, { side: "n", from: 16.5, len: 2.5 }, { side: "n", from: 24.5, len: 3.0 },
+  { side: "w", from: 2.4, len: 2.2 }, { side: "w", from: 10.2, len: 2.6 },
+  { side: "s", from: 3, len: 2.0 }, { side: "s", from: 6.5, len: 2.0 }, { side: "s", from: 12.5, len: 2.5 }, { side: "s", from: 20.5, len: 2.5 }, { side: "s", from: 25, len: 2.5 },
+  { side: "e", from: 2.5, len: 2.0 }, { side: "e", from: 10, len: 2.2 }, { side: "e", from: 13, len: 1.6 },
+];
 
 /** Mobília fixa, além das mesas do `DESKS` (cada mesa já traz sua cadeira). */
 export const FURNITURE: FurnitureSpec[] = [
@@ -95,15 +111,9 @@ export const FURNITURE: FurnitureSpec[] = [
   { type: "rug", x: 24.4, y: 3.2, w: 3.4, d: 2.4, color: 0x8fb3a0, line: 0x6f9482 },
   { type: "rug", x: 4.6, y: 10.9, w: 4.0, d: 3.2, color: 0x5f8f9c, line: 0x4a7681 },
 
-  // janelas do prédio (parede norte y=1 e parede oeste x=1) + marca
-  { type: "window", x: 2.5, f: 1.0, len: 2.0, z: 0.95, h: 0.95, alongX: true },
-  { type: "window", x: 5.5, f: 1.0, len: 2.0, z: 0.95, h: 0.95, alongX: true },
-  { type: "window", x: 13, f: 1.0, len: 2.5, z: 0.95, h: 0.95, alongX: true },
-  { type: "window", x: 16.5, f: 1.0, len: 2.5, z: 0.95, h: 0.95, alongX: true },
-  { type: "window", x: 24.5, f: 1.0, len: 3.0, z: 0.95, h: 0.95, alongX: true },
-  { type: "window", x: 10.2, f: 1.0, len: 2.6, z: 0.95, h: 0.95, alongX: false },
-  { type: "window", x: 2.4, f: 1.0, len: 2.2, z: 0.95, h: 0.95, alongX: false },
-  { type: "orbitMark", x: 10, yf: 1.0, z: 1.5, r: 0.42 },
+  // marca OrbitMind nas fachadas norte e sul (aparece a que estiver no fundo)
+  { type: "orbitMark", x: 10, yf: 1.0, z: 1.5, r: 0.42, side: "n" },
+  { type: "orbitMark", x: 19, yf: 15.0, z: 1.5, r: 0.42, side: "s" },
 
   // Pesquisa
   { type: "whiteboard", x: 3.2, yf: 1.02, len: 2.4, z: 1.0, h: 0.8, variant: "chart" },
@@ -152,7 +162,7 @@ export const FURNITURE: FurnitureSpec[] = [
   { type: "counter", x: 25.4, y: 9.3, w: 2.2, d: 0.62, h: 0.92, color: 0x3a3733 },
   { type: "coffee", x: 25.55, y: 9.35, z: 0.92 },
   { type: "counter", x: 25.6, y: 13.0, w: 2.4, d: 0.7, h: 1.0, color: 0x1a1a17 },
-  { type: "orbitMark", x: 26.2, yf: 13.72, z: 0.42, r: 0.32 },
+  { type: "orbitMark", x: 26.2, yf: 13.72, z: 0.42, r: 0.32, side: "n" },
   { type: "screen", x: 22.4, yf: 9.2, len: 1.6, z: 0.4, h: 0.72 },
   { type: "plant", x: 19.3, y: 14.2 },
   { type: "plant", x: 28.2, y: 9.4, size: 1.15 },
@@ -231,9 +241,12 @@ const HAIR_PALETTE = [0x3b2a1a, 0x1a1a17, 0xc0392b, 0xf0d58c, 0xb0b0b0, 0x6b4423
 const SKIN_PALETTE = [0xf0c8a2, 0xc99671, 0x8d5a3b];
 
 function hashString(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return h;
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
 }
 
 /** Cores para um agente: pelo papel; se desconhecido, determinístico pelo id. */
@@ -247,6 +260,12 @@ export function colorsForAgent(role: string, id: string): { primary: number; hai
     hair: HAIR_PALETTE[(h >> 3) % HAIR_PALETTE.length]!,
     skin: SKIN_PALETTE[(h >> 6) % SKIN_PALETTE.length]!,
   };
+}
+
+/** Aparência de um agente: cores pelo papel; se o papel é desconhecido, determinísticas pelo id. */
+export function lookForAgent(role: string, id: string): AvatarLook {
+  const colors = colorsForAgent(role, id);
+  return { shirt: colors.primary, hair: colors.hair, skin: colors.skin };
 }
 
 /** Sala de um agente a partir do papel. */

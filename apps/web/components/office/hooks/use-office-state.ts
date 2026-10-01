@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DESKS, STANDING_SPOTS, colorsForAgent, deskSeat, getRoomForRole } from "@/lib/office/room-layout";
+import { DESKS, STANDING_SPOTS, deskSeat, getRoomForRole, lookForAgent } from "@/lib/office/room-layout";
+import { useSquadSocket, type SquadSocketMessage } from "@/lib/realtime/use-squad-socket";
 import type {
   OfficeAgent, OfficeAgentStatus, OfficeEvent, OfficeHandoff, OfficePipelineInfo, OfficeSeat,
 } from "@/lib/office/types";
@@ -22,6 +23,8 @@ interface AgentRow {
   modelTier?: string;
   monthlyBudgetTokens?: number | null;
   budgetUsedTokens?: number;
+  /** Modelo efetivo (calculado no servidor com a mesma regra do motor). */
+  model?: string | null;
 }
 
 export interface RunStep {
@@ -30,6 +33,7 @@ export interface RunStep {
   agentId: string;
   status: string;
   tokensUsed: number;
+  estimatedCostCents?: number;
   durationMs: number | null;
   startedAt: string;
   completedAt: string | null;
@@ -45,6 +49,7 @@ interface StepOutput {
 
 interface PipelineRunRow {
   runId: string;
+  runNumber?: number;
   status: string;
   checkpointStepId: string | null;
   stepOutputs?: Record<string, StepOutput>;
@@ -68,6 +73,12 @@ const DONE_WINDOW_MS = 90_000;
 const RUN_DONE_WINDOW_MS = 150_000;
 const DEMO_PATTERN: OfficeAgentStatus[] = ["working", "idle", "done", "working", "idle", "working", "idle"];
 const DEMO_HANDOFF_EVERY_MS = 16_000;
+
+/** "Pesquisa de mercado" → "pesquisa de mercado" (mantém siglas como "SEO"). */
+function lowerFirst(s: string): string {
+  if (s.length > 1 && s[1] === s[1]!.toUpperCase() && s[1] !== s[1]!.toLowerCase()) return s;
+  return s.charAt(0).toLowerCase() + s.slice(1);
+}
 
 function toKebab(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, "-");
@@ -193,7 +204,8 @@ export function useOfficeState(initialSquadId: string | null = null) {
         if (!alive) return;
         const list = Array.isArray(data) ? data : [];
         setSquads(list);
-        setSquadIdState((cur) => cur ?? list[0]?.id ?? null);
+        // squad pedido na URL só vale se for da organização; senão, o primeiro da lista
+        setSquadIdState((cur) => (cur && list.some((s) => s.id === cur) ? cur : list[0]?.id ?? null));
         if (list.length === 0) setLoading(false);
       })
       .catch(() => { if (alive) setLoading(false); });
@@ -258,21 +270,60 @@ export function useOfficeState(initialSquadId: string | null = null) {
     return () => { alive = false; };
   }, [squadId, loadSquad, loadRun]);
 
-  // polling: rápido com execução ativa, lento em repouso, só com a aba visível
+  // tempo real: eventos do servidor WS disparam recarga imediata e um handoff animado
+  const wsHandoffAt = useRef(0);
+  const onSocketMessage = useCallback((msg: SquadSocketMessage) => {
+    if (!squadId) return;
+    switch (msg.type) {
+      case "HANDOFF_START": {
+        const from = typeof msg.from === "string" ? msg.from : null;
+        const to = typeof msg.to === "string" ? msg.to : null;
+        if (from && to && from !== to) {
+          wsHandoffAt.current = Date.now();
+          setHandoff({ fromId: from, toId: to, at: Date.now() });
+        }
+        loadRun(squadId).catch(() => {});
+        break;
+      }
+      case "STEP_STARTED":
+      case "STEP_COMPLETED":
+      case "STEP_FAILED":
+      case "CHECKPOINT_REACHED":
+      case "CHECKPOINT_RESOLVED":
+      case "PIPELINE_STARTED":
+      case "PIPELINE_COMPLETED":
+      case "PIPELINE_FAILED":
+      case "PIPELINE_CANCELLED":
+      case "PIPELINE_AGENT_STATUS":
+        loadRun(squadId).catch(() => {});
+        setTick((t) => t + 1);
+        break;
+      case "SQUAD_UPDATED":
+        loadSquad(squadId).catch(() => {});
+        break;
+      default:
+        break;
+    }
+  }, [squadId, loadRun, loadSquad]);
+  const { connected: realtime } = useSquadSocket(squadId, onSocketMessage);
+
+  // polling: rápido com execução ativa, lento em repouso, só com a aba visível.
+  // Com o WebSocket conectado vira só uma rede de segurança.
   const active = isActiveRun(run);
   useEffect(() => {
     if (!squadId) return;
+    const every = realtime ? 30000 : active ? 3000 : 12000;
     const interval = setInterval(() => {
       if (document.visibilityState !== "visible") return;
       loadRun(squadId).catch(() => {});
       setTick((t) => t + 1);
-    }, active ? 3000 : 12000);
+    }, every);
     const agentsInterval = setInterval(() => {
       if (document.visibilityState !== "visible") return;
       loadSquad(squadId).catch(() => {});
     }, 30000);
     return () => { clearInterval(interval); clearInterval(agentsInterval); };
-  }, [squadId, active, loadRun, loadSquad]);
+  }, [squadId, active, realtime, loadRun, loadSquad]);
 
   const refresh = useCallback(() => {
     if (!squadId) return;
@@ -287,8 +338,12 @@ export function useOfficeState(initialSquadId: string | null = null) {
 
   const agents: OfficeAgent[] = useMemo(() => rows.map((row) => {
     const seat = seats.get(row.id)!;
-    const look = colorsForAgent(row.role, row.id);
+    const look = lookForAgent(row.role, row.id);
     const step = derived.currentStep.get(row.id);
+    const mine = runSteps.filter((s) => s.agentId === row.id);
+    const finished = mine.filter((s) => s.status === "completed" && s.durationMs);
+    const avgStepMs = finished.length ? finished.reduce((sum, s) => sum + (s.durationMs ?? 0), 0) / finished.length : null;
+    const runCostCents = mine.reduce((sum, s) => sum + (s.estimatedCostCents ?? 0), 0);
     return {
       id: row.id,
       name: row.name,
@@ -297,16 +352,18 @@ export function useOfficeState(initialSquadId: string | null = null) {
       status: derived.statuses.get(row.id) ?? "idle",
       roomId: seat.roomId,
       seat,
-      color: look.primary,
-      hair: look.hair,
-      skin: look.skin,
+      look,
+      color: look.shirt,
       modelTier: row.modelTier,
       monthlyBudgetTokens: row.monthlyBudgetTokens ?? null,
       budgetUsedTokens: row.budgetUsedTokens ?? 0,
       currentStep: step?.name ?? null,
       currentStepStartedAt: step?.startedAt ?? null,
+      model: row.model ?? null,
+      runCostCents,
+      avgStepMs,
     };
-  }), [rows, seats, derived]);
+  }), [rows, seats, derived, runSteps]);
 
   const pipeline: OfficePipelineInfo = useMemo(() => {
     if (!run) return { ...EMPTY_PIPELINE, steps: cfg.map((s) => ({ step: s.step, name: s.name, type: s.type, agentId: s.agentId })), totalSteps: cfg.length };
@@ -320,6 +377,8 @@ export function useOfficeState(initialSquadId: string | null = null) {
     }
     const running = runSteps.find((s) => s.status === "running");
     const currentCfg = cfg[run.currentStepIndex];
+    const cpIndex = cfg.findIndex((s) => `step-${s.step}` === run.checkpointStepId);
+    const nextStep = cpIndex >= 0 ? cfg.slice(cpIndex + 1).find((s) => !CHECKPOINT_TYPES.has(s.type)) : undefined;
     const status = (["running", "waiting_approval", "completed", "failed", "cancelled"].includes(run.status) ? run.status : "idle") as OfficePipelineInfo["status"];
     return {
       runId: run.runId,
@@ -328,6 +387,9 @@ export function useOfficeState(initialSquadId: string | null = null) {
       totalSteps: run.totalSteps || cfg.length,
       currentStepName: running?.pipelineStep ?? currentCfg?.name ?? cpStep?.name ?? null,
       startedAt: run.startedAt,
+      pausedAt: run.pausedAt ?? null,
+      runNumber: run.runNumber ?? null,
+      nextStepName: nextStep?.name ?? null,
       checkpointStepId: run.checkpointStepId,
       checkpointStepName: cpStep?.name ?? (run.checkpointStepId ? "Aprovação" : null),
       checkpointType: cpStep?.type ?? (run.checkpointStepId ? "checkpoint-approve" : null),
@@ -353,11 +415,17 @@ export function useOfficeState(initialSquadId: string | null = null) {
       if (priming) continue;
       if (cur.status !== "running" && !(cur.status === "completed" && Date.now() - new Date(cur.startedAt).getTime() < 20_000)) continue;
       if (!rows.some((r) => r.id === prev.agentId) || !rows.some((r) => r.id === cur.agentId)) continue;
-      setHandoff({ fromId: prev.agentId, toId: cur.agentId, at: Date.now() });
+      // o WebSocket já animou este handoff há pouco: só registra o evento
+      if (Date.now() - wsHandoffAt.current > 30_000) setHandoff({ fromId: prev.agentId, toId: cur.agentId, at: Date.now() });
       const from = rows.find((r) => r.id === prev.agentId)?.name ?? "Agente";
       const to = rows.find((r) => r.id === cur.agentId)?.name ?? "Agente";
-      const stepLabel = prev.pipelineStep ? cfg.find((s) => `step-${s.step}` === prev.pipelineStep)?.name ?? prev.pipelineStep : "o trabalho";
-      const event: OfficeEvent = { id: key, kind: "handoff", text: `${from} entregou ${stepLabel} para ${to}`, at: Date.now(), agentId: prev.agentId };
+      const stepLabel = prev.pipelineStep ? lowerFirst(cfg.find((s) => `step-${s.step}` === prev.pipelineStep)?.name ?? prev.pipelineStep) : "o trabalho";
+      const event: OfficeEvent = {
+        id: key, kind: "handoff", at: Date.now(), agentId: prev.agentId,
+        actor: from, target: to,
+        text: `está levando ${stepLabel} para`,
+        settledText: `entregou ${stepLabel} para`,
+      };
       setExtraEvents((ev) => [event, ...ev].slice(0, 12));
     }
     primedSquad.current = squadId;
@@ -386,14 +454,16 @@ export function useOfficeState(initialSquadId: string | null = null) {
     const list: OfficeEvent[] = [...extraEvents];
     for (const s of runSteps) {
       const name = byId.get(s.agentId)?.name ?? "Agente";
-      const stepName = s.pipelineStep ? stepNames.get(s.pipelineStep) ?? s.pipelineStep : "etapa";
-      if (s.status === "completed" && s.completedAt) list.push({ id: `${s.id}:done`, kind: "done", text: `${name} concluiu ${stepName}`, at: new Date(s.completedAt).getTime(), agentId: s.agentId });
-      else if (s.status === "running") list.push({ id: `${s.id}:start`, kind: "start", text: `${name} está trabalhando em ${stepName}`, at: new Date(s.startedAt).getTime(), agentId: s.agentId });
-      else if (s.status === "failed") list.push({ id: `${s.id}:failed`, kind: "failed", text: `${name} falhou em ${stepName}${s.error ? `: ${s.error.slice(0, 80)}` : ""}`, at: new Date(s.startedAt).getTime(), agentId: s.agentId });
+      const stepName = s.pipelineStep ? lowerFirst(stepNames.get(s.pipelineStep) ?? s.pipelineStep) : "a etapa";
+      if (s.status === "completed" && s.completedAt) list.push({ id: `${s.id}:done`, kind: "done", actor: name, text: `concluiu ${stepName}`, at: new Date(s.completedAt).getTime(), agentId: s.agentId });
+      else if (s.status === "running") list.push({ id: `${s.id}:start`, kind: "start", actor: name, text: `está trabalhando em ${stepName}`, at: new Date(s.startedAt).getTime(), agentId: s.agentId });
+      else if (s.status === "failed") list.push({ id: `${s.id}:failed`, kind: "failed", actor: name, text: `falhou em ${stepName}${s.error ? `: ${s.error.slice(0, 80)}` : ""}`, at: new Date(s.startedAt).getTime(), agentId: s.agentId });
     }
     if (run?.status === "waiting_approval") {
       const who = derived.checkpointAgentId ? byId.get(derived.checkpointAgentId)?.name : null;
-      list.push({ id: `${run.runId}:cp`, kind: "checkpoint", text: `${who ?? "O squad"} aguarda sua aprovação${pipeline.checkpointStepName ? `: ${pipeline.checkpointStepName}` : ""}`, at: run.pausedAt ? new Date(run.pausedAt).getTime() : Date.now(), agentId: derived.checkpointAgentId ?? undefined });
+      const cpName = pipeline.checkpointStepName;
+      const what = cpName && /^(aprova|revis)/i.test(cpName) ? `aguarda sua ${lowerFirst(cpName)}` : `aguarda sua aprovação${cpName ? ` em ${cpName}` : ""}`;
+      list.push({ id: `${run.runId}:cp`, kind: "checkpoint", actor: who ?? "O squad", text: what, at: run.pausedAt ? new Date(run.pausedAt).getTime() : Date.now(), agentId: derived.checkpointAgentId ?? undefined });
     }
     if (run?.status === "completed" && run.completedAt) list.push({ id: `${run.runId}:end`, kind: "info", text: "Pipeline concluído", at: new Date(run.completedAt).getTime() });
     if (run?.status === "failed") list.push({ id: `${run.runId}:fail`, kind: "failed", text: "Pipeline falhou", at: run.completedAt ? new Date(run.completedAt).getTime() : Date.now() });
@@ -404,7 +474,7 @@ export function useOfficeState(initialSquadId: string | null = null) {
 
   const squad = squads.find((s) => s.id === squadId) ?? null;
 
-  return { squads, squad, squadId, setSquadId, agents, runSteps, pipeline, events, handoff, demoMode: derived.demo, loading, refresh };
+  return { squads, squad, squadId, setSquadId, agents, runSteps, pipeline, events, handoff, demoMode: derived.demo, realtime, loading, refresh };
 }
 
 export type OfficeState = ReturnType<typeof useOfficeState>;

@@ -1,5 +1,5 @@
 import { Graphics } from "pixi.js";
-import { poly } from "./projection";
+import { depthOf, isoRaw, poly, rotRect, rotatedSide, type Side } from "./projection";
 import { PALETTE } from "./palette";
 import { drawBox } from "./draw";
 import type { OfficeRoom } from "@/lib/office/types";
@@ -16,32 +16,70 @@ function inDoor(i: number, doors: Array<[number, number]>): boolean {
   return doors.some(([a, b]) => c > a && c < b);
 }
 
-/** Parede sólida dividida em segmentos de 1 tile (cada um com sua profundidade). */
-export function buildSolidWall(
-  add: AddObject, ground: Graphics,
-  x0: number, y0: number, len: number, alongX: boolean, h: number, t: number,
-  doors: Array<[number, number]> = [],
-): void {
+/** Segmento de parede (footprint no mundo) desenhado como caixa sólida. */
+function solidSegment(add: AddObject, x: number, y: number, w: number, d: number, h: number): void {
+  const g = new Graphics();
+  drawBox(g, x, y, 0, w, d, h, PALETTE.wall, { top: PALETTE.wallTopCap });
+  add(g, depthOf(x, y, w, d));
+}
+
+/** Segmento de divisória de vidro: face translúcida voltada para a câmera, moldura e tampo claro. */
+function glassSegment(add: AddObject, x: number, y: number, w: number, d: number, h: number): void {
+  const r = rotRect(x, y, w, d);
+  const P = (px: number, py: number, pz: number): number[] => { const s = isoRaw(px, py, pz); return [s.x, s.y]; };
+  const alongX = r.w > r.d; // no espaço rotacionado
+  const g = new Graphics();
+  const face = alongX
+    ? [...P(r.x, r.y + r.d, 0), ...P(r.x + r.w, r.y + r.d, 0), ...P(r.x + r.w, r.y + r.d, h), ...P(r.x, r.y + r.d, h)]
+    : [...P(r.x + r.w, r.y, 0), ...P(r.x + r.w, r.y + r.d, 0), ...P(r.x + r.w, r.y + r.d, h), ...P(r.x + r.w, r.y, h)];
+  const hi = alongX
+    ? [...P(r.x, r.y + r.d, h * 0.55), ...P(r.x + r.w, r.y + r.d, h * 0.55), ...P(r.x + r.w, r.y + r.d, h), ...P(r.x, r.y + r.d, h)]
+    : [...P(r.x + r.w, r.y, h * 0.55), ...P(r.x + r.w, r.y + r.d, h * 0.55), ...P(r.x + r.w, r.y + r.d, h), ...P(r.x + r.w, r.y, h)];
+  g.poly(face).fill({ color: PALETTE.glass, alpha: 0.32 });
+  g.poly(hi).fill({ color: 0xffffff, alpha: 0.18 });
+  g.poly(face).stroke({ width: 0.8, color: PALETTE.glassFrame, alpha: 0.7 });
+  g.poly([...P(r.x, r.y, h), ...P(r.x + r.w, r.y, h), ...P(r.x + r.w, r.y + r.d, h), ...P(r.x, r.y + r.d, h)]).fill(PALETTE.glassCap);
+  add(g, depthOf(x, y, w, d));
+}
+
+function doorPost(add: AddObject, x: number, y: number, w: number, d: number, h: number): void {
+  const g = new Graphics();
+  drawBox(g, x, y, 0, w, d, h, PALETTE.doorFrame);
+  add(g, depthOf(x, y, w, d, 0.02));
+}
+
+interface WallRun {
+  /** início da parede no mundo */
+  x0: number;
+  y0: number;
+  len: number;
+  alongX: boolean;
+  t: number;
+  doors: Array<[number, number]>;
+  kind: "solid" | "glass";
+  h: number;
+}
+
+/** Constrói uma parede do mundo, tile a tile, com portas (batentes + capacho). */
+function buildRun(add: AddObject, ground: Graphics, run: WallRun): void {
+  const { x0, y0, len, alongX, t, doors, kind, h } = run;
   for (let i = 0; i < len; i++) {
     if (inDoor(i, doors)) continue;
-    const g = new Graphics();
-    if (alongX) {
-      drawBox(g, x0 + i, y0, 0, 1.02, t, h, PALETTE.wall, { top: PALETTE.wallTopCap });
-      add(g, x0 + i + 1.02 + y0 + t);
-    } else {
-      drawBox(g, x0, y0 + i, 0, t, 1.02, h, PALETTE.wall, { top: PALETTE.wallTopCap });
-      add(g, x0 + t + y0 + i + 1.02);
-    }
+    const x = alongX ? x0 + i : x0;
+    const y = alongX ? y0 : y0 + i;
+    const w = alongX ? 1.02 : t;
+    const d = alongX ? t : 1.02;
+    if (kind === "solid") solidSegment(add, x, y, w, d, h);
+    else glassSegment(add, x, y, w, d, h);
   }
   for (const [a, b] of doors) {
-    const post = (px: number, py: number): void => {
-      const g = new Graphics();
-      if (alongX) drawBox(g, px, py - 0.02, 0, 0.1, t + 0.04, h + 0.12, PALETTE.doorFrame);
-      else drawBox(g, px - 0.02, py, 0, t + 0.04, 0.1, h + 0.12, PALETTE.doorFrame);
-      add(g, alongX ? px + 0.1 + py + t + 0.04 : px + t + 0.04 + py + 0.1);
-    };
-    if (alongX) { post(x0 + a - 0.1, y0); post(x0 + b, y0); } else { post(x0, y0 + a - 0.1); post(x0, y0 + b); }
-    // capacho
+    if (alongX) {
+      doorPost(add, x0 + a - 0.1, y0 - 0.02, 0.1, t + 0.04, h + 0.12);
+      doorPost(add, x0 + b, y0 - 0.02, 0.1, t + 0.04, h + 0.12);
+    } else {
+      doorPost(add, x0 - 0.02, y0 + a - 0.1, t + 0.04, 0.1, h + 0.12);
+      doorPost(add, x0 - 0.02, y0 + b, t + 0.04, 0.1, h + 0.12);
+    }
     const mat = alongX
       ? poly([[x0 + a + 0.1, y0 - 0.35], [x0 + b - 0.1, y0 - 0.35], [x0 + b - 0.1, y0 + t + 0.35], [x0 + a + 0.1, y0 + t + 0.35]])
       : poly([[x0 - 0.35, y0 + a + 0.1], [x0 + t + 0.35, y0 + a + 0.1], [x0 + t + 0.35, y0 + b - 0.1], [x0 - 0.35, y0 + b - 0.1]]);
@@ -49,62 +87,60 @@ export function buildSolidWall(
   }
 }
 
-/** Divisória de vidro (frente das salas): face translúcida com moldura e tampo claro. */
-export function buildGlassWall(
-  add: AddObject,
-  x0: number, y0: number, len: number, alongX: boolean, h: number,
-  doors: Array<[number, number]> = [],
-): void {
-  const t = 0.06;
-  for (let i = 0; i < len; i++) {
-    if (inDoor(i, doors)) continue;
-    const x = alongX ? x0 + i : x0;
-    const y = alongX ? y0 : y0 + i;
-    const w = alongX ? 1.02 : t;
-    const d = alongX ? t : 1.02;
-    const g = new Graphics();
-    const face = alongX
-      ? poly([[x, y + d, 0], [x + w, y + d, 0], [x + w, y + d, h], [x, y + d, h]])
-      : poly([[x + w, y, 0], [x + w, y + d, 0], [x + w, y + d, h], [x + w, y, h]]);
-    g.poly(face).fill({ color: PALETTE.glass, alpha: 0.32 });
-    // reflexo mais claro na parte de cima
-    const hi = alongX
-      ? poly([[x, y + d, h * 0.55], [x + w, y + d, h * 0.55], [x + w, y + d, h], [x, y + d, h]])
-      : poly([[x + w, y, h * 0.55], [x + w, y + d, h * 0.55], [x + w, y + d, h], [x + w, y, h]]);
-    g.poly(hi).fill({ color: 0xffffff, alpha: 0.18 });
-    g.poly(face).stroke({ width: 0.8, color: PALETTE.glassFrame, alpha: 0.7 });
-    g.poly(poly([[x, y, h], [x + w, y, h], [x + w, y + d, h], [x, y + d, h]])).fill(PALETTE.glassCap);
-    add(g, x + w + y + d);
-  }
-  for (const [a, b] of doors) {
-    const post = (px: number, py: number): void => {
-      const g = new Graphics();
-      if (alongX) drawBox(g, px, py - 0.02, 0, 0.1, t + 0.04, h + 0.1, PALETTE.doorFrame);
-      else drawBox(g, px - 0.02, py, 0, t + 0.04, 0.1, h + 0.1, PALETTE.doorFrame);
-      add(g, alongX ? px + 0.1 + py + t + 0.04 : px + t + 0.04 + py + 0.1);
-    };
-    if (alongX) { post(x0 + a - 0.1, y0); post(x0 + b, y0); } else { post(x0, y0 + a - 0.1); post(x0, y0 + b); }
-  }
+/** Lado do mundo que, nesta orientação, fica no fundo (norte/oeste rotacionado) e ganha parede sólida. */
+export function isBackSide(side: Side): boolean {
+  const r = rotatedSide(side);
+  return r === "n" || r === "w";
 }
 
-/** Constrói todas as paredes (externas + salas) e registra as arestas bloqueadas no grid. */
+/** A sala encosta na parede externa do prédio por esse lado? */
+export function touchesExterior(room: OfficeRoom, side: Side): boolean {
+  if (side === "n") return room.y === 1;
+  if (side === "w") return room.x === 1;
+  if (side === "s") return room.y + room.h === BUILDING_D - 1;
+  return room.x + room.w === BUILDING_W - 1;
+}
+
+/**
+ * Constrói as paredes externas (só nos dois lados do fundo, em corte) e as
+ * paredes das salas (sólidas no fundo, vidro na frente), tudo em coordenadas
+ * de mundo. Registra as arestas bloqueadas no grid de navegação.
+ */
 export function buildAllWalls(add: AddObject, ground: Graphics, rooms: OfficeRoom[], nav: NavGrid): void {
-  // externas: norte (y = 0.7..1) e oeste (x = 0.7..1)
-  buildSolidWall(add, ground, 0.7, 0.7, BUILDING_W, true, EXTERIOR_WALL_HEIGHT, EXTERIOR_WALL_THICKNESS);
-  buildSolidWall(add, ground, 0.7, 1.0, BUILDING_D - 1, false, EXTERIOR_WALL_HEIGHT, EXTERIOR_WALL_THICKNESS);
-  for (let x = 0; x < BUILDING_W; x++) { nav.blockCell(x, 0); }
-  for (let y = 0; y < BUILDING_D; y++) { nav.blockCell(0, y); }
+  const T = EXTERIOR_WALL_THICKNESS;
+  const H = EXTERIOR_WALL_HEIGHT;
+  const W = BUILDING_W;
+  const D = BUILDING_D;
+  // paredes externas nos lados de fundo desta orientação
+  if (isBackSide("n")) buildRun(add, ground, { x0: 0.7, y0: 1 - T, len: W, alongX: true, t: T, doors: [], kind: "solid", h: H });
+  if (isBackSide("s")) buildRun(add, ground, { x0: 0.7, y0: D - 1, len: W, alongX: true, t: T, doors: [], kind: "solid", h: H });
+  if (isBackSide("w")) buildRun(add, ground, { x0: 1 - T, y0: 1, len: D - 1, alongX: false, t: T, doors: [], kind: "solid", h: H });
+  if (isBackSide("e")) buildRun(add, ground, { x0: W - 1, y0: 1, len: D - 1, alongX: false, t: T, doors: [], kind: "solid", h: H });
+  for (let x = 0; x < W; x++) { nav.blockCell(x, 0); nav.blockCell(x, D - 1); }
+  for (let y = 0; y < D; y++) { nav.blockCell(0, y); nav.blockCell(W - 1, y); }
 
   for (const r of rooms) {
     const d = r.doors;
     const x1 = r.x + r.w;
     const y1 = r.y + r.h;
-    if (r.y !== 1) buildSolidWall(add, ground, r.x, r.y, r.w, true, WALL_HEIGHT, WALL_THICKNESS, d.n ? [d.n] : []);
-    if (r.x !== 1) buildSolidWall(add, ground, r.x, r.y, r.h, false, WALL_HEIGHT, WALL_THICKNESS, d.w ? [d.w] : []);
-    buildGlassWall(add, r.x, y1 - 0.06, r.w, true, GLASS_HEIGHT, d.s ? [d.s] : []);
-    buildGlassWall(add, x1 - 0.06, r.y, r.h, false, GLASS_HEIGHT, d.e ? [d.e] : []);
+    const sideRun = (side: Side): void => {
+      const back = isBackSide(side);
+      // sala encostada na parede externa deste lado: a externa já faz o papel
+      if (back && touchesExterior(r, side)) return;
+      const kind = back ? "solid" : "glass";
+      const h = back ? WALL_HEIGHT : GLASS_HEIGHT;
+      const t = back ? WALL_THICKNESS : 0.06;
+      const doors = d[side] ? [d[side]!] : [];
+      switch (side) {
+        case "n": buildRun(add, ground, { x0: r.x, y0: r.y, len: r.w, alongX: true, t, doors, kind, h }); break;
+        case "s": buildRun(add, ground, { x0: r.x, y0: y1 - t, len: r.w, alongX: true, t, doors, kind, h }); break;
+        case "w": buildRun(add, ground, { x0: r.x, y0: r.y, len: r.h, alongX: false, t, doors, kind, h }); break;
+        case "e": buildRun(add, ground, { x0: x1 - t, y0: r.y, len: r.h, alongX: false, t, doors, kind, h }); break;
+      }
+    };
+    (["n", "w", "s", "e"] as Side[]).forEach(sideRun);
 
-    // arestas bloqueadas (com passagem nas portas)
+    // arestas bloqueadas (com passagem nas portas), sempre em coordenadas de mundo
     for (let i = 0; i < r.w; i++) {
       if (!(d.n && inDoor(i, [d.n]))) nav.blockEdge(r.x + i, r.y - 1, r.x + i, r.y);
       if (!(d.s && inDoor(i, [d.s]))) nav.blockEdge(r.x + i, y1 - 1, r.x + i, y1);

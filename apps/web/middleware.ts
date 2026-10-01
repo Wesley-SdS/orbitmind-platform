@@ -8,6 +8,7 @@ const PUBLIC_ROUTES = [
   "/api/auth",
   "/api/inngest",
   "/api/quote-requests",
+  "/office-preview",
 ];
 
 export function middleware(req: NextRequest) {

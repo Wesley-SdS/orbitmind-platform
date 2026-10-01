@@ -1,8 +1,9 @@
 import { Container, Graphics } from "pixi.js";
-import { TILE_H, TILE_W, Z_UNIT, poly, toScreen } from "./projection";
+import { TILE_H, TILE_W, Z_UNIT, depthOf, faceVisible, poly, toScreen } from "./projection";
 import { PALETTE, SPINE_COLORS, STATUS_COLORS, shade } from "./palette";
 import { drawBox, drawCylinder, drawEllipseShadow, drawShadow, faceN, faceW, flat } from "./draw";
-import type { FurnitureSpec } from "@/lib/office/room-layout";
+import type { FurnitureSpec, WindowSpec } from "@/lib/office/room-layout";
+import { BUILDING_D, BUILDING_W } from "@/lib/office/room-layout";
 import type { OfficeAgentStatus } from "@/lib/office/types";
 
 export interface Layers {
@@ -39,15 +40,15 @@ export class DeskActor {
     drawBox(m, x + 1.28, y + 0.22, 0.73, 0.14, 0.14, 0.14, PALETTE.mug, { top: 0xffffff });
     this.container.addChild(m);
     this.container.addChild(this.rim);
-    this.setStatus("off");
+    this.setStatus("off", true);
   }
 
   get depth(): number {
-    return this.x + 1.6 + this.y + 0.8;
+    return depthOf(this.x, this.y, 1.6, 0.8);
   }
 
-  setStatus(status: OfficeAgentStatus | "off"): void {
-    if (status === this.status) return;
+  setStatus(status: OfficeAgentStatus | "off", force = false): void {
+    if (status === this.status && !force) return;
     this.status = status;
     this.glow.clear();
     this.rim.clear();
@@ -66,12 +67,12 @@ export function buildChair(L: Layers, x: number, y: number, color: number = PALE
   const base = new Graphics();
   const c = toScreen(x + 0.25, y + 0.25);
   base.ellipse(c.x, c.y, 0.3 * TILE_W, 0.3 * TILE_H).fill(PALETTE.dark);
-  L.add(base, x + y + 0.2);
+  L.add(base, depthOf(x, y, 0.5, 0.5, -0.8));
   const g = new Graphics();
   drawBox(g, x + 0.21, y + 0.21, 0, 0.08, 0.08, 0.42, 0x57534c);
   drawBox(g, x, y + 0.02, 0.42, 0.5, 0.48, 0.1, color);
   drawBox(g, x, y, 0.5, 0.5, 0.08, 0.5, color);
-  L.add(g, x + 0.5 + y + 0.5);
+  L.add(g, depthOf(x, y, 0.5, 0.5));
 }
 
 export function buildPlant(L: Layers, x: number, y: number, size = 1): void {
@@ -85,7 +86,7 @@ export function buildPlant(L: Layers, x: number, y: number, size = 1): void {
   g.circle(c.x + 6 * k, c.y - 12 * k, 9 * k).fill(PALETTE.leaf2);
   g.circle(c.x, c.y - 18 * k, 9 * k).fill(PALETTE.leaf3);
   g.circle(c.x - 3 * k, c.y - 20 * k, 3.5 * k).fill({ color: PALETTE.leafHi, alpha: 0.8 });
-  L.add(g, x + y + r * 2 + 0.05);
+  L.add(g, depthOf(x, y, r * 2, r * 2, 0.05));
 }
 
 export function buildBookshelf(L: Layers, x: number, y: number, alongY = true): void {
@@ -95,26 +96,30 @@ export function buildBookshelf(L: Layers, x: number, y: number, alongY = true): 
   drawShadow(L.shadows, x, y, w, d, 0.22);
   const g = new Graphics();
   drawBox(g, x, y, 0, w, d, h, PALETTE.shelf);
-  for (const lvl of [0.02, 0.58, 1.14]) {
-    const shelf = alongY
-      ? poly([[x + w, y, lvl], [x + w, y + d, lvl], [x + w, y + d, lvl + 0.05], [x + w, y, lvl + 0.05]])
-      : poly([[x, y + d, lvl], [x + w, y + d, lvl], [x + w, y + d, lvl + 0.05], [x, y + d, lvl + 0.05]]);
-    g.poly(shelf).fill(PALETTE.shelfPlank);
-    let a = 0.1;
-    let i = 0;
-    const span = alongY ? d : w;
-    while (a < span - 0.2) {
-      const bw = 0.11 + (i % 3) * 0.03;
-      const bh = 0.34 + (i % 2) * 0.08;
-      const q = alongY
-        ? poly([[x + w, y + a, lvl + 0.05], [x + w, y + a + bw, lvl + 0.05], [x + w, y + a + bw, lvl + 0.05 + bh], [x + w, y + a, lvl + 0.05 + bh]])
-        : poly([[x + a, y + d, lvl + 0.05], [x + a + bw, y + d, lvl + 0.05], [x + a + bw, y + d, lvl + 0.05 + bh], [x + a, y + d, lvl + 0.05 + bh]]);
-      g.poly(q).fill(SPINE_COLORS[(i + Math.round(lvl * 10)) % SPINE_COLORS.length]!);
-      a += bw + 0.03;
-      i++;
+  // prateleiras e lombadas na face voltada para dentro da sala (+x quando encostada na parede oeste)
+  const facePlus = alongY ? faceVisible(1, 0) : faceVisible(0, 1);
+  if (facePlus) {
+    for (const lvl of [0.02, 0.58, 1.14]) {
+      const shelf = alongY
+        ? poly([[x + w, y, lvl], [x + w, y + d, lvl], [x + w, y + d, lvl + 0.05], [x + w, y, lvl + 0.05]])
+        : poly([[x, y + d, lvl], [x + w, y + d, lvl], [x + w, y + d, lvl + 0.05], [x, y + d, lvl + 0.05]]);
+      g.poly(shelf).fill(PALETTE.shelfPlank);
+      let a = 0.1;
+      let i = 0;
+      const span = alongY ? d : w;
+      while (a < span - 0.2) {
+        const bw = 0.11 + (i % 3) * 0.03;
+        const bh = 0.34 + (i % 2) * 0.08;
+        const q = alongY
+          ? poly([[x + w, y + a, lvl + 0.05], [x + w, y + a + bw, lvl + 0.05], [x + w, y + a + bw, lvl + 0.05 + bh], [x + w, y + a, lvl + 0.05 + bh]])
+          : poly([[x + a, y + d, lvl + 0.05], [x + a + bw, y + d, lvl + 0.05], [x + a + bw, y + d, lvl + 0.05 + bh], [x + a, y + d, lvl + 0.05 + bh]]);
+        g.poly(q).fill(SPINE_COLORS[(i + Math.round(lvl * 10)) % SPINE_COLORS.length]!);
+        a += bw + 0.03;
+        i++;
+      }
     }
   }
-  L.add(g, x + w + y + d + 0.01);
+  L.add(g, depthOf(x, y, w, d, 0.01));
 }
 
 export function buildSofa(L: Layers, x: number, y: number, w = 1.8, color: number = PALETTE.sofa): void {
@@ -131,14 +136,14 @@ export function buildSofa(L: Layers, x: number, y: number, w = 1.8, color: numbe
     const b = toScreen(u, y + 0.85, 0.42);
     g.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width: 1, color: shade(color, 0.75) });
   }
-  L.add(g, x + w + y + 0.86);
+  L.add(g, depthOf(x, y, w, 0.86));
 }
 
 export function buildCounter(L: Layers, x: number, y: number, w: number, d: number, h: number, color: number = PALETTE.dark): void {
   drawShadow(L.shadows, x, y, w, d, 0.24);
   const g = new Graphics();
   drawBox(g, x, y, 0, w, d, h, color, { top: PALETTE.woodTop });
-  L.add(g, x + w + y + d);
+  L.add(g, depthOf(x, y, w, d));
 }
 
 export function buildCoffeeMachine(L: Layers, x: number, y: number, z: number): void {
@@ -150,7 +155,7 @@ export function buildCoffeeMachine(L: Layers, x: number, y: number, z: number): 
   drawBox(g, x + 0.5, y + 0.05, z, 0.14, 0.14, 0.14, PALETTE.ghost);
   drawBox(g, x + 0.68, y + 0.05, z, 0.14, 0.14, 0.14, PALETTE.ghost);
   drawBox(g, x + 0.5, y + 0.22, z, 0.14, 0.14, 0.14, PALETTE.ghost);
-  L.add(g, x + y + 0.8);
+  L.add(g, depthOf(x, y, 0.82, 0.36, 0.06));
 }
 
 export function buildWaterCooler(L: Layers, x: number, y: number): void {
@@ -158,7 +163,7 @@ export function buildWaterCooler(L: Layers, x: number, y: number): void {
   const g = new Graphics();
   drawBox(g, x, y, 0, 0.36, 0.36, 0.95, PALETTE.cooler);
   drawCylinder(g, x + 0.18, y + 0.18, 0.95, 0.15, 0.42, PALETTE.waterBottle, PALETTE.waterBottleTop);
-  L.add(g, x + 0.36 + y + 0.36 + 0.3);
+  L.add(g, depthOf(x, y, 0.36, 0.36, 0.3));
 }
 
 export function buildPrinter(L: Layers, x: number, y: number): void {
@@ -167,7 +172,7 @@ export function buildPrinter(L: Layers, x: number, y: number): void {
   drawBox(g, x, y, 0, 0.75, 0.6, 0.42, PALETTE.printer);
   drawBox(g, x + 0.12, y + 0.1, 0.42, 0.5, 0.35, 0.1, PALETTE.printerDark);
   drawBox(g, x + 0.08, y + 0.44, 0.42, 0.6, 0.03, 0.03, 0x2f6fd6);
-  L.add(g, x + 0.75 + y + 0.6);
+  L.add(g, depthOf(x, y, 0.75, 0.6));
 }
 
 export function buildPackages(L: Layers, x: number, y: number): void {
@@ -178,23 +183,25 @@ export function buildPackages(L: Layers, x: number, y: number): void {
   const a = toScreen(x + 0.35, y + 0.7, 0);
   const b = toScreen(x + 0.35, y + 0.7, 0.5);
   g.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width: 1.5, color: PALETTE.woodDark });
-  L.add(g, x + 0.7 + y + 0.7 + 0.2);
+  L.add(g, depthOf(x, y, 0.7, 0.7, 0.2));
 }
 
 export function buildCabinet(L: Layers, x: number, y: number): void {
   drawShadow(L.shadows, x, y, 0.5, 1.2, 0.2);
   const g = new Graphics();
   drawBox(g, x, y, 0, 0.5, 1.2, 1.3, PALETTE.cabinet);
-  for (const lv of [0.35, 0.7, 1.05]) {
-    const a = toScreen(x + 0.5, y + 0.05, lv);
-    const b = toScreen(x + 0.5, y + 1.15, lv);
-    g.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width: 1, color: PALETTE.cabinetLine });
+  if (faceVisible(1, 0)) {
+    for (const lv of [0.35, 0.7, 1.05]) {
+      const a = toScreen(x + 0.5, y + 0.05, lv);
+      const b = toScreen(x + 0.5, y + 1.15, lv);
+      g.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width: 1, color: PALETTE.cabinetLine });
+    }
+    const colors = [0x2f6fd6, 0xf2541b, 0x2e8b57, 0x8f8c84];
+    for (let i = 0; i < 4; i++) {
+      g.poly(poly([[x + 0.5, y + 0.15 + i * 0.26, 0.1], [x + 0.5, y + 0.33 + i * 0.26, 0.1], [x + 0.5, y + 0.33 + i * 0.26, 0.28], [x + 0.5, y + 0.15 + i * 0.26, 0.28]])).fill(colors[i]!);
+    }
   }
-  const colors = [0x2f6fd6, 0xf2541b, 0x2e8b57, 0x8f8c84];
-  for (let i = 0; i < 4; i++) {
-    g.poly(poly([[x + 0.5, y + 0.15 + i * 0.26, 0.1], [x + 0.5, y + 0.33 + i * 0.26, 0.1], [x + 0.5, y + 0.33 + i * 0.26, 0.28], [x + 0.5, y + 0.15 + i * 0.26, 0.28]])).fill(colors[i]!);
-  }
-  L.add(g, x + 0.5 + y + 1.2 + 0.02);
+  L.add(g, depthOf(x, y, 0.5, 1.2, 0.02));
 }
 
 export function buildLamp(L: Layers, x: number, y: number): void {
@@ -204,7 +211,7 @@ export function buildLamp(L: Layers, x: number, y: number): void {
   const g = new Graphics();
   drawBox(g, x + 0.06, y + 0.06, 0, 0.08, 0.08, 1.5, PALETTE.dark);
   drawCylinder(g, x + 0.1, y + 0.1, 1.5, 0.26, 0.3, PALETTE.lampShade, PALETTE.lampShadeTop);
-  L.add(g, x + y + 0.2 + 0.4);
+  L.add(g, depthOf(x, y, 0.2, 0.2, 0.4));
 }
 
 export function buildMeetingTable(L: Layers, x: number, y: number, r: number): void {
@@ -212,7 +219,7 @@ export function buildMeetingTable(L: Layers, x: number, y: number, r: number): v
   const g = new Graphics();
   drawCylinder(g, x, y, 0, 0.12, 0.72, PALETTE.dark, 0x57534c);
   drawCylinder(g, x, y, 0.72, r, 0.08, PALETTE.wood, PALETTE.woodTop);
-  L.add(g, x + y + r * 2 + 0.6);
+  L.add(g, depthOf(x - r, y - r, r * 2, r * 2, 0.6));
 }
 
 export function buildCoffeeTable(L: Layers, x: number, y: number): void {
@@ -220,7 +227,7 @@ export function buildCoffeeTable(L: Layers, x: number, y: number): void {
   const g = new Graphics();
   drawBox(g, x, y, 0, 0.9, 0.55, 0.32, 0x4a3a2c, { top: 0x6b5541 });
   drawBox(g, x + 0.3, y + 0.15, 0.32, 0.14, 0.14, 0.12, PALETTE.ghost);
-  L.add(g, x + 0.9 + y + 0.55);
+  L.add(g, depthOf(x, y, 0.9, 0.55));
 }
 
 interface Stroke { pts: Array<[number, number]>; color: number; w?: number; fill?: boolean }
@@ -255,7 +262,9 @@ const BOARD_STROKES: Record<"chart" | "mood" | "check" | "calendar" | "plan", St
   ],
 };
 
+/** Quadro na face +y de uma parede (norte da sala). Só aparece quando essa face está voltada para a câmera. */
 export function buildWhiteboard(L: Layers, x: number, yf: number, len: number, z: number, h: number, variant: keyof typeof BOARD_STROKES): void {
+  if (!faceVisible(0, 1)) return;
   const F = faceN(yf);
   const g = new Graphics();
   g.poly(flat([F(x, z), F(x + len, z), F(x + len, z + h), F(x, z + h)])).fill(PALETTE.whiteboard).stroke({ width: 1.2, color: PALETTE.whiteboardFrame, join: "round" });
@@ -265,32 +274,48 @@ export function buildWhiteboard(L: Layers, x: number, yf: number, len: number, z
     if (st.fill) g.fill(st.color);
     else g.stroke({ width: st.w ?? 1.6, color: st.color, cap: "round", join: "round" });
   }
-  L.add(g, x + len + yf + 0.3);
+  L.add(g, depthOf(x, yf, len, 0.05, 0.3));
 }
 
-export function buildWindow(L: Layers, x: number, f: number, len: number, z: number, h: number, alongX: boolean): void {
-  const F = alongX ? faceN(f) : faceW(f);
-  const g = new Graphics();
-  // vidro em três faixas (céu mais claro em cima)
-  const bands: Array<[number, number, number]> = [[0, 0.45, PALETTE.window3], [0.45, 0.75, PALETTE.window2], [0.75, 1, PALETTE.window1]];
-  for (const [a, b, color] of bands) {
-    g.poly(flat([F(x, z + h * a), F(x + len, z + h * a), F(x + len, z + h * b), F(x, z + h * b)])).fill(color);
+/** Janelas das fachadas: só as das duas paredes de fundo desta orientação. A luz delas mancha o chão. */
+export function buildWindows(L: Layers, specs: WindowSpec[]): void {
+  for (const s of specs) {
+    const z = s.z ?? 0.95;
+    const h = s.h ?? 0.95;
+    // normal da face interna da parede externa (aponta para dentro do prédio)
+    const normal: [number, number] = s.side === "n" ? [0, 1] : s.side === "s" ? [0, -1] : s.side === "w" ? [1, 0] : [-1, 0];
+    if (!faceVisible(normal[0], normal[1])) continue;
+    const alongX = s.side === "n" || s.side === "s";
+    const plane = s.side === "n" ? 1.0 : s.side === "s" ? BUILDING_D - 1.0 : s.side === "w" ? 1.0 : BUILDING_W - 1.0;
+    const F = alongX ? faceN(plane) : faceW(plane);
+    const g = new Graphics();
+    const bands: Array<[number, number, number]> = [[0, 0.45, PALETTE.window3], [0.45, 0.75, PALETTE.window2], [0.75, 1, PALETTE.window1]];
+    for (const [a, b, color] of bands) {
+      g.poly(flat([F(s.from, z + h * a), F(s.from + s.len, z + h * a), F(s.from + s.len, z + h * b), F(s.from, z + h * b)])).fill(color);
+    }
+    g.poly(flat([F(s.from, z), F(s.from + s.len, z), F(s.from + s.len, z + h), F(s.from, z + h)])).stroke({ width: 1.5, color: PALETTE.windowFrame });
+    const m1 = F(s.from + s.len / 2, z);
+    const m2 = F(s.from + s.len / 2, z + h);
+    const m3 = F(s.from, z + h * 0.55);
+    const m4 = F(s.from + s.len, z + h * 0.55);
+    g.moveTo(m1.x, m1.y).lineTo(m2.x, m2.y).moveTo(m3.x, m3.y).lineTo(m4.x, m4.y).stroke({ width: 1.2, color: PALETTE.windowFrame });
+    // footprint da janela para a ordenação
+    if (alongX) L.add(g, depthOf(s.from, plane - 0.05, s.len, 0.1, 0.2));
+    else L.add(g, depthOf(plane - 0.05, s.from, 0.1, s.len, 0.2));
+    // luz no chão, para dentro do prédio
+    const [nx, ny] = normal;
+    const near = 0.3;
+    const far = 2.4;
+    const spread = 1.0;
+    const patch = alongX
+      ? poly([[s.from + 0.4, plane + ny * near], [s.from + s.len + 0.4, plane + ny * near], [s.from + s.len + 0.4 + spread, plane + ny * far], [s.from + 0.4 - spread * 0, plane + ny * far]])
+      : poly([[plane + nx * near, s.from + 0.4], [plane + nx * near, s.from + s.len + 0.4], [plane + nx * far, s.from + s.len + 0.4 + spread], [plane + nx * far, s.from + 0.4]]);
+    L.lights.poly(patch).fill({ color: 0xffffff, alpha: 0.16 });
   }
-  g.poly(flat([F(x, z), F(x + len, z), F(x + len, z + h), F(x, z + h)])).stroke({ width: 1.5, color: PALETTE.windowFrame });
-  const m1 = F(x + len / 2, z);
-  const m2 = F(x + len / 2, z + h);
-  const m3 = F(x, z + h * 0.55);
-  const m4 = F(x + len, z + h * 0.55);
-  g.moveTo(m1.x, m1.y).lineTo(m2.x, m2.y).moveTo(m3.x, m3.y).lineTo(m4.x, m4.y).stroke({ width: 1.2, color: PALETTE.windowFrame });
-  L.add(g, x + len + f + 0.2);
-  // luz no chão
-  const patch = alongX
-    ? poly([[x + 0.4, f + 0.3], [x + len + 0.4, f + 0.3], [x + len + 1.4, f + 2.4], [x + 0.4, f + 2.4]])
-    : poly([[f + 0.3, x + 0.4], [f + 0.3, x + len + 0.4], [f + 2.4, x + len + 1.4], [f + 2.4, x + 0.4]]);
-  L.lights.poly(patch).fill({ color: 0xffffff, alpha: 0.16 });
 }
 
 export function buildWallScreen(L: Layers, x: number, yf: number, len: number, z: number, h: number): void {
+  if (!faceVisible(0, 1)) return;
   const F = faceN(yf);
   const g = new Graphics();
   g.poly(flat([F(x, z), F(x + len, z), F(x + len, z + h), F(x, z + h)])).fill(PALETTE.screenDark).stroke({ width: 1.5, color: PALETTE.screenFrame });
@@ -301,10 +326,13 @@ export function buildWallScreen(L: Layers, x: number, yf: number, len: number, z
     g.poly(flat([F(x + u0 * len, z + 0.12 * h), F(x + u1 * len, z + 0.12 * h), F(x + u1 * len, z + (0.12 + v * 0.75) * h), F(x + u0 * len, z + (0.12 + v * 0.75) * h)])).fill(c);
   });
   g.poly(flat([F(x + 0.06 * len, z + 0.92 * h), F(x + 0.5 * len, z + 0.92 * h), F(x + 0.5 * len, z + 0.86 * h), F(x + 0.06 * len, z + 0.86 * h)])).fill({ color: PALETTE.ghost, alpha: 0.6 });
-  L.add(g, x + len + yf + 0.3);
+  L.add(g, depthOf(x, yf, len, 0.05, 0.3));
 }
 
-export function buildOrbitMark(L: Layers, x: number, yf: number, z: number, r: number): void {
+/** Marca OrbitMind numa face de parede (`side` diz para onde a face aponta: "n" = face +y, "s" = face −y). */
+export function buildOrbitMark(L: Layers, x: number, yf: number, z: number, r: number, side: "n" | "s" = "n"): void {
+  const ny = side === "n" ? 1 : -1;
+  if (!faceVisible(0, ny)) return;
   const F = faceN(yf);
   const g = new Graphics();
   const circle: number[] = [];
@@ -325,7 +353,7 @@ export function buildOrbitMark(L: Layers, x: number, yf: number, z: number, r: n
   g.poly(flat(ring), false).stroke({ width: 1.6, color: PALETTE.ghost });
   const dot = F(x + r * 0.78, z + r * 0.42);
   g.circle(dot.x, dot.y, 2.2).fill(PALETTE.ghost);
-  L.add(g, x + yf + 0.5);
+  L.add(g, depthOf(x - r, yf - 0.05, r * 2, 0.1, 0.5));
 }
 
 /** Constrói uma peça a partir da especificação da planta. */
@@ -335,7 +363,7 @@ export function buildFurniture(L: Layers, f: FurnitureSpec): void {
     case "plant": buildPlant(L, f.x, f.y, f.size); break;
     case "bookshelf": buildBookshelf(L, f.x, f.y, f.alongY ?? true); break;
     case "sofa": buildSofa(L, f.x, f.y, f.w); break;
-    case "rug": break; // desenhado na camada de chão pelo scene
+    case "rug": break; // desenhado na camada de chão pela cena
     case "counter": buildCounter(L, f.x, f.y, f.w, f.d, f.h, f.color); break;
     case "coffee": buildCoffeeMachine(L, f.x, f.y, f.z); break;
     case "cooler": buildWaterCooler(L, f.x, f.y); break;
@@ -346,9 +374,8 @@ export function buildFurniture(L: Layers, f: FurnitureSpec): void {
     case "table": buildMeetingTable(L, f.x, f.y, f.r); break;
     case "coffeeTable": buildCoffeeTable(L, f.x, f.y); break;
     case "whiteboard": buildWhiteboard(L, f.x, f.yf, f.len, f.z, f.h, f.variant); break;
-    case "window": buildWindow(L, f.x, f.f, f.len, f.z, f.h, f.alongX); break;
     case "screen": buildWallScreen(L, f.x, f.yf, f.len, f.z, f.h); break;
-    case "orbitMark": buildOrbitMark(L, f.x, f.yf, f.z, f.r); break;
+    case "orbitMark": buildOrbitMark(L, f.x, f.yf, f.z, f.r, f.side); break;
   }
 }
 
