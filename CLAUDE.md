@@ -16,6 +16,8 @@ OrbitMind é uma plataforma de orquestração de squads de agentes IA. Permite q
 
 Todo trabalho de produto segue [docs/prds/orbitmind-prd-v2.md](docs/prds/orbitmind-prd-v2.md). Antes de começar, leia a seção 0 (protocolo): pegue o próximo item do marco atual, marque *Implementado* e *Testado* só com evidência (PR e arquivo de teste) e registre a sessão no Log de sessões.
 
+A **ordem de execução**, as regras de trabalho (sem stub, sem parcial) e as armadilhas do ambiente estão em [docs/prds/orbitmind-prd-v2-execucao.md](docs/prds/orbitmind-prd-v2-execucao.md). Siga os passos de lá na ordem.
+
 ---
 
 ## Stack
