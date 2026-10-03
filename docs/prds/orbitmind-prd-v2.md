@@ -101,6 +101,7 @@ Ela também tem lacunas que vamos superar:
 | **D-11** | `squad.yaml` continua existindo como **formato de import/export**, normalizado com `.transform` snake→camel no Zod. O pipeline linear legado é migrado para DAG. | Compatibilidade com templates e com o OpenSquad. | Abandonar o YAML. |
 | **D-12** | i18n com **next-intl** (pt-BR default, en, es). | Já instalado; locales existem. | — |
 | **D-13** | Armazenamento de arquivos **S3-compatível** (MinIO no docker local, R2/S3 em produção). | Anexos do chat, imagens de checkpoint, assets de skills. | Base64 no banco. |
+| **D-14** | Email transacional via **Resend SDK** (`RESEND_API_KEY`, `EMAIL_FROM`), módulo único `lib/email.ts`, transport mockado nos testes. Decidida em 2026-10-03. | RUN-06, SEC-15, HITL-05, HITL-07, UI-03 e UI-15 mandam email e nenhuma decisão cobria o provedor. | Nodemailer + SMTP. |
 
 ### 3.1 Arquitetura alvo
 
@@ -180,6 +181,8 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
   - [ ] Testado — Unit: env sem `DATABASE_URL` lança erro com mensagem clara; grep de `process.env.` fora de `env.ts` retorna vazio (regra de lint).
 - [ ] **FND-07** Implementado — Regra de lint/CI que proíbe `void (async` e `.catch(` solto em `app/api/**` e em Server Actions (execução fire-and-forget).
   - [ ] Testado — Um arquivo de exemplo com fire-and-forget faz o lint falhar.
+- [ ] **FND-08** Implementado — ESLint 9 (flat config) instalado e configurado em todos os pacotes (`typescript-eslint` + regras do Next); `pnpm lint` roda de verdade na raiz. Hoje não há ESLint instalado nem configurado, e o "lint verde" exigido pela seção 0 não existe.
+  - [ ] Testado — `pnpm lint` verde na raiz; um erro proposital num arquivo de cada pacote faz o lint falhar (registrado no log).
 
 ### DB — Banco e queries
 
@@ -439,6 +442,8 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
   - [ ] Testado — Integração: os valores batem com o seed controlado.
 - [ ] **OBS-11** Implementado — Resumo humanizado da run (LLM barato, sob demanda, cacheado) na página de run.
   - [ ] Testado — Unit com adapter mock: gera 1× e reutiliza o cache.
+- [ ] **OBS-12** Implementado — Aposentar o WebSocket (D-03): remover `ws`, `server.ts`, `/api/ws-token`, `wsManager` e `use-squad-socket`; `pnpm dev`/`pnpm start` voltam a ser Next + worker. (dep: OBS-07)
+  - [ ] Testado — grep sem referências a `ws`/`wsManager`/`ws-token`; o escritório e a página de run continuam ao vivo pelo SSE (e2e do OBS-04 verde).
 
 ### HITL — Aprovação humana
 
@@ -693,6 +698,8 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
 
 **Exceção de ordem:** INT-01 pode ser puxado para M2, porque PERF-10 e ARC-05 dependem dele.
 
+**Ordem efetiva (2026-10-03):** várias dependências atravessam os marcos acima (RUN-04 → ENG-06, RUN-03 → OBS-02, HITL-04 → UI-07, SQD-02 → DEV-05, RUN-12 → TRG-02, FND-07 ↔ RUN-02). A sequência de execução que respeita todas elas está em [orbitmind-prd-v2-execucao.md](orbitmind-prd-v2-execucao.md) e prevalece sobre a tabela acima. Itens novos FND-08 (entra no M0) e OBS-12 (entra no M4).
+
 ## 7. Definição de pronto (vale para todo item)
 
 - Código em PR com Summary + Test Plan citando os IDs do PRD.
@@ -721,3 +728,4 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
 | 2026-09-30 | Claude (auditoria) | — | PRD criado a partir da auditoria | O worktree `.claude/worktrees/feat-office-gather-redesign` é o redesign do escritório (PixiJS), não código órfão |
 | 2026-09-30 | Claude (escritório) | PERF-11 (parcial), SEC-02 (parcial: `pipeline-run`, `runs/[runId]`, `squads/[id]/agents` GET), HITL-03 (parcial: "Devolver para ajustes" no checkpoint) | Escritório igual às pranchas 01, 02 e 04 na branch `worktree-feat-office-gather-redesign`; `packages/engine/src/pipeline.revise.check.ts` e `apps/web/lib/office/review-parse.check.ts` passando | Falta merge da branch; validação da página real `/office` feita com build de produção |
 | 2026-10-01 | Claude (escritório) | OBS-02 (parcial: WS do escritório funcionando ponta a ponta), ENG-06 (parcial: run rejeitado grava `cancelled`, falha grava `failed`) | Tempo real verificado com build de produção + `server.ts`: PIPELINE_STARTED/CHECKPOINT_REACHED/CHECKPOINT_RESOLVED/PIPELINE_CANCELLED chegam pelo WS e o painel abre/fecha sozinho; rotação, som e caminhada conferidos por captura | `AI_GATEWAY_API_KEY` vazio no .env local impede testar etapas com agente; checkpoint ainda em memória (RUN-04) |
+| 2026-10-03 | Claude (planejamento) | — | Checklist de execução criado (`docs/prds/orbitmind-prd-v2-execucao.md`); itens novos FND-08 e OBS-12; decisão D-14 (Resend); ordem efetiva pelas dependências; perf:nav no CI só relata até o PERF-24; FND-07 anda junto com RUN-02 | Sem ESLint instalado (FND-08 vem primeiro); `Adalink-Agents-Pipeline/apps/web` vazio no disco (ler via `git show`) |
