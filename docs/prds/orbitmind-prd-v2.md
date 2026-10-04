@@ -93,7 +93,7 @@ Ela também tem lacunas que vamos superar:
 | **D-03** | Tempo real via **SSE** (route handler) + **Postgres LISTEN/NOTIFY**. Aposentar `ws` e o `server.ts` quando o SSE cobrir o escritório (hoje o escritório usa o WS com token curto de `/api/ws-token` + polling de segurança, entregue na branch `worktree-feat-office-gather-redesign`). | Funciona atrás de qualquer proxy, reconecta com `Last-Event-ID` e dispensa servidor custom. | Manter o WS: exige servidor custom e não roda em serverless. |
 | **D-04** | Squad = **DAG em tabelas** (`squad_nodes`, `squad_edges`) dentro de uma **`squad_versions`**. Publicar congela a versão; runs apontam para ela. | Edição sem quebrar runs em andamento; marketplace com versão; auditoria. | Pipeline em `squads.config` jsonb (atual): sem integridade, sem versão. |
 | **D-05** | **Biblioteca de agentes da org**: `agents.org_id`, e o agente deixa de pertencer a um squad. O nó AGENT referencia o agente, e o **tier é do nó**. | O mesmo agente participa de várias squads; persona única. | Manter `agents.squad_id` NOT NULL. |
-| **D-06** | LLM via `ai` + AI Gateway (mantém). Tier LIGHT = `generateText` com tools. Tier DEEP = **Claude Agent SDK** em sandbox (E2B default, porta com provider nulo). | Já integrado; DEEP é o diferencial da esteira dev. | — |
+| **D-06** | LLM via `ai` + AI Gateway (mantém). Tier LIGHT = `generateText` com tools. Tier DEEP = **Claude Agent SDK** em **Vercel Sandbox** (`@vercel/sandbox`, o mesmo da Adalink), atrás de uma porta com provider nulo. Trocado de E2B para Vercel Sandbox em 2026-10-04. | Já integrado; DEEP é o diferencial da esteira dev. | E2B. |
 | **D-07** | Front: **RSC + Server Actions + `router.refresh()` + SSE**. Sem TanStack Query. | Alinhado ao CLAUDE.md e menos JS no cliente. | TanStack Query (Adalink): mais bundle e duplica o cache do Next. |
 | **D-08** | Testes: **Vitest** (unit + integração com Postgres real via docker) e **Playwright** (e2e + perf). | Rápido, ESM nativo, e o engine já usa. | Jest. |
 | **D-09** | Custo em **micro-USD (bigint)** calculado por `pricing.ts` a partir dos tokens, gravado por step e por run. Cost-guard compara com esse valor. | A Adalink tem cost-guard inerte porque ninguém preenchia o custo. | Créditos abstratos. |
@@ -101,6 +101,8 @@ Ela também tem lacunas que vamos superar:
 | **D-11** | `squad.yaml` continua existindo como **formato de import/export**, normalizado com `.transform` snake→camel no Zod. O pipeline linear legado é migrado para DAG. | Compatibilidade com templates e com o OpenSquad. | Abandonar o YAML. |
 | **D-12** | i18n com **next-intl** (pt-BR default, en, es). | Já instalado; locales existem. | — |
 | **D-13** | Armazenamento de arquivos **S3-compatível** (MinIO no docker local, R2/S3 em produção). | Anexos do chat, imagens de checkpoint, assets de skills. | Base64 no banco. |
+| **D-14** | Email transacional via **Resend SDK** (`RESEND_API_KEY`, `EMAIL_FROM`), módulo único `lib/email.ts`, transport mockado nos testes. Decidida em 2026-10-03. | RUN-06, SEC-15, HITL-05, HITL-07, UI-03 e UI-15 mandam email e nenhuma decisão cobria o provedor. | Nodemailer + SMTP. |
+| **D-15** | Integrações **sem Nango**: OAuth 2.0 próprio por provider (authorization code + PKCE, `state` assinado e preso à org e ao usuário) e, para os providers que aceitam, token/API key colado pela org. Credenciais cifradas no banco (SEC-12) e renovadas antes do uso quando expiradas. Cada provider premium tem um app OAuth nosso (client id/secret no env). Decidida em 2026-10-04. | Menos um serviço externo e o controle total do ciclo da credencial. | Nango; só token manual; GitHub App. |
 
 ### 3.1 Arquitetura alvo
 
@@ -117,7 +119,7 @@ Ela também tem lacunas que vamos superar:
           ┌──────────────────── PostgreSQL 16 ────────────────────────▼──┐
           │ dados de domínio · pgboss.* · LISTEN/NOTIFY run_events        │
           └───────────────────────────────────────────────────────────────┘
-                   S3 (MinIO/R2) · AI Gateway · Nango · E2B · GitHub
+                   S3 (MinIO/R2) · AI Gateway · OAuth dos providers · Vercel Sandbox · GitHub
 ```
 
 ### 3.2 Onde superamos a Adalink
@@ -142,6 +144,7 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
 | **`squad_nodes`** | id, version_id, **key** (alias estável), type (enum dos 10), label, position_x/y, agent_id?, tier (light\|deep)?, instructions, config jsonb, checkpoint bool |
 | **`squad_edges`** | id, version_id, source_node_id, target_node_id, source_handle, label, condition jsonb |
 | `agents` | id, **org_id**, name, role, icon, **persona_color, persona_trait, persona_register**, model_tier, monthly_budget_tokens, budget_used_tokens, status, config. **`squad_id` removido.** |
+| `org_integrations` | + **auth_type (oauth\|token)**, **credentials_encrypted** (`v1:`), **scopes**, **token_expires_at**, **last_verified_at**, **connected_by**. Colunas do Nango (`connection_id`, `provider_config_key`) **removidas** (D-15). |
 | **`agent_connector_grants`** | agent_id, integration_id, access_level (none\|read\|read_write), approval_policy (never\|always_side_effects) |
 | `pipeline_runs` → **`runs`** | id (uuid), org_id, squad_id, **version_id**, status (pending\|running\|paused\|completed\|failed\|cancelled), **trigger_type**, **input**, **output**, **error**, **control_signal**, **pause_reason (manual\|checkpoint)**, **paused_at_node_id**, **checkpoint jsonb**, **cost_micros**, **tokens**, **steps_executed**, **last_heartbeat_at**, **is_dry_run**, started_at, completed_at, **approval_expires_at** |
 | `executions` → **`run_steps`** | id, run_id, node_id, agent_id?, status, input, output, tokens, cost_micros, model, started_at, completed_at, error |
@@ -176,10 +179,12 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
   - [ ] Testado — Um PR de teste mostra todos os jobs verdes; um PR com erro de tipo falha.
 - [ ] **FND-05** Implementado — `pnpm perf:nav`: Playwright contra `next build && next start` que navega por todas as rotas do dashboard pela sidebar, mede o tempo até um `data-ready` da página e falha acima do orçamento de O1. Roda no CI. (dep: FND-03)
   - [ ] Testado — O relatório lista todas as rotas com tempo; forçar um `sleep` numa página faz o script falhar.
-- [ ] **FND-06** Implementado — `lib/env.ts` valida env com Zod no boot (web e worker). Um único `.env.example` completo na raiz, documentando todas as variáveis realmente lidas (incluindo `NANGO_SECRET_KEY`, `ENCRYPTION_KEY`, `AI_GATEWAY_*`, `S3_*`, `E2B_API_KEY`) e removendo as não usadas (GitLab, Discord, Telegram).
+- [ ] **FND-06** Implementado — `lib/env.ts` valida env com Zod no boot (web e worker). Um único `.env.example` completo na raiz, documentando todas as variáveis realmente lidas (incluindo `ENCRYPTION_KEY`, `AI_GATEWAY_*`, `S3_*`, `RESEND_API_KEY`, `VERCEL_SANDBOX_TOKEN`/`VERCEL_TEAM_ID`/`VERCEL_PROJECT_ID` e os client id/secret OAuth de cada provider premium) e removendo as não usadas (GitLab, Discord, Telegram).
   - [ ] Testado — Unit: env sem `DATABASE_URL` lança erro com mensagem clara; grep de `process.env.` fora de `env.ts` retorna vazio (regra de lint).
 - [ ] **FND-07** Implementado — Regra de lint/CI que proíbe `void (async` e `.catch(` solto em `app/api/**` e em Server Actions (execução fire-and-forget).
   - [ ] Testado — Um arquivo de exemplo com fire-and-forget faz o lint falhar.
+- [ ] **FND-08** Implementado — ESLint 9 (flat config) instalado e configurado em todos os pacotes (`typescript-eslint` + regras do Next); `pnpm lint` roda de verdade na raiz. Hoje não há ESLint instalado nem configurado, e o "lint verde" exigido pela seção 0 não existe.
+  - [ ] Testado — `pnpm lint` verde na raiz; um erro proposital num arquivo de cada pacote faz o lint falhar (registrado no log).
 
 ### DB — Banco e queries
 
@@ -229,12 +234,12 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
   - [ ] Testado — Unit: assinatura válida → 200; inválida ou ausente → 401; corpo com `orbitmind_org_id` falso é ignorado.
 - [ ] **SEC-07** Implementado — `safeFetch()` em `packages/engine`: só http(s); bloqueia IPs privados, loopback, link-local e metadata (checagem após DNS e em cada redirect); timeout de 15 s; limite de 5 MB. Usado por `web_fetch`, `ImageFetcher`, download de imagem do LinkedIn e Sherlock.
   - [ ] Testado — Unit: `http://169.254.169.254`, `http://localhost`, `http://10.0.0.1` e um redirect para IP privado são bloqueados; URL pública passa.
-- [ ] **SEC-08** Implementado — `images.remotePatterns` restrito aos hosts usados de fato (avatar do GitHub, logos do Nango, bucket S3).
+- [ ] **SEC-08** Implementado — `images.remotePatterns` restrito aos hosts usados de fato (avatar do GitHub, bucket S3; logos de integração servidos localmente).
   - [ ] Testado — `/_next/image?url=https://evil.com/x.png` → 400.
 - [ ] **SEC-09** Implementado — Remover `simpleMarkdown` + `dangerouslySetInnerHTML` (`pipeline-chat.tsx`, `checkpoint-review.tsx`) e usar o renderer de markdown seguro compartilhado (react-markdown sem HTML cru, `urlTransform` que bloqueia `javascript:`).
   - [ ] Testado — Unit: output com `<img src=x onerror=alert(1)>` e `[x](javascript:alert(1))` renderiza inerte.
-- [ ] **SEC-10** Implementado — `/api/integrations/[id]/test`: sem fallback que lista conexões do ambiente Nango; nenhum `console.log` de credencial.
-  - [ ] Testado — Unit/integração: integração sem `connectionId` → erro claro; grep por log de token no arquivo vazio.
+- [ ] **SEC-10** Implementado — `/api/integrations/[id]/test`: verifica a conexão no provider usando **só** a credencial da própria integração (sem fallback para outra credencial ou outra org); nenhum `console.log` de credencial.
+  - [ ] Testado — Unit/integração: integração sem credencial → erro claro; credencial revogada no provider → falha reportada; grep por log de token no arquivo vazio.
 - [ ] **SEC-11** Implementado — `callbackUrl` do login aceita só path relativo iniciado por `/` (sem `//`).
   - [ ] Testado — e2e: `/login?callbackUrl=https://evil.com` redireciona para `/dashboard`.
 - [ ] **SEC-12** Implementado — `ENCRYPTION_KEY` dedicada (32 bytes, base64) com salt/IV aleatório por registro (AES-256-GCM, formato versionado `v1:`). Script `pnpm secrets:migrate` recifra os dados antigos derivados do `NEXTAUTH_SECRET`.
@@ -247,7 +252,7 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
   - [ ] Testado — Integração: a 6ª requisição em 10 min → 429 mesmo após restart; lead gera email (transport mockado).
 - [ ] **SEC-16** Implementado — Tokens de Apify e Instagram enviados por header quando a API aceitar; nunca logados.
   - [ ] Testado — Unit das skills: a URL montada não contém o token.
-- [ ] **SEC-17** Implementado — Integração só fica `active` após confirmação do servidor (callback/webhook do Nango ou verificação da conexão). O PATCH manual de `status` é proibido.
+- [ ] **SEC-17** Implementado — Integração só fica `active` após confirmação do servidor (callback OAuth com troca de `code` bem-sucedida, ou token/API key verificado no provider antes de salvar). O PATCH manual de `status` é proibido.
   - [ ] Testado — Integração: PATCH `{status:'active'}` é ignorado ou recusado.
 - [ ] **SEC-18** Implementado — Audit log em ações sensíveis: squad (criar, editar, publicar, deletar), run (aprovar, rejeitar, devolver, cancelar, parada de emergência), integrações, membros, tokens de API, org.
   - [ ] Testado — Integração: cada ação gera exatamente 1 linha de audit com ator, org e alvo.
@@ -270,8 +275,8 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
   - [ ] Testado — `perf:nav` ok.
 - [ ] **PERF-08** Implementado — `/settings` no padrão, com abas via `?tab=` e dados da aba carregados no servidor. (dep: PERF-03)
   - [ ] Testado — `perf:nav` ok; trocar de aba não mostra `SectionLoader`.
-- [ ] **PERF-09** Implementado — `/integrations` no padrão. Catálogo Nango com `unstable_cache` (1 h), cache negativo de 60 s em falha, envio só de premium + contagens e genéricos paginados sob demanda, `<img loading="lazy">`. (dep: PERF-03)
-  - [ ] Testado — `perf:nav` ok com Nango fora do ar (mock); a página abre em ≤ 300 ms.
+- [ ] **PERF-09** Implementado — `/integrations` no padrão. Catálogo local e estático (D-15: sem catálogo externo de 700 providers), status das conexões da org lido no servidor, logos locais com `<img loading="lazy">`. (dep: PERF-03)
+  - [ ] Testado — `perf:nav` ok; abrir a página não faz nenhuma requisição externa.
 - [ ] **PERF-10** Implementado — `/pipeline`: listagem só com metadados; YAML e skill buscados ao abrir o editor; chamadas ao GitHub em `Promise.all` com limite de concorrência 4; `unstable_cache` por org (60 s) invalidado em toggle e trigger. (dep: INT-01)
   - [ ] Testado — Integração com GitHub mockado com latência de 200 ms e 10 workflows: listagem em < 1 s (antes: 3 + 2N seriais).
 - [ ] **PERF-11** Implementado — `/office` (escritório isométrico em PixiJS 8, design aprovado em https://claude.ai/artifact/9rexnXJsmz6XsE88aJcvNW): um único `dynamic`; dados iniciais via RSC; `import()` da cena só no navegador; qualidade adaptativa (blur de sombras e luzes reduzido em GPU fraca / `devicePixelRatio` limitado); prefetch do chunk no hover do link.
@@ -439,6 +444,8 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
   - [ ] Testado — Integração: os valores batem com o seed controlado.
 - [ ] **OBS-11** Implementado — Resumo humanizado da run (LLM barato, sob demanda, cacheado) na página de run.
   - [ ] Testado — Unit com adapter mock: gera 1× e reutiliza o cache.
+- [ ] **OBS-12** Implementado — Aposentar o WebSocket (D-03): remover `ws`, `server.ts`, `/api/ws-token`, `wsManager` e `use-squad-socket`; `pnpm dev`/`pnpm start` voltam a ser Next + worker. (dep: OBS-07)
+  - [ ] Testado — grep sem referências a `ws`/`wsManager`/`ws-token`; o escritório e a página de run continuam ao vivo pelo SSE (e2e do OBS-04 verde).
 
 ### HITL — Aprovação humana
 
@@ -467,7 +474,7 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
   - [ ] Testado — Unit: ambos ou nenhum → 422; plano aprovado → 409.
 - [ ] **ARC-04** Implementado — Custo estimado por run a partir do `pricing.ts` (tokens médios por tier e modelo) exibido no plano.
   - [ ] Testado — Unit: plano 2 light + 1 deep = valor esperado.
-- [ ] **ARC-05** Implementado — `connected` de cada conector calculado no servidor a partir de `org_integrations` ativas; botão "Conectar" inline (Nango) que recarrega o plano ao concluir. (dep: INT-01)
+- [ ] **ARC-05** Implementado — `connected` de cada conector calculado no servidor a partir de `org_integrations` ativas; botão "Conectar" inline (OAuth próprio, INT-01) que recarrega o plano ao concluir. (dep: INT-01)
   - [ ] Testado — Integração: conectar o GitHub → o plano recarregado mostra `connected: true`.
 - [ ] **ARC-06** Implementado — Aprovar: claim atômico (`UPDATE … WHERE status='draft'`) + transação que cria o squad (draft), reaproveita agentes da biblioteca por nome (case-insensitive) ou cria, monta o DAG `TRIGGER → agentes → (APPROVAL sugeridos) → END` e valida. Responde `{planId, squadId}`; corrida → 409. (dep: SQD-07, ENG-04)
   - [ ] Testado — Integração: 2 aprovações simultâneas → 1 squad; falha no meio → nada criado (rollback).
@@ -574,26 +581,34 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
 
 ### INT — Integrações
 
-- [ ] **INT-01** Implementado — Nango correto: `createConnectSession` com `allowed_integrations` = o provider clicado; o front envia `event.payload.connectionId` ao servidor; `org_integrations` grava `connection_id` + `provider_config_key`; todas as chamadas usam esses valores (**corrige `connectionId = orgId`**).
-  - [ ] Testado — Integração com Nango mockado: conectar grava o id real; a chamada de proxy usa esse id.
+- [ ] **INT-01** Implementado — Conexões próprias, sem Nango (D-15):
+  - rotas `/api/integrations/[provider]/oauth/start` e `/oauth/callback` com PKCE e `state` assinado (HMAC, expira em 10 min, preso à org e ao usuário);
+  - troca do `code` e tokens gravados cifrados em `org_integrations` (formato `v1:` do SEC-12);
+  - conexão por token/API key para os providers que aceitam, validada no provider antes de salvar;
+  - cliente `integrationFetch(integrationId, …)` que injeta a credencial da integração e renova o token expirado antes da chamada;
+  - remove `@nangohq/*`, `nango-client.ts`, o catálogo genérico e as colunas do Nango (**corrige `connectionId = orgId`**);
+  - runbook explica como criar o app OAuth de cada provider.
+
+  (dep: SEC-12)
+  - [ ] Testado — Integração com provider OAuth mockado: `state` inválido, expirado ou de outra org → 400; o callback grava o token cifrado; token expirado é renovado antes da chamada; token colado inválido é recusado; grep sem `nango`.
 - [ ] **INT-02** Implementado — Erros de integração propagam: `request()` lança `IntegrationError` tipado; a UI mostra a falha real (sem "sucesso" falso em run, toggle ou installer).
   - [ ] Testado — Unit: 401 do provider → erro com mensagem amigável; e2e: toggle com falha mostra toast de erro.
-- [ ] **INT-03** Implementado — Desconectar remove a conexão no Nango e marca `disconnected`.
-  - [ ] Testado — Integração: a chamada DELETE ao Nango ocorre.
-- [ ] **INT-04** Implementado — Catálogo honesto: premium = somente integrações implementadas de ponta a ponta (GitHub, Slack, WordPress, Instagram, LinkedIn, Google Drive — confirmar lista no PR). As demais ficam como "em breve"; as ~20 rotas inexistentes de `fetchOptions` e as 38 classes mortas são removidas ou implementadas.
+- [ ] **INT-03** Implementado — Desconectar revoga o token no provider (quando ele oferece endpoint de revogação), apaga as credenciais e marca `disconnected`.
+  - [ ] Testado — Integração: a chamada de revogação ocorre; as credenciais somem do banco.
+- [ ] **INT-04** Implementado — Catálogo honesto: premium = somente integrações implementadas de ponta a ponta, com conexão própria (INT-01) e ações funcionando (GitHub, Slack, WordPress, Instagram, LinkedIn, Google Drive — confirmar lista no PR). As demais ficam como "em breve"; as ~20 rotas inexistentes de `fetchOptions` e as 38 classes mortas são removidas ou implementadas.
   - [ ] Testado — Unit: todo `fetchOptions` aponta para uma rota existente (teste varre o catálogo); `knip` sem classes órfãs.
 - [ ] **INT-05** Implementado — Ao conectar o GitHub, oferecer registrar webhooks (TRG-04).
   - [ ] Testado — e2e com mock.
 - [ ] **INT-06** Implementado — Skills com credenciais funcionando de ponta a ponta (Instagram, LinkedIn, Canva, Blotato, Apify): configurar em Settings → teste de skill → uso em run. (dep: ENG-09, ENG-22)
   - [ ] Testado — Integração com APIs mockadas: um run com a skill `instagram-publisher` chama a API com o token configurado.
-- [ ] **INT-07** Implementado — Tela `/pipeline` (esteira GitHub) funcionando com o `connectionId` correto: listar, toggle, disparar e editar agentes do repo. (dep: INT-01, PERF-10)
+- [ ] **INT-07** Implementado — Tela `/pipeline` (esteira GitHub) funcionando com a credencial do GitHub da própria org (INT-01): listar, toggle, disparar e editar agentes do repo. (dep: INT-01, PERF-10)
   - [ ] Testado — Integração com GitHub mockado: os 4 fluxos.
 - [ ] **INT-08** Implementado — Webhooks de integração (Slack, Jira, Linear) implementados ou removidos — sem stubs vazios. Decisão registrada no PR.
   - [ ] Testado — Unit dos handlers mantidos.
 
 ### DEV — Esteira de desenvolvimento autônoma
 
-- [ ] **DEV-01** Implementado — Porta `SandboxProvider` (`create`, `exec`, `writeFile`, `readFile`, `gitClone`, `destroy`) com E2B + `NullSandboxProvider`; validações anti-injeção (repo só HTTPS, ref e dir por regex, `--` antes dos args) e token via `GIT_ASKPASS`.
+- [ ] **DEV-01** Implementado — Porta `SandboxProvider` (`create`, `exec`, `writeFile`, `readFile`, `gitClone`, `destroy`) com **Vercel Sandbox** (`@vercel/sandbox`; port de `vercel-sandbox.provider.ts` da Adalink; credenciais `VERCEL_SANDBOX_TOKEN`, `VERCEL_TEAM_ID`, `VERCEL_PROJECT_ID`) + `NullSandboxProvider`, que falha com erro claro quando nada está configurado; validações anti-injeção (repo só HTTPS, ref e dir por regex, `--` antes dos args) e token via `GIT_ASKPASS`.
   - [ ] Testado — Unit: repoUrl malicioso, ref com `;` e dir com `..` são rejeitados; o token nunca aparece nos args.
 - [ ] **DEV-02** Implementado — Tier DEEP: Claude Agent SDK no sandbox (clone, Read/Write/Edit/Bash, commit) com timeout de 15 min e uso/custo extraídos; sem sandbox configurado → erro claro (ou fallback LIGHT se configurado). (dep: DEV-01, ENG-09)
   - [ ] Testado — Integração com sandbox fake: o nó DEEP produz alterações de arquivo e custo registrado.
@@ -693,6 +708,8 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
 
 **Exceção de ordem:** INT-01 pode ser puxado para M2, porque PERF-10 e ARC-05 dependem dele.
 
+**Ordem efetiva (2026-10-03):** várias dependências atravessam os marcos acima (RUN-04 → ENG-06, RUN-03 → OBS-02, HITL-04 → UI-07, SQD-02 → DEV-05, RUN-12 → TRG-02, FND-07 ↔ RUN-02). A sequência de execução que respeita todas elas está em [orbitmind-prd-v2-execucao.md](orbitmind-prd-v2-execucao.md) e prevalece sobre a tabela acima. Itens novos FND-08 (entra no M0) e OBS-12 (entra no M4).
+
 ## 7. Definição de pronto (vale para todo item)
 
 - Código em PR com Summary + Test Plan citando os IDs do PRD.
@@ -711,7 +728,7 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
 | pg-boss com carga alta no mesmo Postgres | Pools separados (DB-03); se a fila crescer, mover o pg-boss para outro schema ou banco (troca de connection string) |
 | Custo de LLM nos testes | Adapter mock por padrão; testes com LLM real só sob a tag `@live`, fora do CI |
 | SSE atrás de proxies que fazem buffer | Header `X-Accel-Buffering: no`, heartbeat de 15 s e fallback de polling (OBS-03) |
-| E2B indisponível ou caro | Porta com provider nulo; DEEP opcional por squad |
+| Vercel Sandbox indisponível ou caro | Porta com provider nulo; DEEP opcional por squad |
 | Escopo grande demais por sessão | Itens pequenos e independentes; protocolo da seção 0 força um item por vez com evidência |
 
 ## 9. Log de sessões
@@ -721,3 +738,5 @@ Todas as PKs são UUID v4 e todo timestamp é `timestamptz`. Toda tabela de dom�
 | 2026-09-30 | Claude (auditoria) | — | PRD criado a partir da auditoria | O worktree `.claude/worktrees/feat-office-gather-redesign` é o redesign do escritório (PixiJS), não código órfão |
 | 2026-09-30 | Claude (escritório) | PERF-11 (parcial), SEC-02 (parcial: `pipeline-run`, `runs/[runId]`, `squads/[id]/agents` GET), HITL-03 (parcial: "Devolver para ajustes" no checkpoint) | Escritório igual às pranchas 01, 02 e 04 na branch `worktree-feat-office-gather-redesign`; `packages/engine/src/pipeline.revise.check.ts` e `apps/web/lib/office/review-parse.check.ts` passando | Falta merge da branch; validação da página real `/office` feita com build de produção |
 | 2026-10-01 | Claude (escritório) | OBS-02 (parcial: WS do escritório funcionando ponta a ponta), ENG-06 (parcial: run rejeitado grava `cancelled`, falha grava `failed`) | Tempo real verificado com build de produção + `server.ts`: PIPELINE_STARTED/CHECKPOINT_REACHED/CHECKPOINT_RESOLVED/PIPELINE_CANCELLED chegam pelo WS e o painel abre/fecha sozinho; rotação, som e caminhada conferidos por captura | `AI_GATEWAY_API_KEY` vazio no .env local impede testar etapas com agente; checkpoint ainda em memória (RUN-04) |
+| 2026-10-03 | Claude (planejamento) | — | Checklist de execução criado (`docs/prds/orbitmind-prd-v2-execucao.md`); itens novos FND-08 e OBS-12; decisão D-14 (Resend); ordem efetiva pelas dependências; perf:nav no CI só relata até o PERF-24; FND-07 anda junto com RUN-02 | Sem ESLint instalado (FND-08 vem primeiro); `Adalink-Agents-Pipeline/apps/web` vazio no disco (ler via `git show`) |
+| 2026-10-04 | Claude (planejamento) | D-06, D-15, FND-06, SEC-08, SEC-10, SEC-17, PERF-09, INT-01, INT-03, INT-07, ARC-05, DEV-01 | Nango removido do plano: integrações com OAuth próprio + token/API key (D-15), INT-01 passa a depender do SEC-12; Tier DEEP em Vercel Sandbox em vez de E2B (D-06) | — |
