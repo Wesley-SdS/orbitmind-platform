@@ -13,7 +13,7 @@
    - `try/catch` que engole erro, `as any`, `as unknown as X` para calar o `tsc`, `@ts-ignore`;
    - `eslint-disable` sem justificativa;
    - teste com `.skip`/`.todo`, ou teste que não falharia se o código estivesse errado.
-2. **Mock só dentro de teste**, e só onde o critério do PRD permite: adapter de LLM, Nango, GitHub, E2B e transport de email. Código de produção nunca tem caminho mock ou demo, exceto o `?demo=1` do escritório, que o próprio OBS-07 pede.
+2. **Mock só dentro de teste**, e só onde o critério do PRD permite: adapter de LLM, providers OAuth (GitHub, Slack, Google…), Vercel Sandbox e transport de email. Código de produção nunca tem caminho mock ou demo, exceto o `?demo=1` do escritório, que o próprio OBS-07 pede.
 3. **Não feche item pela metade.** Se faltar chave, decisão ou dependência, pare e pergunte ao Wesley. Nesse caso não marque o item, não entregue parte dele e não deixe o "resto para depois".
 4. **Parciais herdados viram completos.** Do HITL-03, ENG-06, OBS-02, SEC-02 e PERF-11 já existe uma parte. Ao chegar neles:
    - aproveite o que existe;
@@ -84,17 +84,20 @@ Decidido em 2026-10-03: **tudo vai para a `main`**. A `main` não tem proteção
   - uma única migration, `0000_third_red_skull.sql`, defasada: não tem `pipeline_runs` nem `quote_requests`, e a `llm_providers` está errada;
   - o banco local foi criado com `db:push`.
 - **Dependências que ainda não existem:** pg-boss, worker, Server Actions (nenhum arquivo `"use server"`), lib de email, S3/MinIO.
+- **Nango:** usado em 16 arquivos (`lib/integrations/nango-client.ts`, `generic-catalog.ts`, as rotas de `api/integrations/*`, `schema.ts`, `seed.ts`, `help/page.tsx`…) e nas dependências `@nangohq/frontend` e `@nangohq/node`. **Sai inteiro** no INT-01 (D-15).
 - **Fire-and-forget (`void (async`)** em `api/cron`, `api/squads/[squadId]/run` e `api/v1/squads/[squadId]/run`. Chat e arquiteto também disparam trabalho solto: confira com grep por `.catch(`.
 - **Uso de env:** `process.env.` aparece em 16 arquivos.
 - **Templates:** `templates/squads` tem `dev-team`, `instagram-carousel`, `marketing-agency` e `support-team`.
 - **Rotas:** 59 `route.ts` em `apps/web/app/api`. A meta-cobertura do SEC-02 precisa de um caso para cada uma.
 
-## 5. Decisões tomadas em 2026-10-03 (além das D-01 a D-13)
+## 5. Decisões tomadas em 2026-10-03 e 2026-10-04 (além das D-01 a D-13)
 
 | Decisão | Efeito |
 |---|---|
 | **Ordem pelas dependências reais** | Os marcos M2 a M4 se entrelaçam conforme a §7. A mudança fica registrada no Log do PRD. |
 | **D-14: email via Resend SDK** | Variáveis `RESEND_API_KEY` e `EMAIL_FROM`, módulo único `lib/email.ts`, transport mockado nos testes. Sem a chave, o envio falha com erro claro (sem log falso de sucesso). Usado por RUN-06, SEC-15, HITL-05, HITL-07, UI-03 e UI-15. |
+| **D-15: sem Nango** | Integrações com OAuth 2.0 próprio por provider (PKCE, `state` assinado e preso à org e ao usuário) e token/API key para quem aceita. Credenciais cifradas pelo SEC-12 e renovadas antes do uso. Por isso o **SEC-12 sobe para antes do INT-01** (passo 1.6). O catálogo vira local e estático (PERF-09). |
+| **D-06 revisada: Vercel Sandbox** | O Tier DEEP roda no Vercel Sandbox (`@vercel/sandbox`), como na Adalink. Porte `vercel-sandbox.provider.ts` e `null-sandbox.provider.ts`; **não** porte o `e2b-sandbox.provider.ts` nem o fallback entre providers da `sandbox-provider.factory.ts`. |
 | **perf:nav no CI só relata até o PERF-24** | O job do FND-05 roda em todo PR e publica o relatório, mas só reprova o CI a partir do PERF-24. O script em si falha de verdade acima do orçamento (é o teste do FND-05). |
 | **FND-07 anda com o RUN-02** | A regra de lint contra fire-and-forget só fica verde quando o RUN-02 tira o trabalho das rotas. Implementar os dois juntos evita uma allowlist temporária. |
 | **Itens novos** | **FND-08:** ESLint em todos os pacotes. **OBS-12:** aposentar `ws`, `server.ts` e `/api/ws-token` depois do OBS-07 (D-03). Os dois já estão no PRD. |
@@ -104,10 +107,10 @@ Decidido em 2026-10-03: **tudo vai para a `main`**. A `main` não tem proteção
 | Precisa de | Para | Quando pedir |
 |---|---|---|
 | `AI_GATEWAY_API_KEY` | Validação manual de run com agente real (ENG-09 em diante; OBS-07; ARC-02; DB-07 "roda até o fim"). Os testes automatizados usam o adapter mock. | Início do passo 3.9 |
-| `NANGO_SECRET_KEY` / `NANGO_PUBLIC_KEY` | Validação manual do INT-01 e do SEC-17 com o Nango real | Início do passo 1.9 |
-| GitHub OAuth App (`GITHUB_CLIENT_ID/SECRET`) | Validação manual do SEC-13 | Passo 3.15 |
+| GitHub OAuth App (`GITHUB_CLIENT_ID/SECRET`) com callback local | Validação manual do INT-01 (conectar o GitHub, `/pipeline`) e do SEC-13 (login). Um app só serve aos dois: o login pede escopos mínimos e a conexão pede `repo` e `admin:repo_hook`. | Início do passo 1.6 |
+| Apps OAuth de Slack, Google (Drive), Meta (Instagram) e LinkedIn; credencial de aplicação do WordPress | Validação manual de cada integração premium (INT-04, INT-06) | Passo 6.3 |
 | `RESEND_API_KEY` + domínio verificado | Envio real de email (os testes usam mock) | Primeiro item com email (RUN-06 ou SEC-15) |
-| `E2B_API_KEY` + chave Anthropic para o Claude Agent SDK | DEV-02 (tier DEEP) | Passo 5.0 |
+| `VERCEL_SANDBOX_TOKEN`, `VERCEL_TEAM_ID`, `VERCEL_PROJECT_ID` + chave Anthropic para o Claude Agent SDK | DEV-02 (tier DEEP) | Passo 5.0 |
 | Repositório `orbitmind-sandbox-repo` + token GitHub com escrita | DEV-06 (execução real da esteira) | Passo 7.x |
 | Conta Render (opcional) | O RUN-08 é testado com `docker-compose.prod.yml` local. Deploy real só se o Wesley pedir. | — |
 
@@ -162,12 +165,18 @@ Formato: `- [ ] passo · IDs · branch sugerida`, seguido das armadilhas especí
   - aqui entram só o padrão, a doc e a primeira página.
 - [ ] **1.4 · PERF-04, PERF-05, PERF-07, PERF-08, PERF-12**: uma branch por página.
 - [ ] **1.5 · PERF-06 · `/chat`**: markdown por `next/dynamic` e conversas sem subquery correlacionada (usa a tabela do SEC-03).
-- [ ] **1.6 · PERF-09 · `/integrations`**: catálogo com `unstable_cache` e cache negativo.
+- [ ] **1.6 · SEC-12 → INT-01 → PERF-09**: puxados para cá. O INT-01 tem exceção explícita na §6 do PRD, e o SEC-12 entra junto porque o INT-01 grava as credenciais com a cifra dele.
+  - SEC-12: `ENCRYPTION_KEY` dedicada, AES-256-GCM com formato `v1:` e `pnpm secrets:migrate`.
+  - INT-01: conexões próprias (D-15).
+    - OAuth start/callback com PKCE e `state` assinado;
+    - token/API key validado no provider;
+    - `integrationFetch` com renovação do token;
+    - remove todo o Nango: dependências, `nango-client.ts`, `generic-catalog.ts`, colunas e textos do help.
+    - Os testes usam provider OAuth mockado. A validação manual com o GitHub real pede o OAuth App (§6).
+  - Depois o PERF-09: `/integrations` no padrão, com catálogo local e estático, status das conexões lido no servidor e nenhuma requisição externa.
 - [ ] **1.7 · PERF-13, PERF-14, PERF-15, PERF-16**: link direto, onboarding no layout server, fim do `SessionProvider` e fim do `window.location`/`<a href>` (com regra de lint).
 - [ ] **1.8 · PERF-18, PERF-19, PERF-20, PERF-21, PERF-22**: cache por tags de org, fontes da landing, `sideEffects` no shared e remoção de `/public/office/sprites` (antes, confirme por grep que nada usa).
-- [ ] **1.9 · INT-01 → PERF-10**: puxados para cá pela exceção da §6 do PRD.
-  - INT-01: `connectionId` real do Nango, testado com Nango mockado. A validação manual pede as chaves Nango (§6).
-  - Depois o PERF-10 (`/pipeline` com `Promise.all`, limite 4 e cache por org).
+- [ ] **1.9 · PERF-10 · `/pipeline`**: listagem só com metadados, YAML sob demanda, `Promise.all` com limite 4 e cache por org. Usa a credencial do GitHub do INT-01 (1.6).
 - [ ] **1.10 · PERF-11 · `/office`**: um `dynamic`, dados por RSC, qualidade adaptativa e prefetch no hover.
   - Validação manual registrada: primeiro frame ≤ 1,5 s em build de produção, nenhuma requisição externa e `/office-preview` igual às pranchas 01, 02 e 04.
   - Com isso nenhuma `page.tsx` do dashboard tem mais `"use client"`: ligue aqui o teste do PERF-03 e marque o PERF-03.
@@ -208,10 +217,9 @@ O schema do ENG-01 vem primeiro porque `runs`, `run_steps`, `control_signal`, `c
 - [ ] **3.13 · HITL-01, HITL-02, HITL-03**: aprovar com output editado, rejeitar e devolver ao agente (reassign em DAG por BFS, 409 com ACTION no trecho).
   - Substitui a rota `revise` linear e o `parseRevisionResponse`, que ficam obsoletos.
 - [ ] **3.14 · DB-07**: seed idempotente com 2 orgs, squads válidos, marketplace executável e token de API demo.
-- [ ] **3.15 · SEC-06 a SEC-16**: segurança independente do motor. Uma branch por item ou por par.
+- [ ] **3.15 · SEC-06 a SEC-16 (menos o SEC-12, feito no 1.6)**: segurança independente do motor. Uma branch por item ou por par.
   - SEC-07 `safeFetch`;
-  - SEC-12 `ENCRYPTION_KEY` + `secrets:migrate`;
-  - SEC-13 login GitHub (pedir o OAuth App para a validação manual);
+  - SEC-13 login GitHub, com o mesmo OAuth App do INT-01;
   - SEC-15 com email via Resend (D-14).
 - [ ] **3.16 · SEC-17, SEC-18**: integração só fica `active` com confirmação do servidor; audit log em toda ação sensível (liga o `AuditLogger`).
 - [ ] **3.17 · RUN-10, RUN-11**: `/api/v1` com Bearer, input em `{{trigger.*}}` e política supervised; UI de tokens (owner).
@@ -242,7 +250,8 @@ O schema do ENG-01 vem primeiro porque `runs`, `run_steps`, `control_signal`, `c
 
 ### M5: Produto
 
-- [ ] **5.0 · DEV-01 a DEV-05**: puxados do M7 porque o SQD-02 inclui o template `dev-pipeline`. **Peça a `E2B_API_KEY` e a chave Anthropic** antes do DEV-02.
+- [ ] **5.0 · DEV-01 a DEV-05**: puxados do M7 porque o SQD-02 inclui o template `dev-pipeline`. **Peça `VERCEL_SANDBOX_TOKEN`, `VERCEL_TEAM_ID`, `VERCEL_PROJECT_ID` e a chave Anthropic** antes do DEV-02.
+  - DEV-01: porte `vercel-sandbox.provider.ts` e `null-sandbox.provider.ts` da Adalink (`apps/agents-service/src/infrastructure/modules/squads/sandbox/`), com os specs. O E2B fica de fora (D-06).
   - Se o Wesley preferir não fazer agora, o SQD-02 fica para o M7. Ele **não** é marcado sem o `dev-pipeline`.
 - [ ] **5.1 · SQD-01, SQD-02**: 13 domínios com `resolveDomainMeta` seguro; catálogo de templates, todos validados e executáveis em dry-run.
 - [ ] **5.2 · SQD-07, SQD-08, SQD-09**: biblioteca de agentes (UI), persona no prompt e na UI, grants de conector.
@@ -262,7 +271,8 @@ O schema do ENG-01 vem primeiro porque `runs`, `run_steps`, `control_signal`, `c
 - [ ] **6.1 · BLD-06, BLD-01, BLD-02, BLD-03, BLD-04, BLD-07, BLD-05**: os conversores DTO ↔ xyflow vêm primeiro.
 - [ ] **6.2 · MKT-01 a MKT-07**: o MKT-02 corrige o 500 de re-adquirir; o MKT-07 roda cada item do seed em dry-run.
 - [ ] **6.3 · INT-02 a INT-08**:
-  - INT-04: catálogo honesto. Integração não implementada aparece como "em breve" e **as classes mortas são apagadas**;
+  - INT-03: desconectar revoga o token no provider e apaga a credencial;
+  - INT-04: catálogo honesto. Cada integração premium tem conexão própria (app OAuth ou token) e ações funcionando. As outras aparecem como "em breve" e **as classes mortas são apagadas**. Peça os apps OAuth de cada provider premium (§6);
   - INT-08: Slack, Jira e Linear são implementados de verdade ou removidos. Nada de stub.
 - [ ] **6.4 · QA-02 fluxo 4** (marketplace).
 - [ ] **6.5 · Fechar M6.** **Pare e reporte.**
